@@ -38,6 +38,14 @@ npm run dev
 npm run build
 ```
 
+Запуск API в production (порт из `API_PORT`, по умолчанию 3001):
+
+```bash
+npm start
+```
+
+На сервере: `pm2 start npm --name rehearsals-api -- start`
+
 ## Google Календарь
 
 Кнопка «Google Календарь» зарезервирована для будущей интеграции. Поле `googleCalendarEventId` в модели репетиции уже предусмотрено.

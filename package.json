@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
+    "start": "tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -19,6 +20,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.17.0",
+    "tsx": "^4.20.3",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
@@ -37,7 +39,6 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "tailwindcss": "^4.3.0",
-    "tsx": "^4.20.3",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"
