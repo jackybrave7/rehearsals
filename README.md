@@ -48,6 +48,8 @@ npm start
 
 Пример конфига nginx (статика из `dist/`, `/api` → `:3001`): [`deploy/nginx.conf.example`](deploy/nginx.conf.example)
 
+Пошаговый деплой на VPS: [`deploy/README.md`](deploy/README.md)
+
 ## Google Календарь
 
 Кнопка «Google Календарь» зарезервирована для будущей интеграции. Поле `googleCalendarEventId` в модели репетиции уже предусмотрено.
