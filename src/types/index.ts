@@ -1,0 +1,224 @@
+export type ActorStatus = 'active' | 'archived';
+
+export interface Theater {
+  id: string;
+  name: string;
+  notes?: string;
+}
+
+export interface Actor {
+  id: string;
+  theaterId?: string;
+  name: string;
+  status: ActorStatus;
+  archiveReason?: string;
+  photoUrl?: string;
+  phone?: string;
+  email?: string;
+  telegramUsername?: string;
+  notes?: string;
+}
+
+export type PlayRoleKind = 'character' | 'crew' | 'technical';
+
+export interface PlayRole {
+  id: string;
+  playId: string;
+  name: string;
+  kind: PlayRoleKind;
+  order: number;
+  description?: string;
+}
+
+export interface Performance {
+  id: string;
+  playId: string;
+  name: string;
+  description?: string;
+  date?: string;
+  startTime?: string;
+  isDefault?: boolean;
+  /** @deprecated используйте description */
+  notes?: string;
+}
+
+export interface CastAssignment {
+  id: string;
+  playId: string;
+  performanceId: string;
+  roleId: string;
+  actorId: string;
+}
+
+export interface Play {
+  id: string;
+  theaterId?: string;
+  title: string;
+  author: string;
+  description?: string;
+  year?: number;
+  documentUrl?: string;
+  /** ID Google Docs, извлекается из documentUrl */
+  googleDocumentId?: string;
+  /** Когда последний раз сопоставляли якоря сцен через Google Docs API */
+  googleDocsLinksSyncedAt?: string;
+  scriptFileName?: string;
+  scriptFileDataUrl?: string;
+  scriptFileMimeType?: string;
+  scriptFileSize?: number;
+}
+
+export type SceneStatus = 'not_started' | 'in_progress' | 'ready';
+export type ScenePriority = 'high' | 'medium' | 'low';
+
+export type SceneScriptAnchorType = 'heading' | 'bookmark';
+
+/** Якорь внутри Google Docs (заголовок или закладка) */
+export interface SceneScriptAnchor {
+  type: SceneScriptAnchorType;
+  id: string;
+}
+
+export interface Scene {
+  id: string;
+  playId: string;
+  number: number;
+  title: string;
+  description?: string;
+  /** Внутренние заметки режиссёра, не попадают в Telegram актёрам */
+  directorNotes?: string;
+  estimatedMinutes?: number;
+  status: SceneStatus;
+  priority?: ScenePriority;
+  /** Роли персонажей, участвующих в сцене */
+  roleIds?: string[];
+  /** Якорь для быстрого открытия фрагмента текста в Google Docs */
+  scriptAnchor?: SceneScriptAnchor;
+}
+
+export interface Task {
+  id: string;
+  theaterId?: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  assignedActorIds: string[];
+  rehearsalId?: string;
+}
+
+export type ScheduleBlockType = 'scene' | 'task' | 'break' | 'warmup' | 'custom';
+
+export interface ScheduleBlock {
+  id: string;
+  startTime: string;
+  durationMinutes: number;
+  type: ScheduleBlockType;
+  title: string;
+  sceneId?: string;
+  taskId?: string;
+  notes?: string;
+  /** Что решили на репетиции, внутренне для истории работы */
+  decidedNotes?: string;
+  /** Что осталось сделать, внутренне для истории работы */
+  remainingNotes?: string;
+}
+
+export interface Venue {
+  id: string;
+  theaterId?: string;
+  name: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface Rehearsal {
+  id: string;
+  theaterId?: string;
+  seriesId?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  venueId?: string;
+  location?: string;
+  notes?: string;
+  playId?: string;
+  performanceId?: string;
+  sceneIds: string[];
+  taskIds: string[];
+  schedule: ScheduleBlock[];
+  actorIds: string[];
+  attendance?: Record<string, AttendanceStatus>;
+  /** Порядок участников в списке репетиции (все потенциальные, не только отмеченные) */
+  participantOrder?: string[];
+  googleCalendarEventId?: string;
+  /** Скрытые пользователем предупреждения перед репетицией */
+  dismissedWarningIds?: string[];
+}
+
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'substitute';
+
+export interface RehearsalTemplateBlock {
+  durationMinutes: number;
+  type: ScheduleBlock['type'];
+  title: string;
+  sceneId?: string;
+  taskId?: string;
+  notes?: string;
+  decidedNotes?: string;
+  remainingNotes?: string;
+}
+
+export interface RehearsalTemplate {
+  id: string;
+  theaterId?: string;
+  playId?: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  sceneIds: string[];
+  taskIds: string[];
+  blocks: RehearsalTemplateBlock[];
+}
+
+export interface RehearsalSeries {
+  id: string;
+  theaterId?: string;
+  playId?: string;
+  performanceId?: string;
+  venueId?: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  /** 0 = воскресенье … 6 = суббота */
+  weekday: number;
+  fromDate: string;
+  untilDate?: string;
+  templateId?: string;
+  name?: string;
+}
+
+export interface AppState {
+  theaters: Theater[];
+  activeTheaterId: string | null;
+  actors: Actor[];
+  plays: Play[];
+  activePlayId: string | null;
+  /** Последняя выбранная вкладка показа для каждой постановки */
+  selectedPerformanceByPlayId?: Record<string, string>;
+  playRoles: PlayRole[];
+  performances: Performance[];
+  castAssignments: CastAssignment[];
+  scenes: Scene[];
+  tasks: Task[];
+  venues: Venue[];
+  rehearsals: Rehearsal[];
+  /** Метки применённых миграций — хранятся вместе с данными пользователя */
+  appMeta?: {
+    stoneHeartCastVersion?: string;
+    stoneHeartScenesVersion?: string;
+    rehearsalTemplates?: RehearsalTemplate[];
+    rehearsalSeries?: RehearsalSeries[];
+    /** false — скрыть блок «Перед репетицией» на обзоре и в карточке репетиции */
+    showRehearsalWarnings?: boolean;
+  };
+}
