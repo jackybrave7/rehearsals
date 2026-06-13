@@ -46,6 +46,8 @@ npm start
 
 На сервере: `pm2 start npm --name rehearsals-api -- start`
 
+Пример конфига nginx (статика из `dist/`, `/api` → `:3001`): [`deploy/nginx.conf.example`](deploy/nginx.conf.example)
+
 ## Google Календарь
 
 Кнопка «Google Календарь» зарезервирована для будущей интеграции. Поле `googleCalendarEventId` в модели репетиции уже предусмотрено.
