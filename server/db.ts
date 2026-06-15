@@ -75,6 +75,10 @@ export function getDb(): AppDatabase {
     `ALTER TABLE rehearsals ADD COLUMN dismissed_warning_ids TEXT NOT NULL DEFAULT '[]'`,
     `ALTER TABLE schedule_blocks ADD COLUMN decided_notes TEXT`,
     `ALTER TABLE schedule_blocks ADD COLUMN remaining_notes TEXT`,
+    `ALTER TABLE theaters ADD COLUMN owner_user_id TEXT REFERENCES users(id)`,
+    `ALTER TABLE scenes ADD COLUMN script_character_count INTEGER`,
+    `ALTER TABLE scenes ADD COLUMN script_character_count_synced_at TEXT`,
+    `ALTER TABLE schedule_blocks ADD COLUMN completed INTEGER`,
   ]) {
     try {
       db.exec(migration);
@@ -87,9 +91,19 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_plays_theater_id ON plays(theater_id)`,
     `CREATE INDEX IF NOT EXISTS idx_actors_theater_id ON actors(theater_id)`,
     `CREATE INDEX IF NOT EXISTS idx_rehearsals_theater_id ON rehearsals(theater_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_theater_members_user_id ON theater_members(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_theaters_owner_user_id ON theaters(owner_user_id)`,
   ]) {
     db.exec(indexSql);
   }
+
+  db.prepare(
+    `INSERT OR IGNORE INTO theater_members (theater_id, user_id, role, created_at)
+     SELECT id, owner_user_id, 'owner', datetime('now')
+     FROM theaters
+     WHERE owner_user_id IS NOT NULL`
+  ).run();
 
   dbInstance = wrapDatabase(db);
   return dbInstance;

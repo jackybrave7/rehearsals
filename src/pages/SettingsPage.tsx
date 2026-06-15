@@ -1,7 +1,14 @@
-import { Check, Palette, Sparkles, AlertTriangle } from 'lucide-react';
+import { Check, Palette, Sparkles, AlertTriangle, LogOut, Clock } from 'lucide-react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { getShowRehearsalWarnings } from '../store/selectors';
+import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
+import { Input } from '../components/FormFields';
+import {
+  DEFAULT_SCENE_TIMING_SETTINGS,
+  resolveSceneTimingSettings,
+} from '../utils/sceneTiming';
 
 const options: Array<{
   id: AppDesign;
@@ -27,7 +34,22 @@ const options: Array<{
 export function SettingsPage() {
   const { design, setDesign } = useDesign();
   const { state, dispatch } = useRehearsalStore();
+  const { user, logout } = useAuth();
   const showRehearsalWarnings = getShowRehearsalWarnings(state);
+  const sceneTiming = resolveSceneTimingSettings(state.appMeta);
+
+  const updateSceneTiming = (patch: Partial<typeof sceneTiming>) => {
+    dispatch({
+      type: 'UPDATE_APP_META',
+      payload: {
+        sceneTiming: {
+          ...state.appMeta?.sceneTiming,
+          ...sceneTiming,
+          ...patch,
+        },
+      },
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -96,6 +118,97 @@ export function SettingsPage() {
         <p className="text-xs text-muted/80">
           Выбор сохраняется на этом устройстве. Переключение применяется сразу, без перезагрузки.
         </p>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+          <LogOut size={16} />
+          Аккаунт
+        </div>
+        <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+          <p className="text-sm text-muted">Вы вошли как</p>
+          <p className="mt-1 text-lg font-medium text-white">{user?.name || user?.email}</p>
+          <p className="text-sm text-muted">{user?.email}</p>
+          <button
+            type="button"
+            onClick={() => void logout().then(() => {
+              window.location.href = '/login';
+            })}
+            className="mt-4 rounded-xl border border-gold/20 px-4 py-2 text-sm text-gold-light transition-colors hover:bg-gold/10"
+          >
+            Выйти
+          </button>
+        </div>
+      </section>
+
+      <TheaterMembersPanel />
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+          <Clock size={16} />
+          Хронометраж сцен
+        </div>
+        <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5 space-y-4">
+          <p className="text-sm leading-relaxed text-muted">
+            Прогноз по печатным знакам с пробелами. Если у сцены есть текст из Google Docs — он
+            точнее описания. По умолчанию: 1 авторский лист ={' '}
+            {DEFAULT_SCENE_TIMING_SETTINGS.charsPerAuthorPage.toLocaleString('ru-RU')} зн.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Знаков в авторском листе"
+              type="number"
+              min={500}
+              step={100}
+              value={sceneTiming.charsPerAuthorPage}
+              onChange={(event) =>
+                updateSceneTiming({
+                  charsPerAuthorPage: Number(event.target.value) || DEFAULT_SCENE_TIMING_SETTINGS.charsPerAuthorPage,
+                })
+              }
+            />
+            <Input
+              label="Минут спектакля на 1 а.л."
+              type="number"
+              min={0.5}
+              step={0.5}
+              value={sceneTiming.performanceMinutesPerAuthorPage}
+              onChange={(event) =>
+                updateSceneTiming({
+                  performanceMinutesPerAuthorPage:
+                    Number(event.target.value) ||
+                    DEFAULT_SCENE_TIMING_SETTINGS.performanceMinutesPerAuthorPage,
+                })
+              }
+            />
+            <Input
+              label="Множитель для репетиции"
+              type="number"
+              min={1}
+              step={0.5}
+              value={sceneTiming.rehearsalMultiplier}
+              onChange={(event) =>
+                updateSceneTiming({
+                  rehearsalMultiplier:
+                    Number(event.target.value) || DEFAULT_SCENE_TIMING_SETTINGS.rehearsalMultiplier,
+                })
+              }
+            />
+          </div>
+          <label className="flex cursor-pointer items-start gap-4 rounded-xl border border-gold/10 bg-black/20 p-4">
+            <input
+              type="checkbox"
+              checked={sceneTiming.autoFillRehearsalMinutes}
+              onChange={(event) =>
+                updateSceneTiming({ autoFillRehearsalMinutes: event.target.checked })
+              }
+              className="mt-1 h-4 w-4 rounded border-gold/30 accent-gold"
+            />
+            <span className="min-w-0 text-sm text-muted">
+              При подсчёте знаков из Google Docs автоматически подставлять «На репетицию (мин)»
+            </span>
+          </label>
+        </div>
       </section>
 
       <section className="space-y-4">

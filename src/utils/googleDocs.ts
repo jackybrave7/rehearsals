@@ -190,6 +190,8 @@ interface GoogleDocsParagraph {
 }
 
 export interface GoogleDocsStructuralElement {
+  startIndex?: number;
+  endIndex?: number;
   paragraph?: GoogleDocsParagraph;
 }
 
@@ -323,4 +325,91 @@ export function matchScenesToDocAnchors(
       sortedScenes.findIndex((scene) => scene.id === a.sceneId) -
       sortedScenes.findIndex((scene) => scene.id === b.sceneId)
   );
+}
+
+function findAnchorStartIndex(
+  document: GoogleDocsDocument,
+  anchor: SceneScriptAnchor
+): number | null {
+  for (const element of document.body?.content ?? []) {
+    if (element.startIndex === undefined) continue;
+    const paragraph = element.paragraph;
+    if (!paragraph) continue;
+
+    if (anchor.type === 'heading' && paragraph.paragraphStyle?.headingId === anchor.id) {
+      return element.startIndex;
+    }
+
+    for (const item of paragraph.elements ?? []) {
+      const link = item.textRun?.textStyle?.link;
+      if (anchor.type === 'heading' && link?.heading?.id === anchor.id) {
+        return element.startIndex;
+      }
+      if (anchor.type === 'bookmark' && link?.bookmark?.id === anchor.id) {
+        return element.startIndex;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractPlainTextInRange(
+  document: GoogleDocsDocument,
+  rangeStart: number,
+  rangeEnd: number
+): string {
+  const parts: string[] = [];
+
+  for (const element of document.body?.content ?? []) {
+    const elementStart = element.startIndex ?? 0;
+    const elementEnd = element.endIndex ?? 0;
+    if (elementEnd <= rangeStart || elementStart >= rangeEnd) continue;
+
+    const paragraph = element.paragraph;
+    if (!paragraph) continue;
+
+    parts.push(
+      (paragraph.elements ?? [])
+        .map((item) => item.textRun?.content ?? '')
+        .join('')
+    );
+  }
+
+  return parts.join('');
+}
+
+/** Подсчёт знаков текста сцены между заголовками в Google Docs. */
+export function countSceneCharactersFromGoogleDoc(
+  document: GoogleDocsDocument,
+  scenes: Scene[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const docEnd =
+    document.body?.content?.[document.body.content.length - 1]?.endIndex ?? 0;
+
+  const positioned = scenes
+    .filter((scene) => scene.scriptAnchor)
+    .map((scene) => ({
+      sceneId: scene.id,
+      anchor: scene.scriptAnchor!,
+      startIndex: findAnchorStartIndex(document, scene.scriptAnchor!),
+    }))
+    .filter((entry): entry is typeof entry & { startIndex: number } => entry.startIndex !== null)
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  for (let index = 0; index < positioned.length; index += 1) {
+    const current = positioned[index];
+    const headingEnd =
+      document.body?.content?.find((element) => element.startIndex === current.startIndex)
+        ?.endIndex ?? current.startIndex;
+    const nextStart = positioned[index + 1]?.startIndex ?? docEnd;
+    const text = extractPlainTextInRange(document, headingEnd, nextStart);
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length > 0) {
+      counts.set(current.sceneId, normalized.length);
+    }
+  }
+
+  return counts;
 }

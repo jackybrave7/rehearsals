@@ -1,11 +1,17 @@
 import type { AppState } from '../types';
 import { API_BASE } from './apiBase';
 
+/** Запросы к API с cookie-сессией. */
+const fetchOptions: RequestInit = { credentials: 'include' };
+
 async function parseSaveError(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as { error?: string; message?: string };
     if (data.error === 'WOULD_LOSE_USER_DATA') {
       return 'WOULD_LOSE_USER_DATA';
+    }
+    if (data.error === 'FORBIDDEN') {
+      return 'FORBIDDEN';
     }
     return data.message ?? data.error ?? `SAVE_STATE_${response.status}`;
   } catch {
@@ -14,7 +20,8 @@ async function parseSaveError(response: Response): Promise<string> {
 }
 
 export async function fetchAppState(): Promise<AppState | null> {
-  const response = await fetch(`${API_BASE}/state`);
+  const response = await fetch(`${API_BASE}/state`, fetchOptions);
+  if (response.status === 401) throw new Error('AUTH_REQUIRED');
   if (response.status === 404) return null;
   if (!response.ok) {
     throw new Error(`FETCH_STATE_${response.status}`);
@@ -31,6 +38,7 @@ export async function saveAppState(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(state),
     keepalive: options?.keepalive ?? false,
+    credentials: 'include',
   });
   if (!response.ok) {
     throw new Error(await parseSaveError(response));
@@ -61,7 +69,7 @@ export async function saveAppStateWithRetry(
 
 export async function checkApiHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/health`);
+    const response = await fetch(`${API_BASE}/health`, fetchOptions);
     if (!response.ok) return false;
     const data = (await response.json()) as { ok?: boolean; db?: string };
     return data.ok === true && typeof data.db === 'string' && data.db.length > 0;
@@ -72,7 +80,7 @@ export async function checkApiHealth(): Promise<boolean> {
 
 export async function fetchLatestBackupState(): Promise<AppState | null> {
   try {
-    const response = await fetch(`${API_BASE}/state/backups/latest`);
+    const response = await fetch(`${API_BASE}/state/backups/latest`, fetchOptions);
     if (response.status === 404) return null;
     if (!response.ok) return null;
     return response.json() as Promise<AppState>;
@@ -83,7 +91,7 @@ export async function fetchLatestBackupState(): Promise<AppState | null> {
 
 export async function fetchBackupList(): Promise<string[]> {
   try {
-    const response = await fetch(`${API_BASE}/state/backups`);
+    const response = await fetch(`${API_BASE}/state/backups`, fetchOptions);
     if (!response.ok) return [];
     const data = (await response.json()) as { files?: string[] };
     return data.files ?? [];
@@ -97,6 +105,7 @@ export async function restoreBackupState(filename: string): Promise<AppState> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename }),
+    credentials: 'include',
   });
   if (!response.ok) {
     throw new Error(`RESTORE_FAILED_${response.status}`);

@@ -94,6 +94,9 @@ export interface Scene {
   roleIds?: string[];
   /** Якорь для быстрого открытия фрагмента текста в Google Docs */
   scriptAnchor?: SceneScriptAnchor;
+  /** Знаков текста сцены из Google Docs (после синхронизации) */
+  scriptCharacterCount?: number;
+  scriptCharacterCountSyncedAt?: string;
 }
 
 export interface Task {
@@ -121,6 +124,8 @@ export interface ScheduleBlock {
   decidedNotes?: string;
   /** Что осталось сделать, внутренне для истории работы */
   remainingNotes?: string;
+  /** Отметка после репетиции: выполнен пункт плана или нет (не для перерывов) */
+  completed?: boolean;
 }
 
 export interface Venue {
@@ -220,5 +225,14 @@ export interface AppState {
     rehearsalSeries?: RehearsalSeries[];
     /** false — скрыть блок «Перед репетицией» на обзоре и в карточке репетиции */
     showRehearsalWarnings?: boolean;
+    /** Коэффициенты прогноза хронометража по знакам */
+    sceneTiming?: Partial<SceneTimingSettingsMeta>;
   };
+}
+
+export interface SceneTimingSettingsMeta {
+  charsPerAuthorPage: number;
+  performanceMinutesPerAuthorPage: number;
+  rehearsalMultiplier: number;
+  autoFillRehearsalMinutes: boolean;
 }

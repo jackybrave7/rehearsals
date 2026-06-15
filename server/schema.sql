@@ -9,10 +9,43 @@ CREATE TABLE IF NOT EXISTS app_settings (
   app_meta TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  password_hash TEXT,
+  google_sub TEXT UNIQUE,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS theaters (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  notes TEXT
+  notes TEXT,
+  owner_user_id TEXT REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS theater_members (
+  theater_id TEXT NOT NULL REFERENCES theaters(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'observer')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (theater_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  active_theater_id TEXT,
+  active_play_id TEXT,
+  selected_performance_by_play_id TEXT NOT NULL DEFAULT '{}',
+  app_meta TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS plays (
@@ -91,7 +124,9 @@ CREATE TABLE IF NOT EXISTS scenes (
   status TEXT NOT NULL,
   priority TEXT,
   role_ids TEXT NOT NULL DEFAULT '[]',
-  script_anchor TEXT
+  script_anchor TEXT,
+  script_character_count INTEGER,
+  script_character_count_synced_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -137,7 +172,8 @@ CREATE TABLE IF NOT EXISTS schedule_blocks (
   notes TEXT,
   decided_notes TEXT,
   remaining_notes TEXT,
-  block_order INTEGER NOT NULL DEFAULT 0
+  block_order INTEGER NOT NULL DEFAULT 0,
+  completed INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_play_roles_play_id ON play_roles(play_id);
@@ -145,3 +181,5 @@ CREATE INDEX IF NOT EXISTS idx_performances_play_id ON performances(play_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_play_id ON scenes(play_id);
 CREATE INDEX IF NOT EXISTS idx_rehearsals_date ON rehearsals(date);
 CREATE INDEX IF NOT EXISTS idx_schedule_blocks_rehearsal_id ON schedule_blocks(rehearsal_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_theater_members_user_id ON theater_members(user_id);

@@ -41,6 +41,7 @@ import {
 import { ACTOR_PHOTOS, enrichActorPhotos } from '../utils/actorPhotos';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
+import { estimateRehearsalMinutes, resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
 import {
   mergeActorsForNewScheduleBlocks,
@@ -55,7 +56,9 @@ import {
   syncRehearsalSceneIdsFromSchedule,
 } from '../utils/scheduleSync';
 import { fetchAppState, fetchBackupList, fetchLatestBackupState, restoreBackupState, saveAppStateWithRetry, checkApiHealth, type SaveStatus } from '../api/storage';
-import { pickBestAppState, scoreAppState } from '../utils/appStateScore';
+import { scoreAppState } from '../utils/appStateScore';
+import { pickAccessibleAppState } from '../utils/appStateScope';
+import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = 'rehearsals-app';
 /** Сохранённые данные пользователя. Миграции только добавляют, не перезаписывают сцены/показы/репетиции. */
@@ -151,7 +154,7 @@ function mirrorLocalStorage(state: AppState): void {
   }
 }
 
-async function loadInitialAppState(): Promise<AppState> {
+async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<AppState> {
   const apiOk = await checkApiHealth();
   if (!apiOk) {
     throw new Error('API_UNAVAILABLE');
@@ -161,6 +164,9 @@ async function loadInitialAppState(): Promise<AppState> {
   try {
     remote = await fetchAppState();
   } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      throw error;
+    }
     console.error('[rehearsals] Ошибка чтения SQLite', error);
     throw error;
   }
@@ -174,18 +180,37 @@ async function loadInitialAppState(): Promise<AppState> {
 
   const raw = localStorage.getItem(STORAGE_KEY);
   const local = raw ? parseSavedState(raw) : null;
-  const best = pickBestAppState(remote, local, backup);
+  const best = pickAccessibleAppState(accessibleTheaterIds, remote, local, backup);
 
   if (best) {
     const bootstrapped = bootstrapAppState(best);
     const source =
       best === remote ? 'SQLite' : best === local ? 'браузера' : 'резервной копии';
+    const shouldPushToServer = best !== remote;
 
-    if (remote !== best || (remote && scoreAppState(best) > scoreAppState(remote))) {
+    if (remote && best !== remote && scoreAppState(best) > scoreAppState(remote)) {
       console.info(`[rehearsals] В SQLite менее полные данные — восстановление из ${source}`);
     }
 
-    await saveAppStateWithRetry(bootstrapped);
+    if (shouldPushToServer) {
+      try {
+        await saveAppStateWithRetry(bootstrapped);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('FORBIDDEN')) {
+          if (remote) {
+            const fromServer = bootstrapAppState(
+              pickAccessibleAppState(accessibleTheaterIds, remote, null, null) ?? remote
+            );
+            mirrorLocalStorage(fromServer);
+            return fromServer;
+          }
+          throw new Error('FORBIDDEN_RELOAD');
+        }
+        throw error;
+      }
+    }
+
     mirrorLocalStorage(bootstrapped);
     return bootstrapped;
   }
@@ -198,11 +223,20 @@ async function loadInitialAppState(): Promise<AppState> {
 
 function formatSaveError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  if (message === 'AUTH_REQUIRED') {
+    return 'Сессия истекла. Войдите снова через страницу входа.';
+  }
   if (message === 'API_UNAVAILABLE') {
     return 'База данных недоступна. Запустите restart.bat и дождитесь строки [api] http://localhost:3001';
   }
   if (message.includes('WOULD_LOSE_USER_DATA')) {
     return 'Сохранение отклонено: попытка затереть данные. Обновите страницу.';
+  }
+  if (message.includes('FORBIDDEN_RELOAD')) {
+    return 'Не удалось синхронизировать данные. Обновите страницу — права доступа уже исправлены на сервере.';
+  }
+  if (message.includes('FORBIDDEN')) {
+    return 'Недостаточно прав для сохранения изменений в этом театре.';
   }
   if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
     return 'Нет связи с базой (порт 3001). Запустите restart.bat — изменения не сохранены.';
@@ -215,8 +249,16 @@ let persistChain: Promise<void> = Promise.resolve();
 function persistToStorage(
   state: AppState,
   setSaveError: (message: string | null) => void,
-  setSaveStatus: (status: SaveStatus) => void
+  setSaveStatus: (status: SaveStatus) => void,
+  readOnly: boolean
 ): void {
+  mirrorLocalStorage(state);
+  if (readOnly) {
+    setSaveError(null);
+    setSaveStatus('saved');
+    return;
+  }
+
   setSaveStatus('saving');
   persistChain = persistChain
     .then(async () => {
@@ -585,6 +627,15 @@ type Action =
         updates: { sceneId: string; scriptAnchor?: Scene['scriptAnchor'] }[];
       };
     }
+  | {
+      type: 'APPLY_SCENE_CHARACTER_COUNTS';
+      payload: {
+        playId: string;
+        syncedAt: string;
+        applyRehearsalMinutes: boolean;
+        updates: { sceneId: string; characterCount: number }[];
+      };
+    }
   | { type: 'DELETE_SCENE'; payload: string }
   | { type: 'ADD_TASK'; payload: Task }
   | { type: 'UPDATE_TASK'; payload: Task }
@@ -823,6 +874,30 @@ function reducer(state: AppState, action: Action): AppState {
         }),
       };
     }
+    case 'APPLY_SCENE_CHARACTER_COUNTS': {
+      const updateMap = new Map(
+        action.payload.updates.map((update) => [update.sceneId, update.characterCount])
+      );
+      const settings = resolveSceneTimingSettings(state.appMeta);
+      return {
+        ...state,
+        scenes: state.scenes.map((scene) => {
+          if (scene.playId !== action.payload.playId) return scene;
+          const characterCount = updateMap.get(scene.id);
+          if (characterCount === undefined) return scene;
+          return {
+            ...scene,
+            scriptCharacterCount: characterCount,
+            scriptCharacterCountSyncedAt: action.payload.syncedAt,
+            ...(action.payload.applyRehearsalMinutes && characterCount > 0
+              ? {
+                  estimatedMinutes: estimateRehearsalMinutes(characterCount, settings),
+                }
+              : {}),
+          };
+        }),
+      };
+    }
     case 'DELETE_SCENE':
       return {
         ...state,
@@ -935,6 +1010,9 @@ function reducer(state: AppState, action: Action): AppState {
           rehearsalTemplates: (state.appMeta?.rehearsalTemplates ?? []).filter(
             (template) => template.id !== action.payload
           ),
+          rehearsalSeries: (state.appMeta?.rehearsalSeries ?? []).map((series) =>
+            series.templateId === action.payload ? { ...series, templateId: undefined } : series
+          ),
         },
       };
     case 'ADD_REHEARSAL_SERIES': {
@@ -979,6 +1057,7 @@ interface RehearsalContextValue {
   saveError: string | null;
   saveStatus: SaveStatus;
   backupFiles: string[];
+  readOnly: boolean;
   restoreLatestBackup: () => Promise<void>;
   retryConnection: () => void;
 }
@@ -986,6 +1065,7 @@ interface RehearsalContextValue {
 const RehearsalContext = createContext<RehearsalContextValue | null>(null);
 
 export function RehearsalProvider({ children }: { children: ReactNode }) {
+  const { canEditTheater, refreshSession } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -996,6 +1076,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   const saveTimerRef = useRef<number | null>(null);
   stateRef.current = state;
+  const readOnly = !canEditTheater(state.activeTheaterId);
 
   const retryConnection = () => setLoadAttempt((value) => value + 1);
 
@@ -1017,9 +1098,14 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
     setReady(false);
     setLoadError(null);
 
-    loadInitialAppState()
+    void refreshSession()
+      .then((session) => {
+        if (cancelled) return null;
+        const theaterIds = new Set(session?.theaters.map((entry) => entry.theaterId) ?? []);
+        return loadInitialAppState(theaterIds);
+      })
       .then((loaded) => {
-        if (cancelled) return;
+        if (cancelled || !loaded) return;
         dispatch({ type: 'LOAD', payload: loaded });
         setSaveStatus('saved');
         setSaveError(null);
@@ -1039,7 +1125,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loadAttempt]);
+  }, [loadAttempt, refreshSession]);
 
   useEffect(() => {
     if (!ready || loadError) return;
@@ -1050,28 +1136,28 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
 
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus);
+      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
     }, 200);
 
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
-        persistToStorage(stateRef.current, setSaveError, setSaveStatus);
+        persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
       }
     };
-  }, [state, ready, loadError]);
+  }, [state, ready, loadError, readOnly]);
 
   useEffect(() => {
     if (!ready || loadError) return;
 
     return () => {
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus);
+      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
     };
-  }, [ready, loadError]);
+  }, [ready, loadError, readOnly]);
 
   useLayoutEffect(() => {
-    if (!ready || loadError) return;
+    if (!ready || loadError || readOnly) return;
 
     const saveOnClose = () => {
       void saveAppStateWithRetry(stateRef.current, { keepalive: true, attempts: 1 })
@@ -1088,7 +1174,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('beforeunload', saveOnClose);
       window.removeEventListener('pagehide', saveOnClose);
     };
-  }, [ready, loadError]);
+  }, [ready, loadError, readOnly]);
 
   if (!ready) {
     return (
@@ -1099,21 +1185,41 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
   }
 
   if (loadError) {
+    const isPermissionError = loadError.includes('прав');
+    const isAuthError = loadError.includes('Сессия истекла');
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
         <div className="max-w-lg space-y-4">
-          <h1 className="text-xl font-semibold text-white">База данных недоступна</h1>
+          <h1 className="text-xl font-semibold text-white">
+            {isPermissionError || isAuthError ? 'Не удалось загрузить данные' : 'База данных недоступна'}
+          </h1>
           <p className="text-red-300">{loadError}</p>
-          <p className="text-sm text-muted">
-            Все данные хранятся в SQLite (<code className="rounded bg-white/5 px-1">data\rehearsals.db</code>).
-            Без API-сервера приложение не может загрузить и сохранить ваши репетиции.
-          </p>
-          <ol className="text-left text-sm text-muted">
-            <li>1. Закройте это окно браузера</li>
-            <li>2. Запустите <code className="rounded bg-white/5 px-1">restart.bat</code></li>
-            <li>3. Дождитесь строки <code className="rounded bg-white/5 px-1">[api] http://localhost:3001</code></li>
-            <li>4. Откройте <code className="rounded bg-white/5 px-1">http://localhost:3003</code></li>
-          </ol>
+          {isPermissionError ? (
+            <p className="text-sm text-muted">
+              В браузере могли остаться старые данные до входа. Нажмите «Повторить» — приложение
+              загрузит только театры, к которым у вас есть доступ.
+            </p>
+          ) : isAuthError ? (
+            <p className="text-sm text-muted">
+              <a href="/login" className="text-gold-light hover:underline">
+                Войти снова
+              </a>
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted">
+                Все данные хранятся в SQLite (
+                <code className="rounded bg-white/5 px-1">data\rehearsals.db</code>). Без API-сервера
+                приложение не может загрузить и сохранить ваши репетиции.
+              </p>
+              <ol className="text-left text-sm text-muted">
+                <li>1. Закройте это окно браузера</li>
+                <li>2. Запустите <code className="rounded bg-white/5 px-1">restart.bat</code></li>
+                <li>3. Дождитесь строки <code className="rounded bg-white/5 px-1">[api] http://localhost:3001</code></li>
+                <li>4. Откройте <code className="rounded bg-white/5 px-1">http://localhost:3003</code></li>
+              </ol>
+            </>
+          )}
           <button
             type="button"
             onClick={retryConnection}
@@ -1136,6 +1242,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
         saveError,
         saveStatus,
         backupFiles,
+        readOnly,
         restoreLatestBackup,
         retryConnection,
       }}

@@ -3,8 +3,9 @@ import { Link2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useGoogleDocsAuth } from '../hooks/useGoogleDocsAuth';
-import { syncSceneAnchorsFromGoogleDoc, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
+import { syncSceneAnchorsFromGoogleDoc, syncSceneCharacterCountsFromGoogleDoc, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
 import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc } from '../utils/googleDocs';
+import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { Button } from './Button';
 
 interface GoogleDocsLinksPanelProps {
@@ -25,7 +26,7 @@ function formatSyncDate(value: string | undefined): string | null {
 }
 
 export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps) {
-  const { dispatch } = useRehearsalStore();
+  const { state, dispatch } = useRehearsalStore();
   const auth = useGoogleDocsAuth();
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -33,6 +34,10 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
   const linkedCount = useMemo(
     () => scenes.filter((scene) => scene.scriptAnchor).length,
+    [scenes]
+  );
+  const countedCount = useMemo(
+    () => scenes.filter((scene) => scene.scriptCharacterCount && scene.scriptCharacterCount > 0).length,
     [scenes]
   );
 
@@ -45,6 +50,31 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
   const syncedAtLabel = formatSyncDate(play.googleDocsLinksSyncedAt);
   const likelyOfficeUpload = isLikelyUploadedOfficeDoc(play.documentUrl);
+
+  const applyCharacterCounts = async (scenesForCount: Scene[], token: string): Promise<number> => {
+    if (!play.documentUrl) return 0;
+    const counts = await syncSceneCharacterCountsFromGoogleDoc(
+      play.documentUrl,
+      scenesForCount,
+      token
+    );
+    if (counts.size === 0) return 0;
+
+    const settings = resolveSceneTimingSettings(state.appMeta);
+    dispatch({
+      type: 'APPLY_SCENE_CHARACTER_COUNTS',
+      payload: {
+        playId: play.id,
+        syncedAt: new Date().toISOString(),
+        applyRehearsalMinutes: settings.autoFillRehearsalMinutes,
+        updates: [...counts.entries()].map(([sceneId, characterCount]) => ({
+          sceneId,
+          characterCount,
+        })),
+      },
+    });
+    return counts.size;
+  };
 
   const handleSync = async () => {
     setSyncMessage(null);
@@ -90,11 +120,57 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         },
       });
 
+      const scenesWithAnchors = scenes.map((scene) => {
+        const match = matches.find((item) => item.sceneId === scene.id);
+        return match ? { ...scene, scriptAnchor: match.anchor } : scene;
+      });
+      const counted = await applyCharacterCounts(scenesWithAnchors, token);
+
       setSyncMessage(
-        matches.length === scenes.length
+        (matches.length === scenes.length
           ? `Сопоставлено ${matches.length} из ${scenes.length} сцен (в документе ${anchorCount} заголовков).`
-          : `Сопоставлено ${matches.length} из ${scenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`
+          : `Сопоставлено ${matches.length} из ${scenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`) +
+          (counted > 0 ? ` Подсчитаны знаки для ${counted} сцен.` : '')
       );
+    } catch (error) {
+      if (error instanceof GoogleDocsClientError && error.code === 'AUTH_EXPIRED') {
+        auth.signOut();
+      }
+      setSyncError(resolveGoogleDocsSyncError(error));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCountCharacters = async () => {
+    setSyncMessage(null);
+    setSyncError(null);
+    setIsSyncing(true);
+
+    try {
+      if (!play.documentUrl) {
+        setSyncError('У постановки не указан Google Docs URL.');
+        return;
+      }
+      const token = await auth.getAccessToken();
+      if (!token) {
+        setSyncError('Не удалось получить доступ Google.');
+        return;
+      }
+
+      const anchored = scenes.filter((scene) => scene.scriptAnchor);
+      if (anchored.length === 0) {
+        setSyncError('Сначала сопоставьте сцены с заголовками документа.');
+        return;
+      }
+
+      const counted = await applyCharacterCounts(scenes, token);
+      if (counted === 0) {
+        setSyncError('Не удалось извлечь текст сцен из документа. Проверьте заголовки.');
+        return;
+      }
+
+      setSyncMessage(`Подсчитаны знаки для ${counted} сцен.`);
     } catch (error) {
       if (error instanceof GoogleDocsClientError && error.code === 'AUTH_EXPIRED') {
         auth.signOut();
@@ -117,6 +193,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             {linkedCount > 0
               ? `Привязано ${linkedCount} из ${scenes.length} сцен`
               : 'Сопоставьте сцены с заголовками документа для быстрого открытия фрагмента текста'}
+            {countedCount > 0 ? ` · хронометраж для ${countedCount} сцен` : ''}
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
         </div>
@@ -139,7 +216,14 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
                 ) : (
                   <RefreshCw size={16} />
                 )}
-                Сопоставить ссылки
+                Ссылки и хронометраж
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleCountCharacters}
+                disabled={isSyncing || linkedCount === 0}
+              >
+                Подсчитать знаки
               </Button>
               <Button variant="ghost" onClick={auth.signOut} title="Выйти из Google">
                 <LogOut size={16} />

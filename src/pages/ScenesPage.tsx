@@ -18,7 +18,9 @@ import { SceneRoleChip } from '../components/SceneRoleChip';
 import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
 import { SceneScriptLink } from '../components/SceneScriptLink';
+import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
+import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
 import { sceneMatchesCharacterFilter } from '../utils/sceneFilters';
 
@@ -273,6 +275,14 @@ export function ScenesPage() {
     );
   }
 
+  const formPreviewScene: Scene = {
+    id: editing?.id ?? 'preview',
+    playId: activePlay.id,
+    ...form,
+    scriptCharacterCount: form.scriptCharacterCount ?? editing?.scriptCharacterCount,
+  };
+  const timingSettings = resolveSceneTimingSettings(state.appMeta);
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -491,6 +501,7 @@ export function ScenesPage() {
                             {scene.description}
                           </p>
                         )}
+                        <SceneTimingHint scene={scene} appMeta={state.appMeta} compact className="mt-1" />
                         {scene.directorNotes?.trim() && (
                           <p className="mt-1 line-clamp-2 rounded-lg bg-gold/5 px-2 py-1 text-xs text-gold-light/90">
                             Режиссёр: {scene.directorNotes.trim()}
@@ -527,7 +538,7 @@ export function ScenesPage() {
                         <SceneScriptLink play={activePlay} scene={scene} compact />
                         <span
                           className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted"
-                          title="Оценочное время на репетицию"
+                          title="Время на репетицию (можно подставить прогноз из знаков)"
                         >
                           {formatDuration(scene.estimatedMinutes ?? DEFAULT_SCENE_REHEARSAL_MINUTES)}
                         </span>
@@ -612,10 +623,34 @@ export function ScenesPage() {
             placeholder="Акт 1, сц. 2 — Трактир"
           />
           <Textarea
-            label="Описание"
+            label="Описание / фрагмент текста"
             value={form.description ?? ''}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Текст сцены для прогноза хронометража (знаки с пробелами). Если есть Google Docs — точнее подсчитать оттуда."
           />
+          <div className="rounded-xl border border-gold/10 bg-black/20 p-3">
+            <SceneTimingHint scene={formPreviewScene} appMeta={state.appMeta} />
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3"
+              onClick={() =>
+                setForm({
+                  ...form,
+                  estimatedMinutes: getSuggestedRehearsalMinutes(formPreviewScene, state.appMeta),
+                })
+              }
+            >
+              Подставить прогноз в «На репетицию»
+            </Button>
+            {timingSettings.charsPerAuthorPage > 0 && (
+              <p className="mt-2 text-[11px] text-muted/70">
+                1 а.л. = {timingSettings.charsPerAuthorPage.toLocaleString('ru-RU')} зн. ·{' '}
+                {timingSettings.performanceMinutesPerAuthorPage} мин спектакль · ×
+                {timingSettings.rehearsalMultiplier} на репетицию
+              </p>
+            )}
+          </div>
           <Textarea
             label="Режиссёрские заметки (не для Telegram)"
             value={form.directorNotes ?? ''}

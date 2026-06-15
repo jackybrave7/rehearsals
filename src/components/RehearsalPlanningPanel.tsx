@@ -13,6 +13,8 @@ import {
 import { generateId } from '../utils/id';
 import { mergeActorsForSceneIds } from '../utils/rehearsalActors';
 import { Button } from './Button';
+import { DeleteButton } from './DeleteButton';
+import { useConfirmDialog } from './ConfirmDialogContext';
 import { Modal } from './Modal';
 import { Input, Select } from './FormFields';
 
@@ -22,6 +24,7 @@ interface RehearsalPlanningPanelProps {
 
 export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProps) {
   const { state, dispatch } = useRehearsalStore();
+  const { confirm } = useConfirmDialog();
   const templates = useMemo(
     () => getRehearsalTemplates(state, state.activeTheaterId),
     [state]
@@ -63,6 +66,20 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
       },
     });
     setTemplateModalOpen(false);
+  };
+
+  const deleteSelectedTemplate = async () => {
+    const template = templates.find((item) => item.id === selectedTemplateId);
+    if (!template) return;
+    const confirmed = await confirm({
+      title: `Удалить шаблон «${template.name}»?`,
+      message: 'Шаблон будет удалён без возможности восстановления.',
+      confirmLabel: 'Удалить',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    dispatch({ type: 'DELETE_REHEARSAL_TEMPLATE', payload: template.id });
+    setSelectedTemplateId('');
   };
 
   const createSeries = () => {
@@ -141,10 +158,16 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
             />
           )}
           {selectedTemplateId && (
-            <Button onClick={applyTemplate}>
-              <Wand2 size={16} />
-              Применить к этой репетиции
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={applyTemplate}>
+                <Wand2 size={16} />
+                Применить к этой репетиции
+              </Button>
+              <DeleteButton
+                label={`Удалить шаблон «${templates.find((item) => item.id === selectedTemplateId)?.name ?? ''}»`}
+                onClick={deleteSelectedTemplate}
+              />
+            </div>
           )}
           <Input
             label="Сохранить текущий план как"

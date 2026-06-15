@@ -1,4 +1,5 @@
 import {
+  countSceneCharactersFromGoogleDoc,
   extractDocTextAnchors,
   matchScenesToDocAnchors,
   parseGoogleDocumentId,
@@ -72,6 +73,20 @@ export async function syncSceneAnchorsFromGoogleDoc(
   const matches = matchScenesToDocAnchors(scenes, docAnchors);
 
   return { matches, anchorCount: docAnchors.length };
+}
+
+export async function syncSceneCharacterCountsFromGoogleDoc(
+  documentUrl: string,
+  scenes: Scene[],
+  accessToken: string
+): Promise<Map<string, number>> {
+  const documentId = parseGoogleDocumentId(documentUrl);
+  if (!documentId) {
+    throw new GoogleDocsClientError('INVALID_URL');
+  }
+
+  const document = await fetchGoogleDocument(documentId, accessToken);
+  return countSceneCharactersFromGoogleDoc(document, scenes);
 }
 
 export function resolveGoogleDocsSyncError(error: unknown): string {

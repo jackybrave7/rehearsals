@@ -23,8 +23,23 @@ declare namespace google.accounts.oauth2 {
   function revoke(accessToken: string, done?: () => void): void;
 }
 
+declare namespace google.accounts.id {
+  interface CredentialResponse {
+    credential: string;
+  }
+
+  interface IdConfiguration {
+    client_id: string;
+    callback: (response: CredentialResponse) => void;
+  }
+
+  function initialize(config: IdConfiguration): void;
+  function renderButton(parent: HTMLElement, options: Record<string, unknown>): void;
+}
+
 declare namespace google.accounts {
   const oauth2: typeof google.accounts.oauth2;
+  const id: typeof google.accounts.id;
 }
 
 declare const google: {

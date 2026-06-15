@@ -66,14 +66,12 @@ import { Modal } from '../components/Modal';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
-import { ExpectedAttendeesPanel } from '../components/ExpectedAttendeesPanel';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalCalendarActions } from '../components/RehearsalCalendarActions';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
 import {
   dismissRehearsalWarning,
   getActorScheduleConflicts,
-  getExpectedAttendees,
   getRehearsalWarnings,
 } from '../utils/rehearsalInsights';
 import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
@@ -103,7 +101,7 @@ const attendanceColors: Record<AttendanceStatus, string> = {
 
 export function RehearsalDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { confirm } = useConfirmDialog();
   const navigate = useNavigate();
   const rehearsal = state.rehearsals.find((r) => r.id === id);
@@ -135,12 +133,11 @@ export function RehearsalDetailPage() {
 
   const rehearsalInsights = useMemo(() => {
     if (!rehearsal) {
-      return { warnings: [], conflicts: [], attendees: [] };
+      return { warnings: [], conflicts: [] };
     }
     return {
       warnings: getRehearsalWarnings(state, rehearsal),
       conflicts: getActorScheduleConflicts(state, rehearsal),
-      attendees: getExpectedAttendees(state, rehearsal),
     };
   }, [state, rehearsal]);
 
@@ -487,7 +484,6 @@ export function RehearsalDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
-          <ExpectedAttendeesPanel attendees={rehearsalInsights.attendees} />
           {participantActors.length > 0 && (
             <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
               <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
@@ -641,6 +637,7 @@ export function RehearsalDetailPage() {
             onAddBlock={openAddBlock}
             onEditBlock={openEditBlock}
             onDeleteBlock={deleteBlock}
+            readOnly={readOnly}
           />
         </div>
       </div>

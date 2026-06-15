@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
+import { useForceZenTheme } from '../hooks/useForceZenTheme';
 import {
   ArrowRight,
   CalendarDays,
@@ -9,7 +10,6 @@ import {
   Layers,
   MessageCircle,
   Sparkles,
-  Theater,
   Users,
   X,
 } from 'lucide-react';
@@ -115,30 +115,32 @@ function ComparisonCell({ value }: { value: boolean | 'partial' }) {
 }
 
 export function MarketingPage() {
+  useForceZenTheme();
+
   return (
-    <div className="marketing-page min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 border-b border-gold/10 bg-background/85 backdrop-blur-xl">
+    <div className="marketing-page zen-page min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <Link to="/" className="flex items-center gap-2.5 text-foreground no-underline">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gold/25 bg-gold/10">
-              <Theater size={18} className="text-gold" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-sm font-bold">
+              Р
             </span>
             <span className="text-lg font-semibold tracking-tight">Репетиции</span>
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-muted sm:flex">
-            <a href="#features" className="transition-colors hover:text-gold-light">
+            <a href="#features" className="transition-colors hover:text-foreground">
               Возможности
             </a>
-            <a href="#how" className="transition-colors hover:text-gold-light">
+            <a href="#how" className="transition-colors hover:text-foreground">
               Как это работает
             </a>
-            <a href="#compare" className="transition-colors hover:text-gold-light">
+            <a href="#compare" className="transition-colors hover:text-foreground">
               Сравнение
             </a>
           </nav>
           <Link
             to={appPaths.home}
-            className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-gold-light"
+            className="zen-primary-btn inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
           >
             Открыть приложение
             <ArrowRight size={16} />
@@ -150,21 +152,21 @@ export function MarketingPage() {
         {/* Hero */}
         <section className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
           <div
-            className="pointer-events-none absolute inset-0 opacity-40"
+            className="pointer-events-none absolute inset-0 opacity-50"
             style={{
               background:
-                'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,169,98,0.18), transparent 70%)',
+                'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(224, 74, 18, 0.12), transparent 70%)',
             }}
           />
           <div className="relative mx-auto max-w-4xl text-center">
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/5 px-4 py-1.5 text-sm text-gold-light">
-              <Sparkles size={14} />
+            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-sm text-muted">
+              <Sparkles size={14} className="text-accent" />
               Планировщик постановки для театральных коллективов
             </p>
-            <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
               От сцены в Google Docs —
               <br />
-              <span className="text-gold">до сообщения в Telegram</span>
+              <span className="text-accent">до сообщения в Telegram</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted sm:text-xl">
               Репетиции — для режиссёра, который ведёт постановку сам: сцены, состав, почасовой план
@@ -173,14 +175,14 @@ export function MarketingPage() {
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 to={appPaths.home}
-                className="inline-flex items-center gap-2 rounded-xl bg-gold px-8 py-3.5 text-base font-semibold text-background transition-colors hover:bg-gold-light"
+                className="zen-primary-btn inline-flex items-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold transition-colors"
               >
                 Начать бесплатно
                 <ArrowRight size={18} />
               </Link>
               <a
                 href="#how"
-                className="inline-flex items-center gap-2 rounded-xl border border-gold/25 px-8 py-3.5 text-base font-medium text-gold-light transition-colors hover:bg-gold/10"
+                className="inline-flex items-center gap-2 rounded-xl border border-border px-8 py-3.5 text-base font-medium text-foreground transition-colors hover:bg-black/5"
               >
                 Как это работает
               </a>
@@ -343,7 +345,7 @@ export function MarketingPage() {
             </p>
             <Link
               to={appPaths.home}
-              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-gold px-10 py-4 text-base font-semibold text-background transition-colors hover:bg-gold-light"
+              className="zen-primary-btn mt-8 inline-flex items-center gap-2 rounded-xl px-10 py-4 text-base font-semibold transition-colors"
             >
               Открыть Репетиции
               <ArrowRight size={18} />

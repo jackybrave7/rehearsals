@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Check,
   CheckSquare,
   Coffee,
   Clock,
@@ -9,6 +10,7 @@ import {
   Plus,
   Sparkles,
   Wand2,
+  X,
 } from 'lucide-react';
 import type { Play, Rehearsal, Scene, ScheduleBlock, ScheduleBlockType, Task } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -30,6 +32,11 @@ import {
   recalculateScheduleStartTimes,
   setPlanScheduleDragData,
 } from '../utils/schedulePlan';
+import {
+  canMarkBlockCompletion,
+  canMarkScheduleCompletion,
+  getScheduleCompletionStats,
+} from '../utils/rehearsalScheduleCompletion';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
   scene: 'Сцена',
@@ -64,6 +71,7 @@ interface RehearsalScheduleEditorProps {
   onAddBlock: () => void;
   onEditBlock: (block: ScheduleBlock) => void;
   onDeleteBlock: (blockId: string) => void;
+  readOnly?: boolean;
 }
 
 export function RehearsalScheduleEditor({
@@ -75,6 +83,7 @@ export function RehearsalScheduleEditor({
   onAddBlock,
   onEditBlock,
   onDeleteBlock,
+  readOnly = false,
 }: RehearsalScheduleEditorProps) {
   const { state } = useRehearsalStore();
   const { confirm } = useConfirmDialog();
@@ -91,6 +100,8 @@ export function RehearsalScheduleEditor({
   const exceedsWindow =
     sortedSchedule.length > 0 &&
     timeToMinutes(planEndTime) > timeToMinutes(rehearsal.endTime);
+  const showCompletionMarks = canMarkScheduleCompletion(rehearsal);
+  const completionStats = getScheduleCompletionStats(sortedSchedule);
 
   const applySchedule = (schedule: ScheduleBlock[]) => {
     onScheduleChange(recalculateScheduleStartTimes(schedule, rehearsal.startTime));
@@ -164,6 +175,19 @@ export function RehearsalScheduleEditor({
     setPlanScheduleDragData(event, blockId);
   };
 
+  const setBlockCompletion = (blockId: string, completed: boolean) => {
+    applySchedule(
+      sortedSchedule.map((block) => {
+        if (block.id !== blockId) return block;
+        if (block.completed === completed) {
+          const { completed: _removed, ...rest } = block;
+          return rest;
+        }
+        return { ...block, completed };
+      })
+    );
+  };
+
   const renderInsertSlot = (index: number) => {
     const active = dragOverIndex === index;
     return (
@@ -193,6 +217,16 @@ export function RehearsalScheduleEditor({
               {exceedsWindow && (
                 <span className="ml-2 text-amber-300">выходит за {rehearsal.endTime}</span>
               )}
+              {showCompletionMarks && completionStats.total > 0 && (
+                <span className="ml-2 text-muted/90">
+                  · отмечено {completionStats.done}/{completionStats.total}
+                </span>
+              )}
+            </p>
+          )}
+          {showCompletionMarks && completionStats.total > 0 && (
+            <p className="mt-1 text-xs text-muted">
+              Итог появится после окончания каждого блока; повторное нажатие снимает отметку
             </p>
           )}
         </div>
@@ -253,6 +287,9 @@ export function RehearsalScheduleEditor({
               ? getSceneCharacterNames(state, blockScene)
               : [];
             const dropActive = dragOverIndex === index + 1;
+            const canComplete = canMarkBlockCompletion(rehearsal, block);
+            const isDone = block.completed === true;
+            const isNotDone = block.completed === false;
 
             return (
               <div key={block.id}>
@@ -263,7 +300,7 @@ export function RehearsalScheduleEditor({
                     dropActive
                       ? 'border-gold/40 ring-1 ring-gold/30'
                       : 'border-gold/10'
-                  }`}
+                  } ${isDone ? 'bg-emerald-950/20' : ''} ${isNotDone ? 'bg-red-950/10' : ''}`}
                   onDragEnter={(event) => handleDragOver(event, index + 1)}
                   onDragOver={(event) => handleDragOver(event, index + 1)}
                   onDrop={(event) => handleDropAt(event, index + 1)}
@@ -310,6 +347,39 @@ export function RehearsalScheduleEditor({
                         <p className="schedule-block-meta inline-flex rounded-full bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-muted">
                           {blockTypeLabels[block.type]}
                         </p>
+                        {canComplete && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted">Итог:</span>
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => setBlockCompletion(block.id, true)}
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                isDone
+                                  ? 'bg-emerald-500/25 text-emerald-200 ring-1 ring-emerald-500/40'
+                                  : 'bg-white/5 text-muted hover:bg-emerald-500/10 hover:text-emerald-200'
+                              } ${readOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                              title="Сделано"
+                            >
+                              <Check size={12} />
+                              Сделано
+                            </button>
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => setBlockCompletion(block.id, false)}
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                isNotDone
+                                  ? 'bg-red-500/20 text-red-200 ring-1 ring-red-500/35'
+                                  : 'bg-white/5 text-muted hover:bg-red-500/10 hover:text-red-200'
+                              } ${readOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                              title="Не сделано"
+                            >
+                              <X size={12} />
+                              Нет
+                            </button>
+                          </div>
+                        )}
                         {block.notes && (
                           <p className="text-sm leading-relaxed text-muted">{block.notes}</p>
                         )}

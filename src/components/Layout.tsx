@@ -5,12 +5,16 @@ import { WorkContextBar } from './WorkContextBar';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
+import { ReadOnlyBanner } from './ReadOnlyBanner';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
-  const { saveError, saveStatus } = useRehearsalStore();
+  const { saveError, saveStatus, readOnly } = useRehearsalStore();
 
-  const message =
-    saveStatus === 'saving'
+  const message = readOnly
+    ? compact
+      ? 'Только просмотр'
+      : 'Режим наблюдателя · изменения не сохраняются'
+    : saveStatus === 'saving'
       ? compact
         ? 'Сохранение…'
         : 'Сохранение в базу…'
@@ -75,13 +79,24 @@ export function Layout() {
   const { isZen } = useDesign();
 
   if (isZen) {
-    return <ZenShell statusBar={<StatusBar compact />} recoveryBar={<RecoveryBar />} />;
+    return (
+      <ZenShell
+        statusBar={<StatusBar compact />}
+        recoveryBar={
+          <>
+            <ReadOnlyBanner />
+            <RecoveryBar />
+          </>
+        }
+      />
+    );
   }
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 overflow-auto">
+        <ReadOnlyBanner />
         <StatusBar />
         <RecoveryBar />
         <WorkContextBar variant="theater" />
