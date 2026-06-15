@@ -56,17 +56,13 @@ import {
 } from '../utils/scheduleSync';
 import { fetchAppState, fetchBackupList, fetchLatestBackupState, restoreBackupState, saveAppStateWithRetry, checkApiHealth, type SaveStatus } from '../api/storage';
 import { scoreAppState } from '../utils/appStateScore';
-import { pickAccessibleAppState } from '../utils/appStateScope';
+import { pickAccessibleAppState, createEmptyAppState } from '../utils/appStateScope';
 import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = 'rehearsals-app';
 /** Сохранённые данные пользователя. Миграции только добавляют, не перезаписывают сцены/показы/репетиции. */
 const STONE_HEART_CAST_KEY = 'stone-heart-cast-version';
 const STONE_HEART_SCENES_KEY = 'stone-heart-scenes-version';
-
-function createDefaultTheaterName(state: Partial<AppState>): string {
-  return state.plays?.[0]?.title ? `Театр: ${state.plays[0].title}` : 'Мой театр';
-}
 
 function touchAppMeta(
   state: AppState,
@@ -101,10 +97,11 @@ function hasPlaySceneData(state: AppState, playId: string): boolean {
 }
 
 function ensureTheaterScope(state: AppState): AppState {
-  const theaters =
-    state.theaters.length > 0
-      ? state.theaters
-      : [{ id: generateId(), name: createDefaultTheaterName(state) }];
+  if (state.theaters.length === 0) {
+    return { ...state, activeTheaterId: null, activePlayId: null };
+  }
+
+  const theaters = state.theaters;
   const activeTheaterId =
     state.activeTheaterId && theaters.some((theater) => theater.id === state.activeTheaterId)
       ? state.activeTheaterId
@@ -207,14 +204,18 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
         await saveAppStateWithRetry(bootstrapped);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const isConflict =
+          message.includes('FORBIDDEN') ||
+          message.includes('UNIQUE constraint') ||
+          message.includes('SQLITE_CONSTRAINT');
+        if (isConflict && remote) {
+          const fromServer = bootstrapAppState(
+            pickAccessibleAppState(accessibleTheaterIds, remote, null, null) ?? remote
+          );
+          mirrorLocalStorage(fromServer);
+          return fromServer;
+        }
         if (message.includes('FORBIDDEN')) {
-          if (remote) {
-            const fromServer = bootstrapAppState(
-              pickAccessibleAppState(accessibleTheaterIds, remote, null, null) ?? remote
-            );
-            mirrorLocalStorage(fromServer);
-            return fromServer;
-          }
           throw new Error('FORBIDDEN_RELOAD');
         }
         throw error;
@@ -225,11 +226,13 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
     return bootstrapped;
   }
 
-  const initialTheaterId = [...accessibleTheaterIds][0];
-  if (!initialTheaterId) {
-    throw new Error('FORBIDDEN_RELOAD');
+  if (accessibleTheaterIds.size === 0) {
+    const empty = bootstrapAppState(createEmptyAppState());
+    mirrorLocalStorage(empty);
+    return empty;
   }
 
+  const initialTheaterId = [...accessibleTheaterIds][0];
   const initial = bootstrapAppState(createBlankAppState(initialTheaterId));
   try {
     await saveAppStateWithRetry(initial);
@@ -244,27 +247,43 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
   return initial;
 }
 
+function isLocalDevHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
 function formatSaveError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (message === 'AUTH_REQUIRED') {
     return 'Сессия истекла. Войдите снова через страницу входа.';
   }
   if (message === 'API_UNAVAILABLE') {
-    return 'База данных недоступна. Запустите restart.bat и дождитесь строки [api] http://localhost:3001';
+    return isLocalDevHost()
+      ? 'База данных недоступна. Запустите restart.bat и дождитесь строки [api] http://localhost:3001'
+      : 'Сервер временно недоступен. Попробуйте обновить страницу через минуту.';
+  }
+  if (message.includes('UNIQUE constraint') || message.includes('SQLITE_CONSTRAINT')) {
+    return 'Не удалось синхронизировать данные с сервером. Нажмите «Повторить подключение».';
   }
   if (message.includes('WOULD_LOSE_USER_DATA')) {
     return 'Сохранение отклонено: попытка затереть данные. Обновите страницу.';
   }
   if (message.includes('FORBIDDEN_RELOAD')) {
-    return 'Не удалось синхронизировать данные. Обновите страницу — права доступа уже исправлены на сервере.';
+    return 'Не удалось синхронизировать данные. Обновите страницу.';
   }
   if (message.includes('FORBIDDEN')) {
     return 'Недостаточно прав для сохранения изменений в этом театре.';
   }
   if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-    return 'Нет связи с базой (порт 3001). Запустите restart.bat — изменения не сохранены.';
+    return isLocalDevHost()
+      ? 'Нет связи с базой (порт 3001). Запустите restart.bat — изменения не сохранены.'
+      : 'Нет связи с сервером — изменения не сохранены. Попробуйте обновить страницу.';
   }
-  return `Не удалось записать в базу: ${message}. Проверьте, что restart.bat запущен.`;
+  if (isLocalDevHost()) {
+    return `Не удалось записать в базу: ${message}. Проверьте, что restart.bat запущен.`;
+  }
+  return `Не удалось записать в базу: ${message}`;
 }
 
 let persistChain: Promise<void> = Promise.resolve();
@@ -585,7 +604,9 @@ function migrateLegacyCast(state: AppState, legacyActors: LegacyActor[]): AppSta
 
 function ensureDefaultVenues(state: AppState): AppState {
   if (state.venues.length > 0) return state;
-  return { ...state, venues: [createDefaultVenue()] };
+  const theaterId = state.activeTheaterId ?? state.theaters[0]?.id;
+  if (!theaterId) return state;
+  return { ...state, venues: [{ ...createDefaultVenue(), theaterId }] };
 }
 
 function parseSavedState(raw: string): AppState | null {
@@ -1231,16 +1252,28 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
           ) : (
             <>
               <p className="text-sm text-muted">
-                Все данные хранятся в SQLite (
-                <code className="rounded bg-white/5 px-1">data\rehearsals.db</code>). Без API-сервера
-                приложение не может загрузить и сохранить ваши репетиции.
+                {isLocalDevHost() ? (
+                  <>
+                    Все данные хранятся в SQLite (
+                    <code className="rounded bg-white/5 px-1">data\rehearsals.db</code>). Без API-сервера
+                    приложение не может загрузить и сохранить ваши репетиции.
+                  </>
+                ) : (
+                  <>Не удалось связаться с сервером приложения. Данные на сервере в безопасности.</>
+                )}
               </p>
-              <ol className="text-left text-sm text-muted">
-                <li>1. Закройте это окно браузера</li>
-                <li>2. Запустите <code className="rounded bg-white/5 px-1">restart.bat</code></li>
-                <li>3. Дождитесь строки <code className="rounded bg-white/5 px-1">[api] http://localhost:3001</code></li>
-                <li>4. Откройте <code className="rounded bg-white/5 px-1">http://localhost:3003</code></li>
-              </ol>
+              {isLocalDevHost() ? (
+                <ol className="text-left text-sm text-muted">
+                  <li>1. Закройте это окно браузера</li>
+                  <li>2. Запустите <code className="rounded bg-white/5 px-1">restart.bat</code></li>
+                  <li>3. Дождитесь строки <code className="rounded bg-white/5 px-1">[api] http://localhost:3001</code></li>
+                  <li>4. Откройте <code className="rounded bg-white/5 px-1">http://localhost:3003</code></li>
+                </ol>
+              ) : (
+                <p className="text-sm text-muted">
+                  Нажмите «Повторить подключение» или обновите страницу. Если ошибка повторяется — выйдите и войдите снова.
+                </p>
+              )}
             </>
           )}
           <button

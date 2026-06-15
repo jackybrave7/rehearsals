@@ -11,6 +11,7 @@ import {
   MapPin,
   Pencil,
   Send,
+  UserPlus,
 } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -42,6 +43,7 @@ import {
   getTheaterTasks,
   getTheaterVenues,
   getShowRehearsalWarnings,
+  getActiveActors,
 } from '../store/selectors';
 import {
   getRehearsalParticipantActorIds,
@@ -116,6 +118,7 @@ export function RehearsalDetailPage() {
   const [telegramSent, setTelegramSent] = useState(false);
   const [draggingParticipantId, setDraggingParticipantId] = useState<string | null>(null);
   const [participantDragOverIndex, setParticipantDragOverIndex] = useState<number | null>(null);
+  const [manualParticipantId, setManualParticipantId] = useState('');
   const [editForm, setEditForm] = useState<Omit<Rehearsal, 'id'> | null>(null);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [blockForm, setBlockForm] = useState<Omit<ScheduleBlock, 'id'>>({
@@ -359,6 +362,23 @@ export function RehearsalDetailPage() {
     .map((aid) => state.actors.find((a) => a.id === aid))
     .filter(Boolean);
 
+  const theaterActorPool = getActiveActors(state).filter(
+    (actor) => !participantActorIds.includes(actor.id)
+  );
+
+  const addManualParticipant = () => {
+    if (!manualParticipantId || participantActorIds.includes(manualParticipantId)) return;
+    dispatch({
+      type: 'UPDATE_REHEARSAL',
+      payload: {
+        ...rehearsal,
+        actorIds: [...new Set([...rehearsal.actorIds, manualParticipantId])],
+        participantOrder: [...participantActorIds, manualParticipantId],
+      },
+    });
+    setManualParticipantId('');
+  };
+
   const reorderParticipants = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
     const order = [...participantActorIds];
@@ -484,15 +504,31 @@ export function RehearsalDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
-          {participantActors.length > 0 && (
-            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
+
+          {linkedScenes.length > 0 && (
+            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
               <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
-                Участники
+                Сцены ({linkedScenes.length})
               </h2>
-              <p className="mb-3 text-xs leading-relaxed text-muted">
-                Перетащите за ⋮⋮ для порядка. Статус посещаемости влияет на внутреннюю историю и
-                Telegram.
-              </p>
+              <p className="mb-3 text-xs text-muted">Перетащите в план справа</p>
+              <SceneListGrouped
+                scenes={linkedScenes}
+                play={rehearsalPlay}
+                compact
+                draggable
+              />
+            </section>
+          )}
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
+            <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
+              Участники
+            </h2>
+            <p className="mb-3 text-xs leading-relaxed text-muted">
+              Перетащите за ⋮⋮ для порядка. Добавьте замену или техника вручную. Статус посещаемости
+              влияет на историю и Telegram.
+            </p>
+            {participantActors.length > 0 ? (
               <div className="space-y-2">
                 {participantActors.map((actor, index) => {
                   const selected = rehearsal.actorIds.includes(actor!.id);
@@ -515,7 +551,7 @@ export function RehearsalDetailPage() {
                       }}
                     >
                       <div
-                        draggable
+                        draggable={!readOnly}
                         onDragStart={() => setDraggingParticipantId(actor!.id)}
                         onDragEnd={() => {
                           setDraggingParticipantId(null);
@@ -538,7 +574,8 @@ export function RehearsalDetailPage() {
                           <button
                             type="button"
                             onClick={() => toggleParticipant(actor!.id)}
-                            className="min-w-0 flex-1 text-left"
+                            disabled={readOnly}
+                            className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
                           >
                             <p className={`truncate text-sm font-semibold ${selected ? 'text-white' : 'text-foreground/80'}`}>
                               {actor!.name}
@@ -557,10 +594,11 @@ export function RehearsalDetailPage() {
                         </div>
                         <select
                           value={attendance}
+                          disabled={readOnly}
                           onChange={(event) =>
                             updateAttendance(actor!.id, event.target.value as AttendanceStatus)
                           }
-                          className={`mt-3 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${attendanceColors[attendance]}`}
+                          className={`mt-3 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${attendanceColors[attendance]}`}
                           aria-label={`Присутствие: ${actor!.name}`}
                         >
                           {Object.entries(attendanceLabels).map(([value, label]) => (
@@ -574,23 +612,46 @@ export function RehearsalDetailPage() {
                   );
                 })}
               </div>
-            </section>
-          )}
+            ) : (
+              <p className="text-sm text-muted">Пока нет участников — добавьте вручную или выберите сцены в плане.</p>
+            )}
 
-          {linkedScenes.length > 0 && (
-            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
-              <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
-                Сцены ({linkedScenes.length})
-              </h2>
-              <p className="mb-3 text-xs text-muted">Перетащите в план справа</p>
-              <SceneListGrouped
-                scenes={linkedScenes}
-                play={rehearsalPlay}
-                compact
-                draggable
-              />
-            </section>
-          )}
+            {!readOnly && (
+              <div className="mt-4 space-y-2 border-t border-gold/10 pt-4">
+                <p className="text-xs font-medium text-muted">Добавить вручную</p>
+                {theaterActorPool.length > 0 ? (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select
+                      value={manualParticipantId}
+                      onChange={(event) => setManualParticipantId(event.target.value)}
+                      className="min-w-0 flex-1 rounded-xl border border-gold/15 bg-black/20 px-3 py-2.5 text-sm text-white focus:border-gold/40 focus:outline-none"
+                    >
+                      <option value="">Выберите из состава…</option>
+                      {theaterActorPool.map((actor) => (
+                        <option key={actor.id} value={actor.id} className="bg-surface">
+                          {actor.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="shrink-0"
+                      disabled={!manualParticipantId}
+                      onClick={addManualParticipant}
+                    >
+                      <UserPlus size={16} />
+                      Добавить
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted">
+                    Все участники труппы уже в списке. Добавьте человека на странице «Участники».
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
 
           {linkedTasks.length > 0 && (
             <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">

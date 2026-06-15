@@ -1,4 +1,3 @@
-import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { ZenShell } from './zen/ZenShell';
 import { WorkContextBar } from './WorkContextBar';
@@ -6,6 +5,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
 import { ReadOnlyBanner } from './ReadOnlyBanner';
+import { NoTheaterGate } from './NoTheaterGate';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
   const { saveError, saveStatus, readOnly } = useRehearsalStore();
@@ -101,7 +101,7 @@ export function Layout() {
         <RecoveryBar />
         <WorkContextBar variant="theater" />
         <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">
-          <Outlet />
+          <NoTheaterGate />
         </div>
       </main>
     </div>

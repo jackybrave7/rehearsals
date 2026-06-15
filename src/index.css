@@ -552,6 +552,35 @@ html[data-design='zen'] .schedule-block-duration {
   color: var(--color-muted);
 }
 
+/* План по времени: на touch-устройствах кнопки всегда видны */
+.schedule-block-actions {
+  opacity: 1;
+}
+
+.schedule-block-grip {
+  opacity: 0.75;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .schedule-block-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .group:hover .schedule-block-actions {
+    opacity: 1;
+  }
+
+  .schedule-block-grip {
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+  }
+
+  .group:hover .schedule-block-grip {
+    opacity: 1;
+  }
+}
+
 html[data-design='zen'] .app-dialog {
   background: var(--color-surface);
   border-color: var(--color-border);

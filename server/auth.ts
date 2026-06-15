@@ -99,27 +99,6 @@ function assignOrphanTheaters(db: AppDatabase, userId: string) {
   }
 }
 
-function ensurePersonalTheater(db: AppDatabase, userId: string, displayName: string) {
-  const row = db
-    .prepare(`SELECT COUNT(*) AS count FROM theater_members WHERE user_id = ?`)
-    .get(userId) as { count: number };
-  if (row.count > 0) return;
-
-  const theaterId = uuidv4();
-  const now = new Date().toISOString();
-  const label = displayName.trim() || 'Мой театр';
-  const theaterName = label === 'Мой театр' ? label : `Театр: ${label}`;
-
-  db.prepare(`INSERT INTO theaters (id, name, notes, owner_user_id) VALUES (?, ?, NULL, ?)`).run(
-    theaterId,
-    theaterName,
-    userId
-  );
-  db.prepare(
-    `INSERT INTO theater_members (theater_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`
-  ).run(theaterId, userId, now);
-}
-
 function createSession(db: AppDatabase, userId: string, res: Response): AuthUser {
   const token = randomBytes(32).toString('hex');
   const sessionId = uuidv4();
@@ -205,14 +184,6 @@ export function registerAuthRoutes(app: import('express').Express) {
       res.status(401).json({ error: 'UNAUTHORIZED' });
       return;
     }
-
-    if (session.theaters.length === 0) {
-      const db = getDb();
-      ensurePersonalTheater(db, session.user.id, session.user.name);
-      res.json({ user: session.user, theaters: getUserTheaters(db, session.user.id) });
-      return;
-    }
-
     res.json(session);
   });
 
@@ -248,7 +219,6 @@ export function registerAuthRoutes(app: import('express').Express) {
     ).run(userId, email, name || email, hashPassword(password), new Date().toISOString());
 
     assignOrphanTheaters(db, userId);
-    ensurePersonalTheater(db, userId, name || email);
     const user = createSession(db, userId, res);
     res.json({ user, theaters: getUserTheaters(db, userId) });
   });
@@ -272,7 +242,6 @@ export function registerAuthRoutes(app: import('express').Express) {
     }
 
     assignOrphanTheaters(db, row.id);
-    ensurePersonalTheater(db, row.id, row.name);
     createSession(db, row.id, res);
     res.json({ user: { id: row.id, email: row.email, name: row.name }, theaters: getUserTheaters(db, row.id) });
   });
@@ -306,7 +275,6 @@ export function registerAuthRoutes(app: import('express').Express) {
       }
 
       assignOrphanTheaters(db, row.id);
-      ensurePersonalTheater(db, row.id, row.name);
       createSession(db, row.id, res);
       res.json({ user: row, theaters: getUserTheaters(db, row.id) });
     } catch (error) {

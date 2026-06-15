@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useDesign } from '../../store/DesignContext';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
+import { NoTheaterGate } from '../NoTheaterGate';
 import { appPaths } from '../../navigation/appPaths';
 import { getMainNavLabel, mainNavItems } from '../../navigation/mainNav';
 
@@ -39,7 +40,7 @@ export function ZenShell({
 
       <main className="zen-main flex-1">
         <div key={`${design}-${location.pathname}`} className="zen-page mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-6">
-          <Outlet />
+          <NoTheaterGate />
         </div>
       </main>
 

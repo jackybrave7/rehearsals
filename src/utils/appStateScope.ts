@@ -1,5 +1,24 @@
 import type { AppState } from '../types';
 
+export function createEmptyAppState(appMeta: AppState['appMeta'] = {}): AppState {
+  return {
+    theaters: [],
+    activeTheaterId: null,
+    actors: [],
+    plays: [],
+    activePlayId: null,
+    selectedPerformanceByPlayId: {},
+    playRoles: [],
+    performances: [],
+    castAssignments: [],
+    scenes: [],
+    tasks: [],
+    venues: [],
+    rehearsals: [],
+    appMeta,
+  };
+}
+
 export function isScopedAppStateEmpty(state: AppState): boolean {
   return (
     state.theaters.length === 0 &&

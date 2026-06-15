@@ -210,7 +210,7 @@ export function RehearsalScheduleEditor({
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">План по времени</h2>
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">План по времени</h2>
           {sortedSchedule.length > 0 && (
             <p className="mt-1 text-sm text-muted">
               {formatDuration(totalMinutes)} · {rehearsal.startTime} – {planEndTime}
@@ -294,7 +294,7 @@ export function RehearsalScheduleEditor({
             return (
               <div key={block.id}>
                 <div
-                  className={`group flex gap-3 rounded-xl border bg-surface/40 py-4 pl-2 pr-4 border-l-4 transition-shadow sm:gap-4 ${blockTypeColors[block.type]} ${
+                  className={`group flex flex-col gap-2 rounded-xl border bg-surface/40 py-3 pl-2 pr-3 border-l-4 transition-shadow sm:flex-row sm:gap-3 sm:py-4 sm:pr-4 ${blockTypeColors[block.type]} ${
                     isDragging ? 'opacity-40' : ''
                   } ${
                     dropActive
@@ -305,32 +305,35 @@ export function RehearsalScheduleEditor({
                   onDragOver={(event) => handleDragOver(event, index + 1)}
                   onDrop={(event) => handleDropAt(event, index + 1)}
                 >
+                  <div className="flex min-w-0 items-start gap-2 sm:contents">
                   <div
-                    draggable
-                    onDragStart={startScheduleDrag(block.id)}
+                    draggable={!readOnly}
+                    onDragStart={readOnly ? undefined : startScheduleDrag(block.id)}
                     onDragEnd={() => {
                       setDraggingId(null);
                       setDragOverIndex(null);
                     }}
                     aria-label={`Переместить блок ${block.title}`}
-                    className="mt-1 flex w-5 shrink-0 cursor-grab items-start justify-center text-muted active:cursor-grabbing"
+                    className="schedule-block-grip mt-0.5 flex w-5 shrink-0 cursor-grab items-start justify-center text-muted active:cursor-grabbing sm:mt-1"
                   >
-                    <GripVertical size={14} className="opacity-50 group-hover:opacity-100" />
+                    <GripVertical size={14} />
                   </div>
 
-                  <div className="schedule-block-time w-[5.25rem] shrink-0 space-y-0.5 pt-0.5 text-right font-mono">
+                  <div className="schedule-block-time flex min-w-0 flex-1 items-baseline gap-2 font-mono sm:block sm:w-[5.25rem] sm:shrink-0 sm:space-y-0.5 sm:pt-0.5 sm:text-right">
                     <p className="text-sm font-semibold leading-none text-gold-light">
                       {block.startTime}
                     </p>
-                    <p className="text-[10px] leading-none text-muted/70">—</p>
-                    <p className="text-xs leading-none text-muted">{endTime}</p>
-                    <p className="schedule-block-duration pt-2 text-[11px] font-medium leading-tight text-muted">
+                    <span className="text-[10px] text-muted/70 sm:hidden">—</span>
+                    <p className="text-xs leading-none text-muted sm:mt-0">{endTime}</p>
+                    <span className="hidden text-[10px] leading-none text-muted/70 sm:block">—</span>
+                    <p className="schedule-block-duration text-[11px] font-medium leading-tight text-muted sm:pt-2">
                       {formatDuration(block.durationMinutes)}
                     </p>
                   </div>
+                  </div>
 
-                  <div className="relative min-w-0 flex-1 border-l border-gold/20 pl-5 sm:pl-6">
-                    <div className="absolute -left-3.5 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-gold/30 bg-surface">
+                  <div className="relative min-w-0 flex-1 border-t border-gold/10 pt-3 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-5 md:pl-6">
+                    <div className="absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-gold/30 bg-surface sm:-left-3.5 sm:top-1">
                       <Icon size={13} className="text-gold" />
                     </div>
 
@@ -400,23 +403,46 @@ export function RehearsalScheduleEditor({
                           </div>
                         )}
                       </div>
-                      <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="schedule-block-actions hidden shrink-0 gap-0.5 sm:flex">
                         {play && blockScene && (
                           <SceneScriptLink play={play} scene={blockScene} compact />
                         )}
+                        {!readOnly && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="!px-2 !py-1"
+                              onClick={() => onEditBlock(block)}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <DeleteButton
+                              label={`Удалить блок «${block.title}»`}
+                              onClick={() => onDeleteBlock(block.id)}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <div className="schedule-block-actions mt-2 flex gap-1 sm:hidden">
+                        {play && blockScene && (
+                          <SceneScriptLink play={play} scene={blockScene} />
+                        )}
                         <Button
-                          variant="ghost"
-                          className="!px-2 !py-1"
+                          variant="secondary"
+                          className="!px-2.5 !py-1.5 text-xs"
                           onClick={() => onEditBlock(block)}
                         >
                           <Pencil size={14} />
+                          Изменить
                         </Button>
                         <DeleteButton
                           label={`Удалить блок «${block.title}»`}
                           onClick={() => onDeleteBlock(block.id)}
                         />
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
                 {renderInsertSlot(index + 1)}

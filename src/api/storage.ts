@@ -120,7 +120,9 @@ const AUTH_SCOPE_KEY = 'rehearsals-auth-user-id';
 
 export function clearAppStateCacheForUserChange(nextUserId: string | null): void {
   const previousUserId = localStorage.getItem(AUTH_SCOPE_KEY);
-  if (previousUserId && previousUserId !== (nextUserId ?? '')) {
+  const hasCachedState = localStorage.getItem(APP_STATE_CACHE_KEY) !== null;
+  const userChanged = previousUserId !== (nextUserId ?? '');
+  if (userChanged && (previousUserId || hasCachedState)) {
     localStorage.removeItem(APP_STATE_CACHE_KEY);
   }
   if (nextUserId) {
