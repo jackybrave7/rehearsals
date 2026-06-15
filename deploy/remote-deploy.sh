@@ -151,7 +151,9 @@ else
 fi
 
 echo "[deploy] git pull..."
-git pull --ff-only
+git fetch origin
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+git reset --hard "origin/${BRANCH}"
 
 if [ ! -f .env ]; then
   echo "[deploy] WARNING: .env missing. Copy from .env.example before build."
@@ -162,7 +164,14 @@ npm_build
 restart_api
 
 echo "[deploy] waiting for API..."
-sleep 5
+for i in 1 2 3 4 5 6; do
+  HEALTH=$(curl -sf "http://127.0.0.1:${API_PORT:-3001}/api/health" || true)
+  if [ -n "$HEALTH" ]; then
+    break
+  fi
+  echo "[deploy] API not ready yet, retry $i/6..."
+  sleep 5
+done
 
 echo "[deploy] health check..."
 HEALTH=$(curl -sf "http://127.0.0.1:${API_PORT:-3001}/api/health" || true)
