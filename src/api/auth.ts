@@ -83,18 +83,22 @@ export async function removeTheaterMember(theaterId: string, userId: string): Pr
 }
 
 async function parseAuthError(response: Response): Promise<string> {
-  if (response.status === 404) {
-    return 'Сервис авторизации недоступен. Перезапустите API (restart.bat) — возможно, порт 3001 занят другим приложением.';
-  }
-
   try {
     const data = (await response.json()) as { error?: string };
     if (data.error === 'INVALID_CREDENTIALS') return 'Неверный email или пароль';
     if (data.error === 'EMAIL_EXISTS') return 'Пользователь с таким email уже зарегистрирован';
-    if (data.error === 'USER_NOT_FOUND') return 'Пользователь не найден. Попросите его зарегистрироваться';
+    if (data.error === 'USER_NOT_FOUND') {
+      return 'Пользователь не найден. Попросите его зарегистрироваться на rehears.ru/login';
+    }
     if (data.error === 'INVALID_GOOGLE_TOKEN') return 'Не удалось войти через Google';
-    return data.error ?? `AUTH_${response.status}`;
+    if (data.error) return data.error;
   } catch {
-    return `AUTH_${response.status}`;
+    // ignore JSON parse errors
   }
+
+  if (response.status === 404) {
+    return 'Сервис авторизации недоступен. Перезапустите API (restart.bat) — возможно, порт 3001 занят другим приложением.';
+  }
+
+  return `AUTH_${response.status}`;
 }
