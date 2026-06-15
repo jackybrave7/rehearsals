@@ -24,7 +24,6 @@ import type {
   Theater,
   Venue,
 } from '../types';
-import { createSeedState } from '../data/seed';
 import { createDefaultVenue } from '../data/seedVenue';
 import {
   applyStoneHeartCastToState,
@@ -62,10 +61,8 @@ import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = 'rehearsals-app';
 /** Сохранённые данные пользователя. Миграции только добавляют, не перезаписывают сцены/показы/репетиции. */
-const SEED_VERSION_KEY = 'rehearsals-seed-version';
 const STONE_HEART_CAST_KEY = 'stone-heart-cast-version';
 const STONE_HEART_SCENES_KEY = 'stone-heart-scenes-version';
-const SEED_VERSION = '7';
 
 function createDefaultTheaterName(state: Partial<AppState>): string {
   return state.plays?.[0]?.title ? `Театр: ${state.plays[0].title}` : 'Мой театр';
@@ -140,18 +137,31 @@ function bootstrapAppState(data: AppState): AppState {
   return migrated;
 }
 
-function createInitialSeedState(): AppState {
-  const seeded = createSeedState();
-  localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
-  return bootstrapAppState({ ...seeded, appMeta: {} });
-}
-
 function mirrorLocalStorage(state: AppState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     console.error('[rehearsals] Ошибка записи localStorage', error);
   }
+}
+
+function createBlankAppState(theaterId: string, theaterName = 'Мой театр'): AppState {
+  return {
+    theaters: [{ id: theaterId, name: theaterName }],
+    activeTheaterId: theaterId,
+    actors: [],
+    plays: [],
+    activePlayId: null,
+    selectedPerformanceByPlayId: {},
+    playRoles: [],
+    performances: [],
+    castAssignments: [],
+    scenes: [],
+    tasks: [],
+    venues: [],
+    rehearsals: [],
+    appMeta: {},
+  };
 }
 
 async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<AppState> {
@@ -215,8 +225,21 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
     return bootstrapped;
   }
 
-  const initial = createInitialSeedState();
-  await saveAppStateWithRetry(initial);
+  const initialTheaterId = [...accessibleTheaterIds][0];
+  if (!initialTheaterId) {
+    throw new Error('FORBIDDEN_RELOAD');
+  }
+
+  const initial = bootstrapAppState(createBlankAppState(initialTheaterId));
+  try {
+    await saveAppStateWithRetry(initial);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('FORBIDDEN')) {
+      throw new Error('FORBIDDEN_RELOAD');
+    }
+    throw error;
+  }
   mirrorLocalStorage(initial);
   return initial;
 }

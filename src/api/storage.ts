@@ -114,3 +114,18 @@ export async function restoreBackupState(filename: string): Promise<AppState> {
 }
 
 export type SaveStatus = 'saved' | 'saving' | 'error';
+
+const APP_STATE_CACHE_KEY = 'rehearsals-app';
+const AUTH_SCOPE_KEY = 'rehearsals-auth-user-id';
+
+export function clearAppStateCacheForUserChange(nextUserId: string | null): void {
+  const previousUserId = localStorage.getItem(AUTH_SCOPE_KEY);
+  if (previousUserId && previousUserId !== (nextUserId ?? '')) {
+    localStorage.removeItem(APP_STATE_CACHE_KEY);
+  }
+  if (nextUserId) {
+    localStorage.setItem(AUTH_SCOPE_KEY, nextUserId);
+  } else {
+    localStorage.removeItem(AUTH_SCOPE_KEY);
+  }
+}

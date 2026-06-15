@@ -14,6 +14,7 @@ import {
   logout as logoutRequest,
   registerWithEmail,
 } from '../api/auth';
+import { clearAppStateCacheForUserChange } from '../api/storage';
 import type { AuthSessionPayload, TheaterAccessRole } from '../types/auth';
 
 interface AuthContextValue {
@@ -37,6 +38,7 @@ function applySession(
   setUser: (user: AuthSessionPayload['user'] | null) => void,
   setTheaters: (theaters: AuthSessionPayload['theaters']) => void
 ) {
+  clearAppStateCacheForUserChange(payload?.user.id ?? null);
   setUser(payload?.user ?? null);
   setTheaters(payload?.theaters ?? []);
 }
