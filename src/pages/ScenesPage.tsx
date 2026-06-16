@@ -19,6 +19,7 @@ import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
 import { SceneScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
+import { PremiereBanner } from '../components/PremiereBanner';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
@@ -309,6 +310,8 @@ export function ScenesPage() {
         </Button>
       </header>
 
+      <PremiereBanner state={state} playId={activePlay.id} />
+
       <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
 
       {sorted.length > 0 && (
@@ -558,7 +561,7 @@ export function ScenesPage() {
                             )
                           )}
                         </select>
-                        <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="card-actions flex min-h-10 gap-0.5">
                           <Button
                             variant="ghost"
                             className="!px-1.5 !py-1"

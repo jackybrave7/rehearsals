@@ -6,8 +6,10 @@ import {
   getActivePlay,
   getActiveTheater,
   getSelectedPerformance,
+  getTheaterPlays,
 } from '../store/selectors';
 import { workContextLinks } from '../navigation/workContextLinks';
+import { PlaySwitcherLabel } from './PlaySwitcher';
 
 type WorkContextBarProps = {
   variant: 'zen' | 'theater';
@@ -39,9 +41,9 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
   const activeTheater = getActiveTheater(state);
   const activePlay = getActivePlay(state);
   const performance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
+  const playCount = getTheaterPlays(state).length;
 
   const theaterValue = activeTheater?.name ?? 'Не выбран';
-  const playValue = activePlay ? `«${activePlay.title}»` : 'Не выбрана';
   const performanceValue = performance ? formatPerformanceLabel(performance) : 'Не выбран';
 
   return (
@@ -66,7 +68,15 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
           <span className="shrink-0 text-muted/40" aria-hidden>
             ·
           </span>
-          <ContextValue value={playValue} to={workContextLinks.play} muted={!activePlay} />
+          {playCount > 1 ? (
+            <PlaySwitcherLabel variant={variant} />
+          ) : (
+            <ContextValue
+              value={activePlay ? `«${activePlay.title}»` : 'Не выбрана'}
+              to={workContextLinks.play}
+              muted={!activePlay}
+            />
+          )}
           <span className="shrink-0 text-muted/40" aria-hidden>
             ·
           </span>

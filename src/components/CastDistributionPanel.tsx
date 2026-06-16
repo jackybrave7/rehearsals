@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, UserPlus, X, Copy } from 'lucide-react';
 import { DeleteButton } from './DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import {
-  formatPerformanceLabel,
-  getActiveActors,
-  getPlayPerformances,
-  getPlayRoles,
-  getRoleAssignmentsForPerformance,
-  isActorAssignedToRole,
-} from '../store/selectors';
+import { formatPerformanceLabel, getActiveActors, getPlayPerformances, getPlayRoles, getRoleAssignmentsForPerformance, isActorAssignedToRole } from '../store/selectors';
+import { formatPremiereCountdown, getUpcomingPremiere } from '../utils/premiere';
 import { generateId } from '../utils/id';
 import type { Performance, PlayRole, PlayRoleKind } from '../types';
 import { Button } from './Button';
@@ -460,6 +454,18 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                   {[
                     activePerformance.date?.split('-').reverse().join('.'),
                     activePerformance.startTime,
+                    activePerformance.date
+                      ? (() => {
+                          const premiere = getUpcomingPremiere(state, playId);
+                          if (
+                            premiere &&
+                            premiere.performance.id === activePerformance.id
+                          ) {
+                            return formatPremiereCountdown(premiere.daysLeft);
+                          }
+                          return null;
+                        })()
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')}

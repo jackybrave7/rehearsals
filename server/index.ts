@@ -5,6 +5,7 @@ import { loadEnvFile } from './env.js';
 import { isEmptyState, loadState, saveState } from './stateRepository.js';
 import { loadStateForUser, saveStateForUser } from './stateUserScope.js';
 import { registerAuthRoutes, requireAuth } from './auth.js';
+import { registerFileRoutes } from './fileRoutes.js';
 import type { AppState } from '../src/types/index.js';
 import { getTelegramConfig, sendTelegramHtmlMessage } from './telegram.js';
 import {
@@ -14,6 +15,7 @@ import {
   loadLatestBackupState,
 } from './backup.js';
 import { handleFetchGoogleDocument } from './googleDocs.js';
+import { startReminderScheduler } from './reminderScheduler.js';
 
 loadEnvFile();
 
@@ -24,6 +26,7 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '25mb' }));
 
 registerAuthRoutes(app);
+registerFileRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });
@@ -143,6 +146,7 @@ const server = app.listen(PORT, () => {
   getDb();
   console.log(`[api] SQLite: ${getDbPath()}`);
   console.log(`[api] http://localhost:${PORT}`);
+  startReminderScheduler();
 });
 
 function shutdown() {

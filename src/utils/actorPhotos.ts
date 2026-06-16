@@ -17,7 +17,9 @@ const LOCAL_PHOTOS: Record<string, string> = {
 };
 
 export function resolveActorPhotoUrl(name: string, photoUrl?: string): string | undefined {
-  if (photoUrl?.startsWith('/images/')) return photoUrl;
+  if (photoUrl?.startsWith('/images/') || photoUrl?.startsWith('/api/') || photoUrl?.startsWith('data:')) {
+    return photoUrl;
+  }
   return LOCAL_PHOTOS[name] ?? photoUrl;
 }
 

@@ -26,6 +26,7 @@ import {
   buildRehearsalTelegramMessage,
   copyRehearsalTelegramMessage,
 } from '../utils/rehearsalTelegramExport';
+import { formatReminderKindLabel } from '../utils/reminders';
 import { getSceneShortLabel } from '../utils/sceneLabels';
 import {
   applySceneIdsToSchedule,
@@ -51,6 +52,7 @@ import {
   resolveRehearsalPerformanceId,
   sortParticipantOrderByParticipation,
 } from '../utils/rehearsalActors';
+import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import { ActorAvatar } from '../components/ActorAvatar';
 import { SceneListGrouped } from '../components/SceneListGrouped';
 import { ScenePicker } from '../components/ScenePicker';
@@ -509,6 +511,49 @@ export function RehearsalDetailPage() {
         />
       )}
 
+      <section className="rounded-2xl border border-gold/10 bg-surface/40 px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <p className="text-sm font-medium uppercase tracking-wide text-muted">
+              Напоминания в Telegram
+            </p>
+            {!readOnly && (
+              <label className="flex cursor-pointer items-center gap-3 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  checked={rehearsal.reminderOptOut ?? false}
+                  onChange={() =>
+                    dispatch({
+                      type: 'UPDATE_REHEARSAL',
+                      payload: { ...rehearsal, reminderOptOut: !rehearsal.reminderOptOut },
+                    })
+                  }
+                  className="h-4 w-4 rounded border-gold/30 accent-gold"
+                />
+                Не напоминать по этой репетиции
+              </label>
+            )}
+            {rehearsal.reminderOptOut && (
+              <p className="text-sm text-amber-200">Авто-напоминания отключены для этой репетиции</p>
+            )}
+            {(rehearsal.remindersSent ?? []).length > 0 ? (
+              <ul className="space-y-1 text-sm text-muted">
+                {(rehearsal.remindersSent ?? []).map((entry, index) => (
+                  <li key={`${entry.kind}-${entry.at}-${index}`}>
+                    Напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)} отправлено в{' '}
+                    {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">
+                Авто-напоминания ещё не отправлялись. Настройте в разделе «Настройки».
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
@@ -541,6 +586,10 @@ export function RehearsalDetailPage() {
                 {participantActors.map((actor, index) => {
                   const selected = rehearsal.actorIds.includes(actor!.id);
                   const attendance = rehearsal.attendance?.[actor!.id] ?? (selected ? 'present' : 'absent');
+                  const unavailable = isActorUnavailable(actor!, rehearsal.date);
+                  const unavailReason = unavailable
+                    ? getActorUnavailabilityReason(actor!, rehearsal.date)
+                    : undefined;
                   return (
                     <div
                       key={actor!.id}
@@ -572,9 +621,11 @@ export function RehearsalDetailPage() {
                       </div>
                       <div
                         className={`min-w-0 flex-1 rounded-xl border px-3 py-2.5 transition-colors ${
-                          selected
-                            ? 'border-gold/25 bg-gold/10 ring-1 ring-gold/20'
-                            : 'border-transparent bg-white/[0.02] opacity-80 hover:border-gold/10 hover:opacity-100'
+                          unavailable
+                            ? 'border-amber-500/25 bg-amber-500/5'
+                            : selected
+                              ? 'border-gold/25 bg-gold/10 ring-1 ring-gold/20'
+                              : 'border-transparent bg-white/[0.02] opacity-80 hover:border-gold/10 hover:opacity-100'
                         }`}
                       >
                         <div className="flex min-w-0 items-start gap-3">
@@ -584,9 +635,15 @@ export function RehearsalDetailPage() {
                             onClick={() => toggleParticipant(actor!.id)}
                             disabled={readOnly}
                             className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
+                            title={unavailReason ? `Недоступен: ${unavailReason}` : undefined}
                           >
                             <p className={`truncate text-sm font-semibold ${selected ? 'text-white' : 'text-foreground/80'}`}>
                               {actor!.name}
+                              {unavailable && (
+                                <span className="ml-2 text-xs font-normal text-amber-300">
+                                  · недоступен
+                                </span>
+                              )}
                             </p>
                             <p className="line-clamp-2 text-xs leading-snug text-muted">
                               {actorRolesInPlay(actor!.id) || 'Роль не указана'}
@@ -635,11 +692,23 @@ export function RehearsalDetailPage() {
                       className="min-w-0 flex-1 rounded-xl border border-gold/15 bg-black/20 px-3 py-2.5 text-sm text-white focus:border-gold/40 focus:outline-none"
                     >
                       <option value="">Выберите из состава…</option>
-                      {theaterActorPool.map((actor) => (
-                        <option key={actor.id} value={actor.id} className="bg-surface">
-                          {actor.name}
-                        </option>
-                      ))}
+                      {theaterActorPool.map((actor) => {
+                        const unavailable = isActorUnavailable(actor, rehearsal.date);
+                        const reason = unavailable
+                          ? getActorUnavailabilityReason(actor, rehearsal.date)
+                          : undefined;
+                        return (
+                          <option
+                            key={actor.id}
+                            value={actor.id}
+                            className="bg-surface"
+                            title={reason ? `Недоступен: ${reason}` : undefined}
+                          >
+                            {actor.name}
+                            {unavailable ? ' (недоступен)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                     <Button
                       type="button"

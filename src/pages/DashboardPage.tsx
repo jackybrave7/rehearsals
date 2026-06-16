@@ -16,6 +16,7 @@ import {
 import { resolveRehearsalLocation } from '../utils/venue';
 import { useDesign } from '../store/DesignContext';
 import { ZenDashboard } from '../components/zen/ZenDashboard';
+import { PlayOverviewMini } from './OverviewPage';
 import { appPaths } from '../navigation/appPaths';
 
 export function DashboardPage() {
@@ -86,7 +87,7 @@ export function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <Icon size={22} className="text-gold/70" />
-              <ArrowRight size={16} className="text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              <ArrowRight size={16} className="card-actions text-muted" />
             </div>
             <p className="mt-3 text-2xl font-bold text-white">{value}</p>
             <p className="text-sm text-muted">
@@ -96,6 +97,8 @@ export function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      <PlayOverviewMini />
 
       <section>
         <div className="mb-4 flex items-center justify-between">

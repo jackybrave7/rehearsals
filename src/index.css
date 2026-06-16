@@ -561,6 +561,11 @@ html[data-design='zen'] .schedule-block-duration {
   opacity: 0.75;
 }
 
+/* Карточки (сцены, участники, задачи): то же поведение */
+.card-actions {
+  opacity: 1;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .schedule-block-actions {
     opacity: 0;
@@ -577,6 +582,15 @@ html[data-design='zen'] .schedule-block-duration {
   }
 
   .group:hover .schedule-block-grip {
+    opacity: 1;
+  }
+
+  .card-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .group:hover .card-actions {
     opacity: 1;
   }
 }

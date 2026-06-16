@@ -13,6 +13,7 @@ import {
   type LoadStateOptions,
   wouldLoseUserData,
 } from './stateRepository.js';
+import { migrateEmbeddedFilesIfNeeded } from './fileMigration.js';
 
 function getEditableTheaterIds(session: AuthSessionPayload): Set<string> {
   return new Set(
@@ -58,7 +59,17 @@ export function loadStateForUser(
 ): AppState | null {
   const theaterIds = session.theaters.map((t) => t.theaterId);
   const options: LoadStateOptions = { userId: session.user.id, theaterIds };
-  return loadState(db, options);
+  const loaded = loadState(db, options);
+  if (!loaded) return null;
+
+  const canMigrate = session.theaters.some((t) => t.role === 'owner' || t.role === 'editor');
+  if (!canMigrate) return loaded;
+
+  const { state: migrated, changed } = migrateEmbeddedFilesIfNeeded(loaded, session.user.id, db);
+  if (changed) {
+    saveStateForUser(migrated, session, db);
+  }
+  return migrated;
 }
 
 export function saveStateForUser(
@@ -75,8 +86,10 @@ export function saveStateForUser(
     }
   }
 
+  const theaterIds = session.theaters.map((t) => t.theaterId);
+  const loadOptions: LoadStateOptions = { userId: session.user.id, theaterIds };
   const dbState =
-    loadStateForUser(session, db) ??
+    loadState(db, loadOptions) ??
     ({
       theaters: [],
       activeTheaterId: null,

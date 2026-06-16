@@ -6,7 +6,9 @@ import { ConfirmDialogProvider } from './components/ConfirmDialogContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
+import { OverviewPage } from './pages/OverviewPage';
 import { ActorsPage } from './pages/ActorsPage';
+import { ActorDetailPage } from './pages/ActorDetailPage';
 import { PlayPage } from './pages/PlayPage';
 import { ScenesPage } from './pages/ScenesPage';
 import { TasksPage } from './pages/TasksPage';
@@ -52,7 +54,9 @@ export default function App() {
                 }
               >
                 <Route index element={<DashboardPage />} />
+                <Route path="overview" element={<OverviewPage />} />
                 <Route path="actors" element={<ActorsPage />} />
+                <Route path="actors/:id" element={<ActorDetailPage />} />
                 <Route path="play" element={<PlayPage />} />
                 <Route path="scenes" element={<ScenesPage />} />
                 <Route path="tasks" element={<TasksPage />} />

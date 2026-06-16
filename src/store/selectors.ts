@@ -1,4 +1,5 @@
 import type { AppState, Performance, PlayRole, RehearsalTemplate, Scene } from '../types';
+import { normalizeTask, getOverdueTasks, getTasksByPlay } from '../utils/tasks';
 
 export function getActivePlay(state: AppState) {
   if (!state.activePlayId) return null;
@@ -15,8 +16,12 @@ export function getTheaterPlays(state: AppState) {
 }
 
 export function getTheaterTasks(state: AppState) {
-  return state.tasks.filter((task) => task.theaterId === state.activeTheaterId);
+  return state.tasks
+    .filter((task) => task.theaterId === state.activeTheaterId)
+    .map(normalizeTask);
 }
+
+export { getOverdueTasks, getTasksByPlay };
 
 export function getTheaterVenues(state: AppState) {
   return state.venues.filter((venue) => venue.theaterId === state.activeTheaterId);

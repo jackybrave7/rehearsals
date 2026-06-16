@@ -79,6 +79,14 @@ export function getDb(): AppDatabase {
     `ALTER TABLE scenes ADD COLUMN script_character_count INTEGER`,
     `ALTER TABLE scenes ADD COLUMN script_character_count_synced_at TEXT`,
     `ALTER TABLE schedule_blocks ADD COLUMN completed INTEGER`,
+    `ALTER TABLE tasks ADD COLUMN due_date TEXT`,
+    `ALTER TABLE tasks ADD COLUMN priority TEXT`,
+    `ALTER TABLE tasks ADD COLUMN play_id TEXT`,
+    `ALTER TABLE tasks ADD COLUMN scene_id TEXT`,
+    `ALTER TABLE actors ADD COLUMN unavailability TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE rehearsals ADD COLUMN reminders_sent TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE rehearsals ADD COLUMN reminder_opt_out INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE plays ADD COLUMN script_file_url TEXT`,
   ]) {
     try {
       db.exec(migration);

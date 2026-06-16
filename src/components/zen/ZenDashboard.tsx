@@ -23,6 +23,7 @@ import {
 } from '../../utils/rehearsalInsights';
 import { getRehearsalEventTitle } from '../../utils/rehearsalCalendar';
 import { appPaths } from '../../navigation/appPaths';
+import { PlayOverviewMini } from '../../pages/OverviewPage';
 
 export function ZenDashboard() {
   const { state, dispatch } = useRehearsalStore();
@@ -147,6 +148,8 @@ export function ZenDashboard() {
           </Link>
         ))}
       </div>
+
+      <PlayOverviewMini />
 
       <section className="zen-card">
         <button

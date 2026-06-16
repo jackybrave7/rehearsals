@@ -95,7 +95,7 @@ export function VenuesPage() {
               {venue.notes && (
                 <p className="border-t border-gold/10 px-5 py-3 text-sm text-muted">{venue.notes}</p>
               )}
-              <div className="flex gap-2 border-t border-gold/10 px-5 py-3 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="card-actions flex min-h-10 gap-2 border-t border-gold/10 px-5 py-3">
                 <Button variant="ghost" className="!px-2 !py-1" onClick={() => openEdit(venue)}>
                   <Pencil size={16} />
                 </Button>

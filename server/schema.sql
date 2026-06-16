@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS plays (
   google_docs_links_synced_at TEXT,
   script_file_name TEXT,
   script_file_data_url TEXT,
+  script_file_url TEXT,
   script_file_mime_type TEXT,
   script_file_size INTEGER
 );
@@ -74,7 +75,8 @@ CREATE TABLE IF NOT EXISTS actors (
   phone TEXT,
   email TEXT,
   telegram_username TEXT,
-  notes TEXT
+  notes TEXT,
+  unavailability TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS venues (
@@ -136,7 +138,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   completed INTEGER NOT NULL DEFAULT 0,
   assigned_actor_ids TEXT NOT NULL DEFAULT '[]',
-  rehearsal_id TEXT
+  rehearsal_id TEXT,
+  due_date TEXT,
+  priority TEXT,
+  play_id TEXT,
+  scene_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS rehearsals (
@@ -157,7 +163,9 @@ CREATE TABLE IF NOT EXISTS rehearsals (
   participant_order TEXT NOT NULL DEFAULT '[]',
   google_calendar_event_id TEXT,
   series_id TEXT,
-  dismissed_warning_ids TEXT NOT NULL DEFAULT '[]'
+  dismissed_warning_ids TEXT NOT NULL DEFAULT '[]',
+  reminders_sent TEXT NOT NULL DEFAULT '[]',
+  reminder_opt_out INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS schedule_blocks (
@@ -181,5 +189,16 @@ CREATE INDEX IF NOT EXISTS idx_performances_play_id ON performances(play_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_play_id ON scenes(play_id);
 CREATE INDEX IF NOT EXISTS idx_rehearsals_date ON rehearsals(date);
 CREATE INDEX IF NOT EXISTS idx_schedule_blocks_rehearsal_id ON schedule_blocks(rehearsal_id);
+
+CREATE TABLE IF NOT EXISTS files (
+  id TEXT PRIMARY KEY,
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_owner_user_id ON files(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_theater_members_user_id ON theater_members(user_id);

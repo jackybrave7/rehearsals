@@ -16,6 +16,7 @@ dist-ssr
 data/*.db
 data/*.db-*
 data/backups/
+data/uploads/
 
 # Временные файлы разбора сценария
 temp-chaika*

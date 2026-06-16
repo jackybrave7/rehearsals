@@ -214,11 +214,12 @@ export function insertStateEntities(
   const insertPlay = db.prepare(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
-      google_docs_links_synced_at, script_file_name, script_file_data_url,
+      google_docs_links_synced_at, script_file_name, script_file_data_url, script_file_url,
       script_file_mime_type, script_file_size
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
+    const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
     insertPlay.run(
       play.id,
       play.theaterId ?? null,
@@ -230,7 +231,8 @@ export function insertStateEntities(
       play.googleDocumentId ?? null,
       play.googleDocsLinksSyncedAt ?? null,
       play.scriptFileName ?? null,
-      play.scriptFileDataUrl ?? null,
+      legacyDataUrl,
+      play.scriptFileUrl ?? null,
       play.scriptFileMimeType ?? null,
       play.scriptFileSize ?? null
     );
@@ -238,8 +240,8 @@ export function insertStateEntities(
 
   const insertActor = db.prepare(
     `INSERT INTO actors (
-      id, theater_id, name, status, archive_reason, photo_url, phone, email, telegram_username, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      id, theater_id, name, status, archive_reason, photo_url, phone, email, telegram_username, notes, unavailability
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const actor of state.actors) {
     insertActor.run(
@@ -252,7 +254,8 @@ export function insertStateEntities(
       actor.phone ?? null,
       actor.email ?? null,
       actor.telegramUsername ?? null,
-      actor.notes ?? null
+      actor.notes ?? null,
+      JSON.stringify(actor.unavailability ?? [])
     );
   }
 
@@ -327,8 +330,10 @@ export function insertStateEntities(
   }
 
   const insertTask = db.prepare(
-    `INSERT INTO tasks (id, theater_id, title, description, completed, assigned_actor_ids, rehearsal_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tasks (
+      id, theater_id, title, description, completed, assigned_actor_ids, rehearsal_id,
+      due_date, priority, play_id, scene_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const task of state.tasks) {
     insertTask.run(
@@ -338,7 +343,11 @@ export function insertStateEntities(
       task.description ?? null,
       task.completed ? 1 : 0,
       JSON.stringify(task.assignedActorIds ?? []),
-      task.rehearsalId ?? null
+      task.rehearsalId ?? null,
+      task.dueDate ?? null,
+      task.priority ?? null,
+      task.playId ?? null,
+      task.sceneId ?? null
     );
   }
 
@@ -346,8 +355,8 @@ export function insertStateEntities(
     `INSERT INTO rehearsals (
       id, theater_id, series_id, date, start_time, end_time, venue_id, location, notes, play_id, performance_id,
       scene_ids, task_ids, actor_ids, attendance, participant_order, google_calendar_event_id,
-      dismissed_warning_ids
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      dismissed_warning_ids, reminders_sent, reminder_opt_out
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const rehearsal of state.rehearsals) {
     insertRehearsal.run(
@@ -368,7 +377,9 @@ export function insertStateEntities(
       JSON.stringify(rehearsal.attendance ?? {}),
       JSON.stringify(rehearsal.participantOrder ?? []),
       rehearsal.googleCalendarEventId ?? null,
-      JSON.stringify(rehearsal.dismissedWarningIds ?? [])
+      JSON.stringify(rehearsal.dismissedWarningIds ?? []),
+      JSON.stringify(rehearsal.remindersSent ?? []),
+      rehearsal.reminderOptOut ? 1 : 0
     );
   }
 
@@ -551,6 +562,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       googleDocumentId: (row.google_document_id as string | null) ?? undefined,
       googleDocsLinksSyncedAt: (row.google_docs_links_synced_at as string | null) ?? undefined,
       scriptFileName: (row.script_file_name as string | null) ?? undefined,
+      scriptFileUrl: (row.script_file_url as string | null) ?? undefined,
       scriptFileDataUrl: (row.script_file_data_url as string | null) ?? undefined,
       scriptFileMimeType: (row.script_file_mime_type as string | null) ?? undefined,
       scriptFileSize: (row.script_file_size as number | null) ?? undefined,
@@ -581,6 +593,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       email: (row.email as string | null) ?? undefined,
       telegramUsername: (row.telegram_username as string | null) ?? undefined,
       notes: (row.notes as string | null) ?? undefined,
+      unavailability: parseJson(row.unavailability as string, []),
     })
   );
 
@@ -690,6 +703,10 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       completed: asBool(row.completed as number | null),
       assignedActorIds: parseJson<string[]>(row.assigned_actor_ids as string, []),
       rehearsalId: (row.rehearsal_id as string | null) ?? undefined,
+      dueDate: (row.due_date as string | null) ?? undefined,
+      priority: (row.priority as Task['priority'] | null) ?? undefined,
+      playId: (row.play_id as string | null) ?? undefined,
+      sceneId: (row.scene_id as string | null) ?? undefined,
     })
   );
 
@@ -722,6 +739,8 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       participantOrder: parseJson<string[]>(row.participant_order as string | undefined, []),
       googleCalendarEventId: (row.google_calendar_event_id as string | null) ?? undefined,
       dismissedWarningIds: parseJson<string[]>(row.dismissed_warning_ids as string | undefined, []),
+      remindersSent: parseJson<Rehearsal['remindersSent']>(row.reminders_sent as string | undefined, []),
+      reminderOptOut: asBool(row.reminder_opt_out as number | null | undefined),
       schedule: scheduleByRehearsal.get(String(row.id)) ?? [],
     })
   );

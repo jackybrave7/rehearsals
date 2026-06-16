@@ -24,6 +24,8 @@ import type {
   Theater,
   Venue,
 } from '../types';
+import { normalizeTask } from '../utils/tasks';
+import { clearRemindersOnScheduleChange } from '../utils/reminders';
 import { createDefaultVenue } from '../data/seedVenue';
 import {
   applyStoneHeartCastToState,
@@ -400,7 +402,7 @@ function migrateState(raw: unknown): AppState {
         priority: scene.priority ?? 'medium',
         directorNotes: scene.directorNotes ?? undefined,
       })),
-      tasks: data.tasks ?? [],
+      tasks: (data.tasks ?? []).map((task) => normalizeTask(task as Task)),
       venues: data.venues ?? [],
       rehearsals: (data.rehearsals ?? []).map((rehearsal) => ({
         ...rehearsal,
@@ -1016,7 +1018,10 @@ function reducer(state: AppState, action: Action): AppState {
             sceneIds
           )
         : action.payload.actorIds;
-      const rehearsalDraft = { ...action.payload, schedule, sceneIds, actorIds };
+      const rehearsalDraft = clearRemindersOnScheduleChange(
+        { ...action.payload, schedule, sceneIds, actorIds },
+        previous
+      );
       const participantOrder = resolveParticipantOrder(state, {
         ...rehearsalDraft,
         participantOrder: action.payload.participantOrder ?? previous?.participantOrder,

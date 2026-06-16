@@ -26,6 +26,7 @@ import { VenueSelect } from '../components/VenueSelect';
 import { ScenePicker } from '../components/ScenePicker';
 import { resolveRehearsalLocation } from '../utils/venue';
 import { mergeActorsForNewScenes, resolveRehearsalPerformanceId } from '../utils/rehearsalActors';
+import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import { getUpcomingRehearsals } from '../utils/rehearsalSort';
 import { RehearsalCalendarActions } from '../components/RehearsalCalendarActions';
 import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
@@ -401,20 +402,30 @@ export function RehearsalsPage() {
               <p className="text-sm text-muted">Участники</p>
               <div className="max-h-32 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-2">
                 <div className="flex flex-wrap gap-2">
-                {activeActors.map((actor) => (
-                  <button
-                    key={actor.id}
-                    type="button"
-                    onClick={() => toggleActor(actor.id)}
-                    className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                      form.actorIds.includes(actor.id)
-                        ? 'bg-gold/20 text-gold-light'
-                        : 'bg-white/5 text-muted hover:bg-white/10'
-                    }`}
-                  >
-                    {actor.name}
-                  </button>
-                ))}
+                {activeActors.map((actor) => {
+                  const unavailable = isActorUnavailable(actor, form.date);
+                  const reason = unavailable
+                    ? getActorUnavailabilityReason(actor, form.date)
+                    : undefined;
+                  return (
+                    <button
+                      key={actor.id}
+                      type="button"
+                      title={reason ? `Недоступен: ${reason}` : undefined}
+                      onClick={() => toggleActor(actor.id)}
+                      className={`rounded-full px-3 py-1 text-sm transition-colors ${
+                        form.actorIds.includes(actor.id)
+                          ? 'bg-gold/20 text-gold-light'
+                          : unavailable
+                            ? 'bg-amber-500/10 text-amber-200/80 hover:bg-amber-500/20'
+                            : 'bg-white/5 text-muted hover:bg-white/10'
+                      }`}
+                    >
+                      {actor.name}
+                      {unavailable ? ' ⚠' : ''}
+                    </button>
+                  );
+                })}
                 </div>
               </div>
             </div>

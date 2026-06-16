@@ -9,6 +9,13 @@ function getScheduleBlockEndDate(rehearsalDate: string, block: ScheduleBlock): D
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+/** Репетиция уже в прошлом (не сегодня). */
+export function isPastRehearsalDay(rehearsal: Rehearsal, now = new Date()): boolean {
+  const rehearsalDay = startOfDay(parseISO(rehearsal.date));
+  const today = startOfDay(now);
+  return rehearsalDay.getTime() < today.getTime();
+}
+
 /** Можно отмечать пункты плана с даты репетиции (включительно) и позже. */
 export function canMarkScheduleCompletion(rehearsal: Rehearsal, now = new Date()): boolean {
   const rehearsalDay = startOfDay(parseISO(rehearsal.date));

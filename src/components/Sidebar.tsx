@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Film, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { getActivePlay } from '../store/selectors';
+import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
+import { getMainNavLabel, getVisibleMainNavItems } from '../navigation/mainNav';
 import { appPaths } from '../navigation/appPaths';
-import { getMainNavLabel, mainNavItems } from '../navigation/mainNav';
 
 const SIDEBAR_COLLAPSED_KEY = 'rehearsals-sidebar-collapsed';
 
@@ -20,6 +20,7 @@ function readCollapsedPreference(): boolean {
 export function Sidebar() {
   const { state } = useRehearsalStore();
   const activePlay = getActivePlay(state);
+  const visibleNavItems = getVisibleMainNavItems(getTheaterPlays(state).length);
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function Sidebar() {
 
       <nav className={`flex-1 space-y-1 ${collapsed ? 'p-2' : 'p-4'}`}>
         {!collapsed && <TheaterSwitcher variant="sidebar" />}
-        {mainNavItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const { to, icon: Icon } = item;
           const navLabel = getMainNavLabel(item, 'theater');
           return (

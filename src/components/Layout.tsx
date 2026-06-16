@@ -4,7 +4,6 @@ import { WorkContextBar } from './WorkContextBar';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
-import { ReadOnlyBanner } from './ReadOnlyBanner';
 import { NoTheaterGate } from './NoTheaterGate';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
@@ -82,12 +81,7 @@ export function Layout() {
     return (
       <ZenShell
         statusBar={<StatusBar compact />}
-        recoveryBar={
-          <>
-            <ReadOnlyBanner />
-            <RecoveryBar />
-          </>
-        }
+        recoveryBar={<RecoveryBar />}
       />
     );
   }
@@ -96,7 +90,6 @@ export function Layout() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 overflow-auto">
-        <ReadOnlyBanner />
         <StatusBar />
         <RecoveryBar />
         <WorkContextBar variant="theater" />

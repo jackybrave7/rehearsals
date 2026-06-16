@@ -2,11 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useDesign } from '../../store/DesignContext';
+import { useRehearsalStore } from '../../store/RehearsalContext';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
 import { NoTheaterGate } from '../NoTheaterGate';
 import { appPaths } from '../../navigation/appPaths';
-import { getMainNavLabel, mainNavItems } from '../../navigation/mainNav';
+import { getMainNavLabel, getVisibleMainNavItems } from '../../navigation/mainNav';
+import { getTheaterPlays } from '../../store/selectors';
 
 export function ZenShell({
   statusBar,
@@ -18,6 +20,8 @@ export function ZenShell({
   const { design } = useDesign();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { state } = useRehearsalStore();
+  const visibleNavItems = getVisibleMainNavItems(getTheaterPlays(state).length);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -65,7 +69,7 @@ export function ZenShell({
             <TheaterSwitcher variant="zen" onTheaterChange={() => setMenuOpen(false)} />
             <div className="px-4 pb-2 pt-1 text-xs font-medium uppercase tracking-[0.12em] text-muted">Разделы</div>
             <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-              {mainNavItems.map(({ to, icon: Icon, label, zenLabel }) => (
+              {visibleNavItems.map(({ to, icon: Icon, label, zenLabel }) => (
                 <NavLink
                   key={to}
                   to={to}

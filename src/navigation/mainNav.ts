@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckSquare,
   Film,
+  LayoutGrid,
   LayoutDashboard,
   MapPin,
   Settings,
@@ -16,11 +17,20 @@ export type MainNavItem = {
   icon: LucideIcon;
   label: string;
   zenLabel?: string;
+  /** Показывать только при playCount >= minPlays */
+  minPlays?: number;
 };
 
-/** Единый порядок: обзор → постановка → сцены → люди → репетиции → площадки → задачи → настройки */
+/** Единый порядок: обзор → все постановки → постановка → сцены → … */
 export const mainNavItems: MainNavItem[] = [
   { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', zenLabel: 'Сейчас' },
+  {
+    to: appPaths.overview,
+    icon: LayoutGrid,
+    label: 'Все постановки',
+    zenLabel: 'Постановки',
+    minPlays: 2,
+  },
   { to: appPaths.play, icon: BookOpen, label: 'Постановки', zenLabel: 'Постановка' },
   { to: appPaths.scenes, icon: Film, label: 'Сцены' },
   { to: appPaths.actors, icon: Users, label: 'Участники' },
@@ -39,4 +49,8 @@ export function resolveMainNavTitle(pathname: string, variant: 'theater' | 'zen'
 
 export function getMainNavLabel(item: MainNavItem, variant: 'theater' | 'zen'): string {
   return variant === 'zen' && item.zenLabel ? item.zenLabel : item.label;
+}
+
+export function getVisibleMainNavItems(playCount: number): MainNavItem[] {
+  return mainNavItems.filter((item) => !item.minPlays || playCount >= item.minPlays);
 }

@@ -1,11 +1,18 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { AppState, Actor, Rehearsal, Scene } from '../types';
 import { getActorIdsForSceneIds, resolveRehearsalPerformanceId } from './rehearsalActors';
-import { getSceneIdsFromSchedule } from './scheduleSync';
 import { getScheduleEndTime, getScheduleTotalMinutes } from './schedulePlan';
+import { getSceneIdsFromSchedule } from './scheduleSync';
 import { timeToMinutes } from './time';
 import { isRehearsalPast } from './rehearsalSort';
 import { getSceneShortLabel } from './sceneLabels';
+import { getUpcomingPremiere } from './premiere';
+import { isTaskOverdue } from './tasks';
+import {
+  getActorUnavailabilityReason,
+  getUnavailableWarningId,
+  isActorUnavailable,
+} from './actorAvailability';
 
 export type RehearsalWarningSeverity = 'info' | 'warn';
 
@@ -24,6 +31,7 @@ export interface ExpectedAttendee {
 export interface ActorScheduleConflict {
   actor: Actor;
   otherRehearsal: Rehearsal;
+  otherPlayTitle: string;
 }
 
 function rehearsalsOverlap(a: Rehearsal, b: Rehearsal): boolean {
@@ -175,7 +183,7 @@ export function getRehearsalWarnings(state: AppState, rehearsal: Rehearsal): Reh
     });
   }
 
-  const staleDays = 21;
+  const staleDays = state.appMeta?.staleSceneDays ?? 21;
   const rehearsalScenes = new Map<string, Scene>();
   for (const sceneId of getSceneIdsFromSchedule(rehearsal.schedule)) {
     const scene = state.scenes.find((item) => item.id === sceneId);
@@ -208,10 +216,45 @@ export function getRehearsalWarnings(state: AppState, rehearsal: Rehearsal): Reh
         rehearsal.schedule.some((block) => block.taskId === task.id))
   );
   if (openTasks.length > 0) {
+    const overdueTitles = openTasks.filter((task) => isTaskOverdue(task)).map((task) => task.title);
+    const base = openTasks.map((task) => task.title).join(', ');
     warnings.push({
       id: 'open-tasks',
       severity: 'info',
-      message: `Открытые задачи к репетиции: ${openTasks.map((task) => task.title).join(', ')}.`,
+      message:
+        overdueTitles.length > 0
+          ? `Открытые задачи к репетиции: ${base}. Просрочено: ${overdueTitles.join(', ')}.`
+          : `Открытые задачи к репетиции: ${base}.`,
+    });
+  }
+
+  if (rehearsal.playId) {
+    const premiere = getUpcomingPremiere(state, rehearsal.playId);
+    if (premiere && premiere.daysLeft <= 14) {
+      const notReady = state.scenes.filter(
+        (scene) => scene.playId === rehearsal.playId && scene.status !== 'ready'
+      );
+      if (notReady.length > 0) {
+        warnings.push({
+          id: 'premiere-not-ready',
+          severity: 'info',
+          message: `До премьеры ${premiere.daysLeft} дн., сцены ещё не готовы: ${notReady
+            .slice(0, 5)
+            .map((scene) => getSceneShortLabel(scene))
+            .join(', ')}${notReady.length > 5 ? '…' : ''}.`,
+        });
+      }
+    }
+  }
+
+  for (const actorId of getExpectedActorIds(state, rehearsal)) {
+    const actor = state.actors.find((item) => item.id === actorId);
+    if (!actor || !isActorUnavailable(actor, rehearsal.date)) continue;
+    const reason = getActorUnavailabilityReason(actor, rehearsal.date);
+    warnings.push({
+      id: getUnavailableWarningId(actorId),
+      severity: 'warn',
+      message: `Ожидается ${actor.name}, но он(а) недоступен(а) на эту дату${reason ? `: ${reason}` : ''}.`,
     });
   }
 
@@ -230,11 +273,13 @@ export function getActorScheduleConflicts(
     if (!rehearsalsOverlap(rehearsal, other)) continue;
 
     const otherExpected = new Set(getExpectedActorIds(state, other));
+    const otherPlayTitle =
+      state.plays.find((play) => play.id === other.playId)?.title ?? 'другой постановки';
     for (const actorId of expectedIds) {
       if (!otherExpected.has(actorId)) continue;
       const actor = state.actors.find((item) => item.id === actorId);
       if (!actor) continue;
-      conflicts.push({ actor, otherRehearsal: other });
+      conflicts.push({ actor, otherRehearsal: other, otherPlayTitle });
     }
   }
 

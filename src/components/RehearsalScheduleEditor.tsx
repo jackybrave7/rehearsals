@@ -36,6 +36,8 @@ import {
   canMarkBlockCompletion,
   canMarkScheduleCompletion,
   getScheduleCompletionStats,
+  isPastRehearsalDay,
+  isScheduleBlockCompletable,
 } from '../utils/rehearsalScheduleCompletion';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
@@ -101,6 +103,7 @@ export function RehearsalScheduleEditor({
     sortedSchedule.length > 0 &&
     timeToMinutes(planEndTime) > timeToMinutes(rehearsal.endTime);
   const showCompletionMarks = canMarkScheduleCompletion(rehearsal);
+  const pastRehearsal = isPastRehearsalDay(rehearsal);
   const completionStats = getScheduleCompletionStats(sortedSchedule);
 
   const applySchedule = (schedule: ScheduleBlock[]) => {
@@ -188,6 +191,27 @@ export function RehearsalScheduleEditor({
     );
   };
 
+  const markAllBlocks = (completed: boolean) => {
+    applySchedule(
+      sortedSchedule.map((block) => {
+        if (!isScheduleBlockCompletable(block)) return block;
+        if (!canMarkBlockCompletion(rehearsal, block)) return block;
+        if (block.completed === completed) return block;
+        return { ...block, completed };
+      })
+    );
+  };
+
+  const clearAllMarks = () => {
+    applySchedule(
+      sortedSchedule.map((block) => {
+        if (block.completed === undefined) return block;
+        const { completed: _removed, ...rest } = block;
+        return rest;
+      })
+    );
+  };
+
   const renderInsertSlot = (index: number) => {
     const active = dragOverIndex === index;
     return (
@@ -226,11 +250,24 @@ export function RehearsalScheduleEditor({
           )}
           {showCompletionMarks && completionStats.total > 0 && (
             <p className="mt-1 text-xs text-muted">
-              Итог появится после окончания каждого блока; повторное нажатие снимает отметку
+              {pastRehearsal
+                ? 'Репетиция прошла — отметки можно проставить ретроспективно по каждому блоку или сразу по всему плану'
+                : 'Итог появится после окончания каждого блока; повторное нажатие снимает отметку'}
             </p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {showCompletionMarks && pastRehearsal && completionStats.total > 0 && !readOnly && (
+            <>
+              <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => markAllBlocks(true)}>
+                <Check size={14} />
+                Всё сделано
+              </Button>
+              <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={clearAllMarks}>
+                Сбросить отметки
+              </Button>
+            </>
+          )}
           {(linkedScenes.length > 0 || linkedTasks.length > 0) && (
             <Button variant="secondary" onClick={handleGeneratePlan}>
               <Wand2 size={16} />
@@ -294,7 +331,7 @@ export function RehearsalScheduleEditor({
             return (
               <div key={block.id}>
                 <div
-                  className={`group flex flex-col gap-2 rounded-xl border bg-surface/40 py-3 pl-2 pr-3 border-l-4 transition-shadow sm:flex-row sm:gap-3 sm:py-4 sm:pr-4 ${blockTypeColors[block.type]} ${
+                  className={`group grid grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-2 rounded-xl border bg-surface/40 py-2.5 pl-1 pr-2.5 border-l-4 transition-shadow sm:grid-cols-[1rem_3.75rem_minmax(0,1fr)] sm:gap-x-1.5 sm:py-3 sm:pl-1.5 sm:pr-3 ${blockTypeColors[block.type]} ${
                     isDragging ? 'opacity-40' : ''
                   } ${
                     dropActive
@@ -305,7 +342,6 @@ export function RehearsalScheduleEditor({
                   onDragOver={(event) => handleDragOver(event, index + 1)}
                   onDrop={(event) => handleDropAt(event, index + 1)}
                 >
-                  <div className="flex min-w-0 items-start gap-2 sm:contents">
                   <div
                     draggable={!readOnly}
                     onDragStart={readOnly ? undefined : startScheduleDrag(block.id)}
@@ -314,30 +350,29 @@ export function RehearsalScheduleEditor({
                       setDragOverIndex(null);
                     }}
                     aria-label={`Переместить блок ${block.title}`}
-                    className="schedule-block-grip mt-0.5 flex w-5 shrink-0 cursor-grab items-start justify-center text-muted active:cursor-grabbing sm:mt-1"
+                    className="schedule-block-grip col-start-1 row-start-1 flex cursor-grab items-start justify-center self-start pt-0.5 text-muted active:cursor-grabbing sm:pt-1"
                   >
                     <GripVertical size={14} />
                   </div>
 
-                  <div className="schedule-block-time flex min-w-0 flex-1 items-baseline gap-2 font-mono sm:flex-none sm:block sm:w-[5.25rem] sm:shrink-0 sm:space-y-0.5 sm:pt-0.5 sm:text-right">
+                  <div className="schedule-block-time col-start-2 row-start-1 flex min-w-0 items-baseline gap-1.5 self-start font-mono sm:block sm:pt-0.5 sm:text-right">
                     <p className="text-sm font-semibold leading-none text-gold-light">
                       {block.startTime}
                     </p>
                     <span className="text-[10px] text-muted/70 sm:hidden">—</span>
                     <p className="text-xs leading-none text-muted sm:mt-0">{endTime}</p>
                     <span className="hidden text-[10px] leading-none text-muted/70 sm:block">—</span>
-                    <p className="schedule-block-duration text-[11px] font-medium leading-tight text-muted sm:pt-2">
+                    <p className="schedule-block-duration text-[11px] font-medium leading-tight text-muted sm:pt-1.5">
                       {formatDuration(block.durationMinutes)}
                     </p>
                   </div>
-                  </div>
 
-                  <div className="relative min-w-0 flex-1 border-t border-gold/10 pt-3 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-5 md:pl-6">
-                    <div className="absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-gold/30 bg-surface sm:-left-3.5 sm:top-1">
-                      <Icon size={13} className="text-gold" />
+                  <div className="relative col-span-2 min-w-0 border-t border-gold/10 pt-2 sm:col-span-1 sm:col-start-3 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-3">
+                    <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-gold/30 bg-surface sm:-left-3 sm:top-1">
+                      <Icon size={12} className="text-gold" />
                     </div>
 
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start justify-between gap-3 pl-7 sm:pl-0">
                       <div className="min-w-0 flex-1 space-y-2 select-none">
                         <div>
                           <p className="text-base font-semibold leading-snug text-white">{block.title}</p>

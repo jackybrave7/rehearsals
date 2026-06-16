@@ -69,7 +69,7 @@ export function RehearsalWarningsPanel({
             Конфликты в календаре
           </p>
           <ul className="space-y-1.5">
-            {visible.conflicts.map(({ actor, otherRehearsal }) => {
+            {visible.conflicts.map(({ actor, otherRehearsal, otherPlayTitle }) => {
               const conflictId = getConflictWarningId(actor.id, otherRehearsal.id);
               return (
                 <li
@@ -77,7 +77,8 @@ export function RehearsalWarningsPanel({
                   className="rehearsal-warnings-conflict flex items-start gap-2 text-sm"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="font-medium">{actor.name}</span> — параллельно{' '}
+                    <span className="font-medium">{actor.name}</span> занят(а) в это же время на
+                    репетиции «{otherPlayTitle}»{' '}
                     <Link
                       to={appPaths.rehearsal(otherRehearsal.id)}
                       className="rehearsal-warnings-conflict-link"

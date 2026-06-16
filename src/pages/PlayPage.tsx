@@ -3,7 +3,9 @@ import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus } from 'lucide-r
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { generateId } from '../utils/id';
-import { readFileAsDataUrl, formatFileSize } from '../utils/file';
+import { formatFileSize } from '../utils/file';
+import { uploadFile } from '../api/files';
+import { resolvePlayScriptUrl } from '../utils/fileUrls';
 import type { Play } from '../types';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { Button } from '../components/Button';
@@ -21,6 +23,7 @@ const emptyPlay = (): Omit<Play, 'id'> => ({
   year: undefined,
   documentUrl: '',
   scriptFileName: undefined,
+  scriptFileUrl: undefined,
   scriptFileDataUrl: undefined,
   scriptFileMimeType: undefined,
   scriptFileSize: undefined,
@@ -58,16 +61,21 @@ export function PlayPage() {
 
     setFileError(null);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const uploaded = await uploadFile(file);
       setForm((f) => ({
         ...f,
         scriptFileName: file.name,
-        scriptFileDataUrl: dataUrl,
-        scriptFileMimeType: file.type || undefined,
-        scriptFileSize: file.size,
+        scriptFileUrl: uploaded.url,
+        scriptFileDataUrl: undefined,
+        scriptFileMimeType: uploaded.mimeType || file.type || undefined,
+        scriptFileSize: uploaded.size,
       }));
-    } catch {
-      setFileError('Файл слишком большой. Максимум — 5 МБ.');
+    } catch (error) {
+      setFileError(
+        error instanceof Error && error.message === 'FILE_TOO_LARGE'
+          ? 'Файл слишком большой. Максимум — 5 МБ.'
+          : 'Не удалось загрузить файл. Проверьте подключение к API.'
+      );
     }
     e.target.value = '';
   };
@@ -76,6 +84,7 @@ export function PlayPage() {
     setForm((f) => ({
       ...f,
       scriptFileName: undefined,
+      scriptFileUrl: undefined,
       scriptFileDataUrl: undefined,
       scriptFileMimeType: undefined,
       scriptFileSize: undefined,
@@ -214,10 +223,11 @@ export function PlayPage() {
                             Онлайн-документ
                           </a>
                         )}
-                        {play.scriptFileName && play.scriptFileDataUrl && (
+                        {play.scriptFileName && resolvePlayScriptUrl(play) && (
                           <a
-                            href={play.scriptFileDataUrl}
-                            download={play.scriptFileName}
+                            href={resolvePlayScriptUrl(play)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 rounded-lg border border-gold/20 bg-background/40 px-3 py-2 text-xs text-gold-light transition-colors hover:border-gold/40"
                           >
                             <FileText size={14} />

@@ -1,4 +1,5 @@
 import { User } from 'lucide-react';
+import { resolveAssetUrl } from '../utils/fileUrls';
 
 interface ActorAvatarProps {
   name: string;
@@ -21,9 +22,10 @@ const iconSizes = {
 
 export function ActorAvatar({ name, photoUrl, size = 'md', archived }: ActorAvatarProps) {
   const boxClass = `${sizes[size]} shrink-0 ${size === 'sm' ? 'rounded-full' : 'rounded-xl'} object-cover ${archived ? 'grayscale' : ''}`;
+  const src = resolveAssetUrl(photoUrl);
 
-  if (photoUrl) {
-    return <img src={photoUrl} alt={name} className={boxClass} loading="lazy" />;
+  if (src) {
+    return <img src={src} alt={name} className={boxClass} loading="lazy" />;
   }
 
   return (

@@ -6,6 +6,13 @@ export interface Theater {
   notes?: string;
 }
 
+export interface ActorUnavailability {
+  id: string;
+  from: string;
+  to: string;
+  reason?: string;
+}
+
 export interface Actor {
   id: string;
   theaterId?: string;
@@ -17,6 +24,7 @@ export interface Actor {
   email?: string;
   telegramUsername?: string;
   notes?: string;
+  unavailability?: ActorUnavailability[];
 }
 
 export type PlayRoleKind = 'character' | 'crew' | 'technical';
@@ -63,6 +71,9 @@ export interface Play {
   /** Когда последний раз сопоставляли якоря сцен через Google Docs API */
   googleDocsLinksSyncedAt?: string;
   scriptFileName?: string;
+  /** Ссылка на файл сценария на сервере, напр. /api/files/{id} */
+  scriptFileUrl?: string;
+  /** @deprecated читается для старых данных; новые загрузки — scriptFileUrl */
   scriptFileDataUrl?: string;
   scriptFileMimeType?: string;
   scriptFileSize?: number;
@@ -99,6 +110,8 @@ export interface Scene {
   scriptCharacterCountSyncedAt?: string;
 }
 
+export type TaskPriority = 'high' | 'medium' | 'low';
+
 export interface Task {
   id: string;
   theaterId?: string;
@@ -107,6 +120,10 @@ export interface Task {
   completed: boolean;
   assignedActorIds: string[];
   rehearsalId?: string;
+  dueDate?: string;
+  priority?: TaskPriority;
+  playId?: string;
+  sceneId?: string;
 }
 
 export type ScheduleBlockType = 'scene' | 'task' | 'break' | 'warmup' | 'custom';
@@ -136,6 +153,12 @@ export interface Venue {
   notes?: string;
 }
 
+export interface RehearsalReminderSent {
+  kind: 'T-24h' | 'T-2h' | 'custom';
+  at: string;
+  offsetHours?: number;
+}
+
 export interface Rehearsal {
   id: string;
   theaterId?: string;
@@ -158,6 +181,10 @@ export interface Rehearsal {
   googleCalendarEventId?: string;
   /** Скрытые пользователем предупреждения перед репетицией */
   dismissedWarningIds?: string[];
+  /** Отправленные авто-напоминания в Telegram */
+  remindersSent?: RehearsalReminderSent[];
+  /** Не отправлять авто-напоминания по этой репетиции */
+  reminderOptOut?: boolean;
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'substitute';
@@ -227,6 +254,15 @@ export interface AppState {
     showRehearsalWarnings?: boolean;
     /** Коэффициенты прогноза хронометража по знакам */
     sceneTiming?: Partial<SceneTimingSettingsMeta>;
+    /** Порог «давно не репетировалась» для сцен в работе (дней) */
+    staleSceneDays?: number;
+    /** Авто-напоминания о репетициях в Telegram */
+    reminders?: {
+      enabled: boolean;
+      offsetsHours: number[];
+    };
+    /** Миграция встроенных data-URL в файловое хранилище */
+    filesMigratedVersion?: string;
   };
 }
 
