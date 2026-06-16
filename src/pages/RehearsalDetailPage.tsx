@@ -49,6 +49,7 @@ import {
   getRehearsalParticipantActorIds,
   mergeActorsForNewScenes,
   resolveRehearsalPerformanceId,
+  sortParticipantOrderByParticipation,
 } from '../utils/rehearsalActors';
 import { ActorAvatar } from '../components/ActorAvatar';
 import { SceneListGrouped } from '../components/SceneListGrouped';
@@ -255,7 +256,14 @@ export function RehearsalDetailPage() {
     const actorIds = rehearsal.actorIds.includes(actorId)
       ? rehearsal.actorIds.filter((id) => id !== actorId)
       : [...rehearsal.actorIds, actorId];
-    dispatch({ type: 'UPDATE_REHEARSAL', payload: { ...rehearsal, actorIds } });
+    const participantOrder = sortParticipantOrderByParticipation(
+      getRehearsalParticipantActorIds(state, rehearsal),
+      actorIds
+    );
+    dispatch({
+      type: 'UPDATE_REHEARSAL',
+      payload: { ...rehearsal, actorIds, participantOrder },
+    });
   };
 
   const updateAttendance = (actorId: string, status: AttendanceStatus) => {

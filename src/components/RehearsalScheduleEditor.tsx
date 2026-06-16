@@ -319,7 +319,7 @@ export function RehearsalScheduleEditor({
                     <GripVertical size={14} />
                   </div>
 
-                  <div className="schedule-block-time flex min-w-0 flex-1 items-baseline gap-2 font-mono sm:block sm:w-[5.25rem] sm:shrink-0 sm:space-y-0.5 sm:pt-0.5 sm:text-right">
+                  <div className="schedule-block-time flex min-w-0 flex-1 items-baseline gap-2 font-mono sm:flex-none sm:block sm:w-[5.25rem] sm:shrink-0 sm:space-y-0.5 sm:pt-0.5 sm:text-right">
                     <p className="text-sm font-semibold leading-none text-gold-light">
                       {block.startTime}
                     </p>

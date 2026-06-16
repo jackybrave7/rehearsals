@@ -112,6 +112,20 @@ export function resolveParticipantOrder(
   return syncParticipantOrder([...rehearsal.actorIds, ...sceneOnly], allIds);
 }
 
+export function sortParticipantOrderByParticipation(
+  order: string[],
+  participatingActorIds: string[]
+): string[] {
+  const participating = new Set(participatingActorIds);
+  const active: string[] = [];
+  const inactive: string[] = [];
+  for (const id of order) {
+    if (participating.has(id)) active.push(id);
+    else inactive.push(id);
+  }
+  return [...active, ...inactive];
+}
+
 export function getRehearsalParticipantActorIds(
   state: AppState,
   rehearsal: Rehearsal
