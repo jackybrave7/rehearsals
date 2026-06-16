@@ -161,7 +161,8 @@ export function filterStateByTheaters(state: AppState, theaterIds: Set<string>):
   };
 }
 
-export function deleteTheaterData(db: AppDatabase, theaterId: string): void {
+/** Удаляет содержимое театра, но сохраняет строку theaters и список theater_members. */
+export function deleteTheaterContent(db: AppDatabase, theaterId: string): void {
   const playRows = db.prepare('SELECT id FROM plays WHERE theater_id = ?').all(theaterId) as Array<{ id: string }>;
   const playIds = playRows.map((row) => row.id);
 
@@ -181,6 +182,10 @@ export function deleteTheaterData(db: AppDatabase, theaterId: string): void {
   db.prepare('DELETE FROM plays WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM actors WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM venues WHERE theater_id = ?').run(theaterId);
+}
+
+export function deleteTheaterData(db: AppDatabase, theaterId: string): void {
+  deleteTheaterContent(db, theaterId);
   db.prepare('DELETE FROM theaters WHERE id = ?').run(theaterId);
 }
 
@@ -190,7 +195,11 @@ export function insertStateEntities(
   options?: { ownerByTheaterId?: Map<string, string | null>; addOwnerMembershipFor?: Set<string> }
 ): void {
   const insertTheater = db.prepare(
-    `INSERT INTO theaters (id, name, notes, owner_user_id) VALUES (?, ?, ?, ?)`
+    `INSERT INTO theaters (id, name, notes, owner_user_id) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       notes = excluded.notes,
+       owner_user_id = COALESCE(theaters.owner_user_id, excluded.owner_user_id)`
   );
   for (const theater of state.theaters) {
     const ownerUserId = options?.ownerByTheaterId?.get(theater.id) ?? null;

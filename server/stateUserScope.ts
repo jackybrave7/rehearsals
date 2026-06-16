@@ -4,6 +4,7 @@ import { canEditTheater } from './auth.js';
 import { backupState } from './backup.js';
 import { getDb, type AppDatabase } from './db.js';
 import {
+  deleteTheaterContent,
   deleteTheaterData,
   filterStateByTheaters,
   insertStateEntities,
@@ -126,8 +127,10 @@ export function saveStateForUser(
       if (!canEditTheater(session, theaterId)) continue;
       const existsInDb = dbState.theaters.some((t) => t.id === theaterId);
       const existsInClient = clientTheaterIds.has(theaterId);
-      if (existsInDb || existsInClient) {
+      if (!existsInClient && existsInDb) {
         deleteTheaterData(db, theaterId);
+      } else if (existsInClient && existsInDb) {
+        deleteTheaterContent(db, theaterId);
       }
     }
 

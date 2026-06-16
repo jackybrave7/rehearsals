@@ -24,6 +24,9 @@ export function TheaterMembersPanel() {
   const [role, setRole] = useState<'editor' | 'observer'>('editor');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const emailLooksLikeTypo = /@gmai\.com$/i.test(email.trim());
 
   useEffect(() => {
     if (!theaterId || !canManage) {
@@ -57,11 +60,16 @@ export function TheaterMembersPanel() {
     event.preventDefault();
     if (!theaterId || !email.trim()) return;
     setError(null);
+    setSuccess(null);
     try {
-      await addTheaterMember(theaterId, email.trim(), role);
+      const normalizedEmail = email.trim();
+      await addTheaterMember(theaterId, normalizedEmail, role);
       setEmail('');
       const rows = await fetchTheaterMembers(theaterId);
       setMembers(rows);
+      setSuccess(
+        `${THEATER_ROLE_LABELS[role]} добавлен: ${normalizedEmail}. Попросите коллегу войти с этим же email и нажать «Проверить доступ».`
+      );
     } catch (addError) {
       setError(addError instanceof Error ? addError.message : 'Не удалось добавить участника');
     }
@@ -90,6 +98,19 @@ export function TheaterMembersPanel() {
           Пригласите коллег по email. Редактор может изменять данные театра, наблюдатель — только
           просматривать.
         </p>
+
+        {success && (
+          <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+            {success}
+          </div>
+        )}
+
+        {emailLooksLikeTypo && (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            Похоже на опечатку: <strong>@gmai.com</strong>. Для входа через Google нужен{' '}
+            <strong>@gmail.com</strong> — это разные аккаунты в системе.
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
