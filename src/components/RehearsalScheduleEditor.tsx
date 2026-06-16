@@ -368,19 +368,20 @@ export function RehearsalScheduleEditor({
                   </div>
 
                   <div className="relative col-span-2 min-w-0 border-t border-gold/10 pt-2 sm:col-span-1 sm:col-start-3 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-3">
-                    <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-gold/30 bg-surface sm:-left-3 sm:top-1">
-                      <Icon size={12} className="text-gold" />
-                    </div>
-
-                    <div className="flex items-start justify-between gap-3 pl-7 sm:pl-0">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-2 select-none">
-                        <div>
-                          <p className="text-base font-semibold leading-snug text-white">{block.title}</p>
-                          {sceneCharacters.length > 0 && (
-                            <p className="mt-1 text-sm leading-snug text-muted">
-                              {sceneCharacters.join(', ')}
-                            </p>
-                          )}
+                        <div className="flex items-start gap-2.5">
+                          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gold/30 bg-surface">
+                            <Icon size={12} className="text-gold" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold leading-snug text-white">{block.title}</p>
+                            {sceneCharacters.length > 0 && (
+                              <p className="mt-1 text-sm leading-snug text-muted">
+                                {sceneCharacters.join(', ')}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <p className="schedule-block-meta inline-flex rounded-full bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-muted">
                           {blockTypeLabels[block.type]}
