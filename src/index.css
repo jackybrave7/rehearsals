@@ -561,6 +561,82 @@ html[data-design='zen'] .schedule-block-duration {
   opacity: 0.75;
 }
 
+.schedule-outcome-btn {
+  border: 1px solid transparent;
+}
+
+.schedule-outcome-done {
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(110 231 183);
+  border-color: rgb(16 185 129 / 0.35);
+}
+
+.schedule-outcome-done:hover:not(:disabled) {
+  background: rgb(16 185 129 / 0.15);
+  color: rgb(167 243 208);
+}
+
+.schedule-outcome-done.is-active {
+  background: rgb(16 185 129 / 0.28);
+  color: rgb(209 250 229);
+  border-color: rgb(52 211 153 / 0.55);
+  box-shadow: 0 0 0 1px rgb(16 185 129 / 0.2);
+}
+
+.schedule-outcome-not-done {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--color-muted);
+  border-color: rgb(255 255 255 / 0.12);
+}
+
+.schedule-outcome-not-done:hover:not(:disabled) {
+  background: rgb(239 68 68 / 0.12);
+  color: rgb(252 165 165);
+  border-color: rgb(239 68 68 / 0.3);
+}
+
+.schedule-outcome-not-done.is-active {
+  background: rgb(239 68 68 / 0.22);
+  color: rgb(254 202 202);
+  border-color: rgb(248 113 113 / 0.45);
+}
+
+html[data-design='zen'] .schedule-outcome-done {
+  background: rgb(236 253 245);
+  color: rgb(4 120 87);
+  border-color: rgb(16 185 129 / 0.4);
+}
+
+html[data-design='zen'] .schedule-outcome-done:hover:not(:disabled) {
+  background: rgb(209 250 229);
+  color: rgb(6 95 70);
+}
+
+html[data-design='zen'] .schedule-outcome-done.is-active {
+  background: rgb(16 185 129);
+  color: rgb(255 255 255);
+  border-color: rgb(5 150 105);
+  box-shadow: none;
+}
+
+html[data-design='zen'] .schedule-outcome-not-done {
+  background: rgb(0 0 0 / 0.03);
+  color: rgb(82 82 82);
+  border-color: rgb(0 0 0 / 0.1);
+}
+
+html[data-design='zen'] .schedule-outcome-not-done:hover:not(:disabled) {
+  background: rgb(254 226 226);
+  color: rgb(185 28 28);
+  border-color: rgb(248 113 113 / 0.35);
+}
+
+html[data-design='zen'] .schedule-outcome-not-done.is-active {
+  background: rgb(220 38 38);
+  color: rgb(255 255 255);
+  border-color: rgb(185 28 28);
+}
+
 /* Карточки (сцены, участники, задачи): то же поведение */
 .card-actions {
   opacity: 1;

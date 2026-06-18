@@ -393,10 +393,8 @@ export function RehearsalScheduleEditor({
                               type="button"
                               disabled={readOnly}
                               onClick={() => setBlockCompletion(block.id, true)}
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                                isDone
-                                  ? 'bg-emerald-500/25 text-emerald-200 ring-1 ring-emerald-500/40'
-                                  : 'bg-white/5 text-muted hover:bg-emerald-500/10 hover:text-emerald-200'
+                              className={`schedule-outcome-btn schedule-outcome-done inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                isDone ? 'is-active' : ''
                               } ${readOnly ? 'cursor-not-allowed opacity-60' : ''}`}
                               title="Сделано"
                             >
@@ -407,10 +405,8 @@ export function RehearsalScheduleEditor({
                               type="button"
                               disabled={readOnly}
                               onClick={() => setBlockCompletion(block.id, false)}
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                                isNotDone
-                                  ? 'bg-red-500/20 text-red-200 ring-1 ring-red-500/35'
-                                  : 'bg-white/5 text-muted hover:bg-red-500/10 hover:text-red-200'
+                              className={`schedule-outcome-btn schedule-outcome-not-done inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                isNotDone ? 'is-active' : ''
                               } ${readOnly ? 'cursor-not-allowed opacity-60' : ''}`}
                               title="Не сделано"
                             >
