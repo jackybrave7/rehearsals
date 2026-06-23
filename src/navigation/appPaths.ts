@@ -12,6 +12,8 @@ export const appPaths = {
   tasks: `${APP_BASE}/tasks`,
   settings: `${APP_BASE}/settings`,
   admin: `${APP_BASE}/admin`,
+  adminUsers: `${APP_BASE}/admin/users`,
+  adminUser: (id: string) => `${APP_BASE}/admin/users/${id}`,
   rehearsal: (id: string) => `${APP_BASE}/rehearsals/${id}`,
   playCast: `${APP_BASE}/play#cast`,
 } as const;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
@@ -10,46 +11,18 @@ import {
   Shield,
   Users,
   UserPlus,
+  ArrowRight,
 } from 'lucide-react';
 import { fetchPlatformStats } from '../api/admin';
 import type { PlatformStats } from '../types/admin';
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
-}
+import { AdminNav } from '../components/admin/AdminNav';
+import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
+import { appPaths } from '../navigation/appPaths';
 
 function formatMonthLabel(month: string): string {
   const [year, mon] = month.split('-').map(Number);
   if (!year || !mon) return month;
   return format(new Date(year, mon - 1, 1), 'LLL yyyy', { locale: ru });
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: typeof Users;
-}) {
-  return (
-    <div className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
-      <div className="flex items-center justify-between">
-        <Icon size={20} className="text-gold/70" />
-      </div>
-      <p className="mt-3 text-2xl font-bold text-white">{value}</p>
-      <p className="text-sm text-muted">
-        {label}
-        {sub ? <span className="text-muted/70"> · {sub}</span> : null}
-      </p>
-    </div>
-  );
 }
 
 export function AdminStatsPage() {
@@ -78,36 +51,33 @@ export function AdminStatsPage() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-gold-light">
-            <Shield size={14} />
-            Админка
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-gold-light">
+              <Shield size={14} />
+              Админка
+            </div>
+            <h1 className="text-3xl font-bold text-white">Статистика платформы</h1>
+            <p className="mt-1 text-muted">
+              Агрегированные данные по всем театрам и пользователям
+              {stats ? ` · обновлено ${format(parseISO(stats.generatedAt), 'd MMM, HH:mm', { locale: ru })}` : ''}
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-white">Статистика платформы</h1>
-          <p className="mt-1 text-muted">
-            Агрегированные данные по всем театрам и пользователям
-            {stats ? ` · обновлено ${format(parseISO(stats.generatedAt), 'd MMM, HH:mm', { locale: ru })}` : ''}
-          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-gold/20 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/35 disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            Обновить
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl border border-gold/20 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/35 disabled:opacity-60"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Обновить
-        </button>
+        <AdminNav />
       </header>
 
-      {error && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-          {error === 'FORBIDDEN'
-            ? 'Нет доступа к админке. Добавьте email в ADMIN_EMAILS на сервере.'
-            : `Не удалось загрузить статистику: ${error}`}
-        </div>
-      )}
+      <AdminErrorBanner error={error} />
 
       {loading && !stats ? (
         <div className="rounded-2xl border border-dashed border-gold/20 p-10 text-center text-muted">
@@ -253,7 +223,16 @@ export function AdminStatsPage() {
           </section>
 
           <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
-            <h2 className="mb-4 text-lg font-semibold text-white">Недавние регистрации</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-white">Недавние регистрации</h2>
+              <Link
+                to={appPaths.adminUsers}
+                className="inline-flex items-center gap-1 text-sm text-gold hover:underline"
+              >
+                Все пользователи
+                <ArrowRight size={14} />
+              </Link>
+            </div>
             {stats.recentUsers.length === 0 ? (
               <p className="text-sm text-muted">Пользователей пока нет</p>
             ) : (
@@ -265,6 +244,7 @@ export function AdminStatsPage() {
                       <th className="px-3 py-2 font-medium">Email</th>
                       <th className="px-3 py-2 font-medium">Дата</th>
                       <th className="px-3 py-2 font-medium">Театров</th>
+                      <th className="px-3 py-2 font-medium" />
                     </tr>
                   </thead>
                   <tbody>
@@ -276,6 +256,11 @@ export function AdminStatsPage() {
                           {format(parseISO(entry.createdAt), 'd MMM yyyy', { locale: ru })}
                         </td>
                         <td className="px-3 py-2">{entry.theaterCount}</td>
+                        <td className="px-3 py-2">
+                          <Link to={appPaths.adminUser(entry.id)} className="text-gold hover:underline">
+                            Статистика
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

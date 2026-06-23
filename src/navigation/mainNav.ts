@@ -42,6 +42,8 @@ export const mainNavItems: MainNavItem[] = [
 
 export function resolveMainNavTitle(pathname: string, variant: 'theater' | 'zen' = 'zen'): string {
   if (pathname.startsWith(`${appPaths.rehearsals}/`)) return 'Репетиция';
+  if (pathname.startsWith(`${appPaths.adminUsers}/`)) return 'Пользователь';
+  if (pathname === appPaths.adminUsers) return 'Пользователи';
   if (pathname === appPaths.admin) return 'Админка';
   const item = mainNavItems.find((entry) => entry.to === pathname);
   if (!item) return 'Репетиции';

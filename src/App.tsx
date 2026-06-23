@@ -17,6 +17,8 @@ import { RehearsalDetailPage } from './pages/RehearsalDetailPage';
 import { VenuesPage } from './pages/VenuesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
+import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminUserDetailPage } from './pages/AdminUserDetailPage';
 import { MarketingPage } from './pages/MarketingPage';
 import { LoginPage } from './pages/LoginPage';
 import { AdminRoute } from './components/AdminRoute';
@@ -71,6 +73,22 @@ export default function App() {
                   element={
                     <AdminRoute>
                       <AdminStatsPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/users"
+                  element={
+                    <AdminRoute>
+                      <AdminUsersPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/users/:userId"
+                  element={
+                    <AdminRoute>
+                      <AdminUserDetailPage />
                     </AdminRoute>
                   }
                 />

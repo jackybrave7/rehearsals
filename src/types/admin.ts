@@ -57,3 +57,49 @@ export interface PlatformStats {
     theaterCount: number;
   }>;
 }
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  authMethods: { password: boolean; google: boolean };
+  activeSessions: number;
+  theaterCount: number;
+  ownedTheaterCount: number;
+  filesCount: number;
+  filesBytes: number;
+  content: {
+    plays: number;
+    scenes: number;
+    rehearsals: number;
+    actors: number;
+    tasks: number;
+    venues: number;
+  };
+  activity: {
+    rehearsalsUpcoming: number;
+    rehearsalsLast30Days: number;
+    openTasks: number;
+  };
+}
+
+export interface AdminUserTheaterStats {
+  id: string;
+  name: string;
+  role: 'owner' | 'editor' | 'observer';
+  isOwner: boolean;
+  plays: number;
+  scenes: number;
+  rehearsals: number;
+  actors: number;
+  tasks: number;
+  venues: number;
+  members: number;
+  rehearsalsUpcoming: number;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  generatedAt: string;
+  theaters: AdminUserTheaterStats[];
+}
