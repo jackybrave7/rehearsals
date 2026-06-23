@@ -463,15 +463,23 @@ html[data-design='zen'] .zen-nav-link-active {
 
 /* Репетиция: участники */
 .participant-status-active {
-  background: color-mix(in srgb, var(--color-accent) 14%, white);
-  color: var(--color-foreground);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  background: rgb(201 169 98 / 0.32);
+  color: #1a0f0a;
+  border: 1px solid rgb(201 169 98 / 0.55);
 }
 
 .participant-status-inactive {
-  background: rgba(10, 10, 10, 0.05);
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
+  background: rgb(255 255 255 / 0.08);
+  color: #d4c8bc;
+  border: 1px solid rgb(255 255 255 / 0.16);
+}
+
+.participants-hint {
+  color: #b8a99a;
+}
+
+.participant-role {
+  color: #c4b5a5;
 }
 
 .attendance-badge {
@@ -537,6 +545,11 @@ html[data-design='zen'] .participant-status-inactive {
   background: #f3f4f6;
   color: #4b5563;
   border-color: #d1d5db;
+}
+
+html[data-design='zen'] .participants-hint,
+html[data-design='zen'] .participant-role {
+  color: var(--color-muted);
 }
 
 html[data-design='zen'] .schedule-block-time .text-gold-light {

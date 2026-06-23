@@ -577,7 +577,7 @@ export function RehearsalDetailPage() {
             <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
               Участники
             </h2>
-            <p className="mb-3 text-xs leading-relaxed text-muted">
+            <p className="participants-hint mb-3 text-xs leading-relaxed">
               Перетащите за ⋮⋮ для порядка. Добавьте замену или техника вручную. Статус посещаемости
               влияет на историю и Telegram.
             </p>
@@ -645,7 +645,7 @@ export function RehearsalDetailPage() {
                                 </span>
                               )}
                             </p>
-                            <p className="line-clamp-2 text-xs leading-snug text-muted">
+                            <p className="participant-role line-clamp-2 text-xs leading-snug">
                               {actorRolesInPlay(actor!.id) || 'Роль не указана'}
                             </p>
                           </button>
