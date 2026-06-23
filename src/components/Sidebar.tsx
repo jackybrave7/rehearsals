@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Film, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Film, PanelLeftClose, PanelLeftOpen, BarChart3 } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
 import { getMainNavLabel, getVisibleMainNavItems } from '../navigation/mainNav';
@@ -19,6 +20,7 @@ function readCollapsedPreference(): boolean {
 
 export function Sidebar() {
   const { state } = useRehearsalStore();
+  const { isPlatformAdmin } = useAuth();
   const activePlay = getActivePlay(state);
   const visibleNavItems = getVisibleMainNavItems(getTheaterPlays(state).length);
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
@@ -91,6 +93,24 @@ export function Sidebar() {
           </NavLink>
           );
         })}
+        {isPlatformAdmin ? (
+          <NavLink
+            to={appPaths.admin}
+            title={collapsed ? 'Админка' : undefined}
+            className={({ isActive }) =>
+              `flex items-center rounded-lg text-sm transition-colors ${
+                collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5'
+              } ${
+                isActive
+                  ? 'bg-gold/15 text-gold-light'
+                  : 'text-muted hover:bg-white/5 hover:text-white'
+              }`
+            }
+          >
+            <BarChart3 size={18} className="shrink-0" />
+            {!collapsed && <span>Админка</span>}
+          </NavLink>
+        ) : null}
       </nav>
 
       {!collapsed && (

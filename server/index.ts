@@ -6,6 +6,7 @@ import { isEmptyState, loadState, saveState } from './stateRepository.js';
 import { loadStateForUser, saveStateForUser } from './stateUserScope.js';
 import { registerAuthRoutes, requireAuth } from './auth.js';
 import { registerFileRoutes } from './fileRoutes.js';
+import { registerAdminRoutes } from './adminStats.js';
 import type { AppState } from '../src/types/index.js';
 import { getTelegramConfig, sendTelegramHtmlMessage } from './telegram.js';
 import {
@@ -27,6 +28,7 @@ app.use(express.json({ limit: '25mb' }));
 
 registerAuthRoutes(app);
 registerFileRoutes(app);
+registerAdminRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });

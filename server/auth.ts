@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
+import { enrichSessionPayload } from './platformAdmin.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
@@ -184,7 +185,7 @@ export function registerAuthRoutes(app: import('express').Express) {
       res.status(401).json({ error: 'UNAUTHORIZED' });
       return;
     }
-    res.json(session);
+    res.json(enrichSessionPayload(session));
   });
 
   app.post('/api/auth/logout', (req, res) => {
@@ -220,7 +221,7 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     assignOrphanTheaters(db, userId);
     const user = createSession(db, userId, res);
-    res.json({ user, theaters: getUserTheaters(db, userId) });
+    res.json(enrichSessionPayload({ user, theaters: getUserTheaters(db, userId) }));
   });
 
   app.post('/api/auth/login', (req, res) => {
@@ -243,7 +244,12 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     assignOrphanTheaters(db, row.id);
     createSession(db, row.id, res);
-    res.json({ user: { id: row.id, email: row.email, name: row.name }, theaters: getUserTheaters(db, row.id) });
+    res.json(
+      enrichSessionPayload({
+        user: { id: row.id, email: row.email, name: row.name },
+        theaters: getUserTheaters(db, row.id),
+      })
+    );
   });
 
   app.post('/api/auth/google', async (req, res) => {
@@ -276,7 +282,7 @@ export function registerAuthRoutes(app: import('express').Express) {
 
       assignOrphanTheaters(db, row.id);
       createSession(db, row.id, res);
-      res.json({ user: row, theaters: getUserTheaters(db, row.id) });
+      res.json(enrichSessionPayload({ user: row, theaters: getUserTheaters(db, row.id) }));
     } catch (error) {
       console.error('[auth] google failed', error);
       res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN' });

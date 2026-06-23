@@ -1,0 +1,290 @@
+import { useCallback, useEffect, useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import {
+  BarChart3,
+  CalendarDays,
+  Database,
+  Film,
+  RefreshCw,
+  Shield,
+  Users,
+  UserPlus,
+} from 'lucide-react';
+import { fetchPlatformStats } from '../api/admin';
+import type { PlatformStats } from '../types/admin';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
+}
+
+function formatMonthLabel(month: string): string {
+  const [year, mon] = month.split('-').map(Number);
+  if (!year || !mon) return month;
+  return format(new Date(year, mon - 1, 1), 'LLL yyyy', { locale: ru });
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: typeof Users;
+}) {
+  return (
+    <div className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+      <div className="flex items-center justify-between">
+        <Icon size={20} className="text-gold/70" />
+      </div>
+      <p className="mt-3 text-2xl font-bold text-white">{value}</p>
+      <p className="text-sm text-muted">
+        {label}
+        {sub ? <span className="text-muted/70"> · {sub}</span> : null}
+      </p>
+    </div>
+  );
+}
+
+export function AdminStatsPage() {
+  const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setStats(await fetchPlatformStats());
+    } catch (loadError) {
+      setStats(null);
+      setError(loadError instanceof Error ? loadError.message : 'Ошибка загрузки');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const maxSignup = Math.max(1, ...(stats?.signupsByMonth.map((entry) => entry.count) ?? [1]));
+
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-gold-light">
+            <Shield size={14} />
+            Админка
+          </div>
+          <h1 className="text-3xl font-bold text-white">Статистика платформы</h1>
+          <p className="mt-1 text-muted">
+            Агрегированные данные по всем театрам и пользователям
+            {stats ? ` · обновлено ${format(parseISO(stats.generatedAt), 'd MMM, HH:mm', { locale: ru })}` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-xl border border-gold/20 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/35 disabled:opacity-60"
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          Обновить
+        </button>
+      </header>
+
+      {error && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          {error === 'FORBIDDEN'
+            ? 'Нет доступа к админке. Добавьте email в ADMIN_EMAILS на сервере.'
+            : `Не удалось загрузить статистику: ${error}`}
+        </div>
+      )}
+
+      {loading && !stats ? (
+        <div className="rounded-2xl border border-dashed border-gold/20 p-10 text-center text-muted">
+          Загрузка статистики…
+        </div>
+      ) : null}
+
+      {stats ? (
+        <>
+          <section>
+            <h2 className="mb-4 text-xl font-semibold text-white">Пользователи и сессии</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Пользователей" value={stats.users.total} sub={`+${stats.users.newLast30Days} за 30 дн.`} icon={Users} />
+              <StatCard label="Активных сессий" value={stats.sessions.active} sub={`${stats.sessions.activeUsers} пользователей`} icon={UserPlus} />
+              <StatCard label="Вход по паролю" value={stats.users.withPassword} icon={Users} />
+              <StatCard label="Вход через Google" value={stats.users.withGoogle} icon={Users} />
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-xl font-semibold text-white">Контент и активность</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Театров" value={stats.theaters.total} icon={BarChart3} />
+              <StatCard label="Постановок" value={stats.content.plays} icon={Film} />
+              <StatCard label="Сцен" value={stats.content.scenes} icon={Film} />
+              <StatCard label="Участников" value={stats.content.actors} icon={Users} />
+              <StatCard
+                label="Репетиций"
+                value={stats.content.rehearsals}
+                sub={`${stats.activity.rehearsalsUpcoming} впереди`}
+                icon={CalendarDays}
+              />
+              <StatCard
+                label="Репетиций за 30 дн."
+                value={stats.activity.rehearsalsLast30Days}
+                sub={`${stats.activity.rehearsalsPast} в прошлом`}
+                icon={CalendarDays}
+              />
+              <StatCard
+                label="Задач"
+                value={stats.content.tasks}
+                sub={`${stats.activity.openTasks} открытых`}
+                icon={BarChart3}
+              />
+              <StatCard label="Блоков в планах" value={stats.content.scheduleBlocks} icon={CalendarDays} />
+            </div>
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+              <h2 className="mb-4 text-lg font-semibold text-white">Регистрации по месяцам</h2>
+              {stats.signupsByMonth.length === 0 ? (
+                <p className="text-sm text-muted">Пока нет данных</p>
+              ) : (
+                <div className="space-y-3">
+                  {stats.signupsByMonth.map((entry) => (
+                    <div key={entry.month}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="text-muted">{formatMonthLabel(entry.month)}</span>
+                        <span className="font-medium text-white">{entry.count}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                        <div
+                          className="h-full rounded-full bg-gold/70"
+                          style={{ width: `${Math.max(8, (entry.count / maxSignup) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+              <h2 className="mb-4 text-lg font-semibold text-white">Хранилище и интеграции</h2>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">База SQLite</dt>
+                  <dd className="font-medium text-white">{formatBytes(stats.storage.dbSizeBytes)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">Загруженные файлы</dt>
+                  <dd className="font-medium text-white">
+                    {stats.storage.fileCount} · {formatBytes(stats.storage.totalBytes)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">Резервные копии</dt>
+                  <dd className="font-medium text-white">{stats.storage.backupCount}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">Google Docs в постановках</dt>
+                  <dd className="font-medium text-white">{stats.integrations.playsWithGoogleDocs}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">Telegram у участников</dt>
+                  <dd className="font-medium text-white">{stats.integrations.actorsWithTelegram}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted">Роли в театрах</dt>
+                  <dd className="font-medium text-white">
+                    {stats.theaters.membersByRole.owner} влад. · {stats.theaters.membersByRole.editor} ред. ·{' '}
+                    {stats.theaters.membersByRole.observer} набл.
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Database size={18} className="text-gold/70" />
+              <h2 className="text-lg font-semibold text-white">Театры</h2>
+            </div>
+            {stats.theatersOverview.length === 0 ? (
+              <p className="text-sm text-muted">Театров пока нет</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gold/10 text-muted">
+                      <th className="px-3 py-2 font-medium">Название</th>
+                      <th className="px-3 py-2 font-medium">Постановки</th>
+                      <th className="px-3 py-2 font-medium">Репетиции</th>
+                      <th className="px-3 py-2 font-medium">Участники</th>
+                      <th className="px-3 py-2 font-medium">Доступ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.theatersOverview.map((theater) => (
+                      <tr key={theater.id} className="border-b border-gold/5 text-foreground/90">
+                        <td className="px-3 py-2 font-medium text-white">{theater.name}</td>
+                        <td className="px-3 py-2">{theater.plays}</td>
+                        <td className="px-3 py-2">{theater.rehearsals}</td>
+                        <td className="px-3 py-2">{theater.actors}</td>
+                        <td className="px-3 py-2">{theater.members}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+            <h2 className="mb-4 text-lg font-semibold text-white">Недавние регистрации</h2>
+            {stats.recentUsers.length === 0 ? (
+              <p className="text-sm text-muted">Пользователей пока нет</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gold/10 text-muted">
+                      <th className="px-3 py-2 font-medium">Имя</th>
+                      <th className="px-3 py-2 font-medium">Email</th>
+                      <th className="px-3 py-2 font-medium">Дата</th>
+                      <th className="px-3 py-2 font-medium">Театров</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recentUsers.map((entry) => (
+                      <tr key={entry.id} className="border-b border-gold/5">
+                        <td className="px-3 py-2 text-white">{entry.name}</td>
+                        <td className="px-3 py-2 text-muted">{entry.email}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {format(parseISO(entry.createdAt), 'd MMM yyyy', { locale: ru })}
+                        </td>
+                        <td className="px-3 py-2">{entry.theaterCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}

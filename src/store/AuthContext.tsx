@@ -20,6 +20,7 @@ import type { AuthSessionPayload, TheaterAccessRole } from '../types/auth';
 interface AuthContextValue {
   user: AuthSessionPayload['user'] | null;
   theaters: AuthSessionPayload['theaters'];
+  isPlatformAdmin: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
@@ -36,21 +37,24 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function applySession(
   payload: AuthSessionPayload | null,
   setUser: (user: AuthSessionPayload['user'] | null) => void,
-  setTheaters: (theaters: AuthSessionPayload['theaters']) => void
+  setTheaters: (theaters: AuthSessionPayload['theaters']) => void,
+  setIsPlatformAdmin: (value: boolean) => void
 ) {
   clearAppStateCacheForUserChange(payload?.user.id ?? null);
   setUser(payload?.user ?? null);
   setTheaters(payload?.theaters ?? []);
+  setIsPlatformAdmin(Boolean(payload?.isPlatformAdmin));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthSessionPayload['user'] | null>(null);
   const [theaters, setTheaters] = useState<AuthSessionPayload['theaters']>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refreshSession = useCallback(async (): Promise<AuthSessionPayload | null> => {
     const session = await fetchAuthSession();
-    applySession(session, setUser, setTheaters);
+    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
     return session;
   }, []);
 
@@ -58,10 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     fetchAuthSession()
       .then((session) => {
-        if (!cancelled) applySession(session, setUser, setTheaters);
+        if (!cancelled) applySession(session, setUser, setTheaters, setIsPlatformAdmin);
       })
       .catch(() => {
-        if (!cancelled) applySession(null, setUser, setTheaters);
+        if (!cancelled) applySession(null, setUser, setTheaters, setIsPlatformAdmin);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -94,28 +98,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await loginWithEmail(email, password);
-    applySession(session, setUser, setTheaters);
+    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
     const session = await registerWithEmail(email, password, name);
-    applySession(session, setUser, setTheaters);
+    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
   }, []);
 
   const googleLogin = useCallback(async (credential: string) => {
     const session = await loginWithGoogle(credential);
-    applySession(session, setUser, setTheaters);
+    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
   }, []);
 
   const logout = useCallback(async () => {
     await logoutRequest();
-    applySession(null, setUser, setTheaters);
+    applySession(null, setUser, setTheaters, setIsPlatformAdmin);
   }, []);
 
   const value = useMemo(
     () => ({
       user,
       theaters,
+      isPlatformAdmin,
       loading,
       login,
       register,
@@ -129,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       user,
       theaters,
+      isPlatformAdmin,
       loading,
       login,
       register,

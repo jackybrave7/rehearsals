@@ -1,4 +1,5 @@
-import { Check, Palette, Sparkles, AlertTriangle, LogOut, Clock, Bell } from 'lucide-react';
+import { Check, Palette, Sparkles, AlertTriangle, LogOut, Clock, Bell, BarChart3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -15,6 +16,7 @@ import {
   DEFAULT_SCENE_TIMING_SETTINGS,
   resolveSceneTimingSettings,
 } from '../utils/sceneTiming';
+import { appPaths } from '../navigation/appPaths';
 
 const options: Array<{
   id: AppDesign;
@@ -40,7 +42,7 @@ const options: Array<{
 export function SettingsPage() {
   const { design, setDesign } = useDesign();
   const { state, dispatch, readOnly } = useRehearsalStore();
-  const { user, logout } = useAuth();
+  const { user, logout, isPlatformAdmin } = useAuth();
   const showRehearsalWarnings = getShowRehearsalWarnings(state);
   const sceneTiming = resolveSceneTimingSettings(state.appMeta);
   const reminders = resolveReminderSettings(state.appMeta);
@@ -104,6 +106,26 @@ export function SettingsPage() {
         <h1 className="text-3xl font-bold text-white">Настройки</h1>
         <p className="mt-1 text-muted">Общие параметры приложения</p>
       </header>
+
+      {isPlatformAdmin ? (
+        <section className="rounded-2xl border border-gold/20 bg-gold/5 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="mb-1 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gold-light">
+                <BarChart3 size={16} />
+                Администрирование
+              </div>
+              <p className="text-sm text-muted">Статистика использования платформы по всем театрам</p>
+            </div>
+            <Link
+              to={appPaths.admin}
+              className="rounded-xl border border-gold/25 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/40"
+            >
+              Открыть админку
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">

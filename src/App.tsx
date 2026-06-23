@@ -16,8 +16,10 @@ import { RehearsalsPage } from './pages/RehearsalsPage';
 import { RehearsalDetailPage } from './pages/RehearsalDetailPage';
 import { VenuesPage } from './pages/VenuesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AdminStatsPage } from './pages/AdminStatsPage';
 import { MarketingPage } from './pages/MarketingPage';
 import { LoginPage } from './pages/LoginPage';
+import { AdminRoute } from './components/AdminRoute';
 import { appPaths } from './navigation/appPaths';
 
 function LegacyRehearsalRedirect() {
@@ -64,6 +66,14 @@ export default function App() {
                 <Route path="rehearsals" element={<RehearsalsPage />} />
                 <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route
+                  path="admin"
+                  element={
+                    <AdminRoute>
+                      <AdminStatsPage />
+                    </AdminRoute>
+                  }
+                />
               </Route>
             </Routes>
           </BrowserRouter>

@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, BarChart3 } from 'lucide-react';
 import { useDesign } from '../../store/DesignContext';
 import { useRehearsalStore } from '../../store/RehearsalContext';
+import { useAuth } from '../../store/AuthContext';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
 import { NoTheaterGate } from '../NoTheaterGate';
@@ -18,6 +19,7 @@ export function ZenShell({
   recoveryBar?: ReactNode;
 }) {
   const { design } = useDesign();
+  const { isPlatformAdmin } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { state } = useRehearsalStore();
@@ -84,6 +86,19 @@ export function ZenShell({
                   {getMainNavLabel({ to, icon: Icon, label, zenLabel }, 'zen')}
                 </NavLink>
               ))}
+              {isPlatformAdmin ? (
+                <NavLink
+                  to={appPaths.admin}
+                  className={({ isActive }) =>
+                    `zen-nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all ${
+                      isActive ? 'zen-nav-link-active' : 'text-muted hover:bg-black/[0.03] hover:text-foreground'
+                    }`
+                  }
+                >
+                  <BarChart3 size={18} className="shrink-0" />
+                  Админка
+                </NavLink>
+              ) : null}
             </nav>
           </aside>
         </div>

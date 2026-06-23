@@ -14,4 +14,5 @@ export interface TheaterAccessInfo {
 export interface AuthSessionPayload {
   user: AuthUser;
   theaters: TheaterAccessInfo[];
+  isPlatformAdmin?: boolean;
 }
