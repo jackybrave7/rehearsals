@@ -260,8 +260,28 @@ export function buildRehearsalTelegramMessage(state: AppState, rehearsal: Rehear
   return buildMessages(state, rehearsal).text;
 }
 
-export function buildRehearsalTelegramBotMessage(state: AppState, rehearsal: Rehearsal): string {
-  return buildMessages(state, rehearsal).botHtml;
+export function buildRehearsalTelegramBotMessage(
+  state: AppState,
+  rehearsal: Rehearsal,
+  options?: { initiatedBy?: string }
+): string {
+  const body = buildMessages(state, rehearsal).botHtml;
+  const initiatedBy = options?.initiatedBy?.trim();
+  if (!initiatedBy) return body;
+  return `${body}\n\n<i>/ ${escapeHtml(initiatedBy)} /</i>`;
+}
+
+export function buildActorReminderTelegramBotMessage(
+  state: AppState,
+  rehearsal: Rehearsal,
+  actorId: string
+): string {
+  const actor = state.actors.find((item) => item.id === actorId);
+  const body = buildRehearsalTelegramBotMessage(state, rehearsal);
+  const greeting = actor
+    ? `<b>${escapeHtml(actor.name)}</b>, напоминание о репетиции:\n\n`
+    : `<b>Напоминание о репетиции</b>\n\n`;
+  return `${greeting}${body}`;
 }
 
 export async function copyRehearsalTelegramMessage(

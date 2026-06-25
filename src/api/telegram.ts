@@ -1,25 +1,77 @@
 import { API_BASE } from './apiBase';
 
-export async function fetchTelegramConfigured(): Promise<boolean> {
+export interface TelegramStatus {
+  configured: boolean;
+  botConfigured: boolean;
+  botUsername: string | null;
+  chatConfigured: boolean;
+  remindersSchedulerActive: boolean;
+  reminderTickMinutes: number;
+  reminderWindowMinutes: number;
+}
+
+export async function fetchTelegramStatus(theaterId: string): Promise<TelegramStatus> {
   try {
-    const response = await fetch(`${API_BASE}/telegram/config`);
-    if (!response.ok) return false;
-    const data = (await response.json()) as { configured?: boolean };
-    return Boolean(data.configured);
+    const response = await fetch(
+      `${API_BASE}/telegram/config?theaterId=${encodeURIComponent(theaterId)}`,
+      { credentials: 'include' }
+    );
+    if (!response.ok) {
+      return {
+        configured: false,
+        botConfigured: false,
+        botUsername: null,
+        chatConfigured: false,
+        remindersSchedulerActive: false,
+        reminderTickMinutes: 5,
+        reminderWindowMinutes: 10,
+      };
+    }
+    return response.json() as Promise<TelegramStatus>;
   } catch {
-    return false;
+    return {
+      configured: false,
+      botConfigured: false,
+      botUsername: null,
+      chatConfigured: false,
+      remindersSchedulerActive: false,
+      reminderTickMinutes: 5,
+      reminderWindowMinutes: 10,
+    };
   }
 }
 
-export async function sendTelegramHtmlMessage(html: string): Promise<void> {
+/** @deprecated Используйте fetchTelegramStatus */
+export async function fetchTelegramConfigured(theaterId?: string): Promise<boolean> {
+  if (!theaterId) return false;
+  const status = await fetchTelegramStatus(theaterId);
+  return status.configured;
+}
+
+export async function sendTelegramHtmlMessage(theaterId: string, html: string): Promise<void> {
   const response = await fetch(`${API_BASE}/telegram/send`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html }),
+    body: JSON.stringify({ theaterId, html }),
   });
 
   if (!response.ok) {
-    const data = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(data?.message ?? `SEND_FAILED_${response.status}`);
+    const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+    throw new Error(data?.message ?? data?.error ?? `SEND_FAILED_${response.status}`);
+  }
+}
+
+export async function sendTelegramTestMessage(theaterId: string, chatId?: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/telegram/test`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ theaterId, chatId: chatId?.trim() || undefined }),
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+    throw new Error(data?.message ?? data?.error ?? `TEST_FAILED_${response.status}`);
   }
 }

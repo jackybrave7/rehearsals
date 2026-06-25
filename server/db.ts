@@ -87,6 +87,9 @@ export function getDb(): AppDatabase {
     `ALTER TABLE rehearsals ADD COLUMN reminders_sent TEXT NOT NULL DEFAULT '[]'`,
     `ALTER TABLE rehearsals ADD COLUMN reminder_opt_out INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE plays ADD COLUMN script_file_url TEXT`,
+    `ALTER TABLE theaters ADD COLUMN telegram_chat_id TEXT`,
+    `ALTER TABLE theaters ADD COLUMN reminder_settings TEXT`,
+    `ALTER TABLE actors ADD COLUMN telegram_chat_id TEXT`,
   ]) {
     try {
       db.exec(migration);

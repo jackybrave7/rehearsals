@@ -294,7 +294,8 @@ function persistToStorage(
   state: AppState,
   setSaveError: (message: string | null) => void,
   setSaveStatus: (status: SaveStatus) => void,
-  readOnly: boolean
+  readOnly: boolean,
+  refreshSession?: () => Promise<unknown>
 ): void {
   mirrorLocalStorage(state);
   if (readOnly) {
@@ -307,6 +308,9 @@ function persistToStorage(
   persistChain = persistChain
     .then(async () => {
       await saveAppStateWithRetry(state);
+      if (refreshSession) {
+        await refreshSession();
+      }
       mirrorLocalStorage(state);
       setSaveError(null);
       setSaveStatus('saved');
@@ -1185,25 +1189,25 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
 
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
+      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
     }, 200);
 
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
-        persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
+        persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
       }
     };
-  }, [state, ready, loadError, readOnly]);
+  }, [state, ready, loadError, readOnly, refreshSession]);
 
   useEffect(() => {
     if (!ready || loadError) return;
 
     return () => {
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly);
+      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
     };
-  }, [ready, loadError, readOnly]);
+  }, [ready, loadError, readOnly, refreshSession]);
 
   useLayoutEffect(() => {
     if (!ready || loadError || readOnly) return;

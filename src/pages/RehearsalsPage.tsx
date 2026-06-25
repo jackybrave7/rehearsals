@@ -28,7 +28,7 @@ import { resolveRehearsalLocation } from '../utils/venue';
 import { mergeActorsForNewScenes, resolveRehearsalPerformanceId } from '../utils/rehearsalActors';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import { getUpcomingRehearsals } from '../utils/rehearsalSort';
-import { RehearsalCalendarActions } from '../components/RehearsalCalendarActions';
+import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
 
 const emptyRehearsal = (
@@ -257,12 +257,11 @@ export function RehearsalsPage() {
                         {r.schedule.length > 0 && <span>{r.schedule.length} блоков в плане</span>}
                       </div>
                     </Link>
-                    <div className="mt-3 border-t border-gold/10 pt-3">
-                      <RehearsalCalendarActions
+                    <div className="mt-3 flex justify-end border-t border-gold/10 pt-3">
+                      <RehearsalActionsMenu
                         rehearsal={r}
                         title={calendarTitle}
                         location={location}
-                        compact
                       />
                     </div>
                   </div>

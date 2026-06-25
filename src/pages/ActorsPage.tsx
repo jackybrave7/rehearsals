@@ -20,6 +20,7 @@ import { Modal } from '../components/Modal';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea, Select } from '../components/FormFields';
 import { ActorAvatar } from '../components/ActorAvatar';
+import { ActorTelegramBotLink } from '../components/ActorTelegramBotLink';
 
 const emptyActor = (): Omit<Actor, 'id'> => ({
   name: '',
@@ -125,6 +126,11 @@ function ActorCard({
           {!archived && telegramUsername && (
             <p className="flex items-center gap-1 text-xs text-muted">
               <AtSign size={12} /> @{telegramUsername}
+            </p>
+          )}
+          {!archived && actor.telegramChatId && (
+            <p className="flex items-center gap-1 text-xs text-emerald-200/90">
+              <AtSign size={12} /> бот подключён
             </p>
           )}
         </div>
@@ -411,6 +417,16 @@ export function ActorsPage() {
                 onChange={(e) => setForm({ ...form, telegramUsername: e.target.value })}
                 placeholder="@username"
               />
+              {editing && (
+                <ActorTelegramBotLink
+                  actorId={editing.id}
+                  theaterId={editing.theaterId ?? state.activeTheaterId}
+                  telegramChatId={
+                    state.actors.find((actor) => actor.id === editing.id)?.telegramChatId ??
+                    editing.telegramChatId
+                  }
+                />
+              )}
               <Textarea
                 label="Заметки"
                 value={form.notes ?? ''}

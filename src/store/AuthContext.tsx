@@ -13,6 +13,7 @@ import {
   loginWithGoogle,
   logout as logoutRequest,
   registerWithEmail,
+  updateAuthProfile,
 } from '../api/auth';
 import { clearAppStateCacheForUserChange } from '../api/storage';
 import type { AuthSessionPayload, TheaterAccessRole } from '../types/auth';
@@ -27,6 +28,12 @@ interface AuthContextValue {
   googleLogin: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthSessionPayload | null>;
+  updateProfile: (payload: {
+    name?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
+  grantTheaterAccess: (theaterId: string, role?: Extract<TheaterAccessRole, 'owner' | 'editor'>) => void;
   getTheaterRole: (theaterId: string | null | undefined) => TheaterAccessRole | null;
   canEditTheater: (theaterId: string | null | undefined) => boolean;
   canManageMembers: (theaterId: string | null | undefined) => boolean;
@@ -57,6 +64,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applySession(session, setUser, setTheaters, setIsPlatformAdmin);
     return session;
   }, []);
+
+  const grantTheaterAccess = useCallback(
+    (theaterId: string, role: Extract<TheaterAccessRole, 'owner' | 'editor'> = 'owner') => {
+      setTheaters((current) => {
+        const existing = current.find((entry) => entry.theaterId === theaterId);
+        if (existing) {
+          if (existing.role === 'owner') return current;
+          return current.map((entry) =>
+            entry.theaterId === theaterId ? { ...entry, role } : entry
+          );
+        }
+        return [...current, { theaterId, role }];
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +119,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [getTheaterRole]
   );
 
+  const updateProfile = useCallback(
+    async (payload: { name?: string; currentPassword?: string; newPassword?: string }) => {
+      const session = await updateAuthProfile(payload);
+      applySession(session, setUser, setTheaters, setIsPlatformAdmin);
+    },
+    []
+  );
+
   const login = useCallback(async (email: string, password: string) => {
     const session = await loginWithEmail(email, password);
     applySession(session, setUser, setTheaters, setIsPlatformAdmin);
@@ -127,6 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       googleLogin,
       logout,
       refreshSession,
+      updateProfile,
+      grantTheaterAccess,
       getTheaterRole,
       canEditTheater,
       canManageMembers,
@@ -141,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       googleLogin,
       logout,
       refreshSession,
+      updateProfile,
+      grantTheaterAccess,
       getTheaterRole,
       canEditTheater,
       canManageMembers,

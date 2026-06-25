@@ -4,6 +4,25 @@ export interface Theater {
   id: string;
   name: string;
   notes?: string;
+  /** ID рабочего чата театра в Telegram (группа/канал) */
+  telegramChatId?: string;
+  /** Авто-напоминания участникам репетиций */
+  reminderSettings?: TheaterReminderSettings;
+}
+
+export type ReminderType = 'day_before' | 'morning_of' | 'two_hours';
+
+export interface TheaterReminderSettings {
+  enabled: boolean;
+  types: ReminderType[];
+  morningHour?: number;
+}
+
+export interface RehearsalReminderSent {
+  kind: ReminderType | 'T-24h' | 'T-2h' | 'custom';
+  at: string;
+  actorId?: string;
+  offsetHours?: number;
 }
 
 export interface ActorUnavailability {
@@ -23,6 +42,8 @@ export interface Actor {
   phone?: string;
   email?: string;
   telegramUsername?: string;
+  /** Chat ID в Telegram после /start у бота (личные напоминания) */
+  telegramChatId?: string;
   notes?: string;
   unavailability?: ActorUnavailability[];
 }
@@ -151,12 +172,6 @@ export interface Venue {
   name: string;
   address?: string;
   notes?: string;
-}
-
-export interface RehearsalReminderSent {
-  kind: 'T-24h' | 'T-2h' | 'custom';
-  at: string;
-  offsetHours?: number;
 }
 
 export interface Rehearsal {

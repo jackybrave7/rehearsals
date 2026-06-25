@@ -15,7 +15,7 @@ import {
 } from '../../store/selectors';
 import { resolveRehearsalLocation } from '../../utils/venue';
 import { RehearsalWarningsPanel } from '../RehearsalWarningsPanel';
-import { RehearsalCalendarActions } from '../RehearsalCalendarActions';
+import { RehearsalActionsMenu } from '../RehearsalActionsMenu';
 import {
   dismissRehearsalWarning,
   getActorScheduleConflicts,
@@ -109,12 +109,13 @@ export function ZenDashboard() {
               </p>
             </Link>
             <div className="space-y-4 border-t border-border/60 px-7 pb-7 pt-5">
-              <RehearsalCalendarActions
-                rehearsal={nextRehearsal}
-                title={getRehearsalEventTitle(nextRehearsalPlay?.title)}
-                location={resolveRehearsalLocation(nextRehearsal, theaterVenues)}
-                compact
-              />
+              <div className="flex justify-end">
+                <RehearsalActionsMenu
+                  rehearsal={nextRehearsal}
+                  title={getRehearsalEventTitle(nextRehearsalPlay?.title)}
+                  location={resolveRehearsalLocation(nextRehearsal, theaterVenues)}
+                />
+              </div>
               {showRehearsalWarnings && (
                 <RehearsalWarningsPanel
                   warnings={nextRehearsalInsights.warnings}

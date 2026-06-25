@@ -20,6 +20,42 @@ export async function fetchAuthSession(): Promise<AuthSessionPayload | null> {
   return response.json() as Promise<AuthSessionPayload>;
 }
 
+export async function fetchAuthConfig(): Promise<{ mailConfigured: boolean }> {
+  try {
+    const response = await authFetch('/auth/config');
+    if (!response.ok) return { mailConfigured: false };
+    return response.json() as Promise<{ mailConfigured: boolean }>;
+  } catch {
+    return { mailConfigured: false };
+  }
+}
+
+export async function updateAuthProfile(payload: {
+  name?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}): Promise<AuthSessionPayload> {
+  const response = await authFetch('/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseAuthError(response));
+  return response.json() as Promise<AuthSessionPayload>;
+}
+
+export async function requestPasswordReset(email: string): Promise<string> {
+  const response = await authFetch('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    message?: string;
+    error?: string;
+  } | null;
+    if (!response.ok) throw new Error(await parseAuthError(response, data?.error, data));
+  return data?.message ?? 'Если аккаунт с таким email зарегистрирован, на почту отправлен одноразовый пароль.';
+}
+
 export async function loginWithEmail(email: string, password: string): Promise<AuthSessionPayload> {
   const response = await authFetch('/auth/login', {
     method: 'POST',
@@ -82,16 +118,30 @@ export async function removeTheaterMember(theaterId: string, userId: string): Pr
   if (!response.ok) throw new Error(await parseAuthError(response));
 }
 
-async function parseAuthError(response: Response): Promise<string> {
+async function parseAuthError(
+  response: Response,
+  errorCode?: string,
+  preloaded?: { error?: string; message?: string } | null
+): Promise<string> {
   try {
-    const data = (await response.json()) as { error?: string };
-    if (data.error === 'INVALID_CREDENTIALS') return 'Неверный email или пароль';
-    if (data.error === 'EMAIL_EXISTS') return 'Пользователь с таким email уже зарегистрирован';
-    if (data.error === 'USER_NOT_FOUND') {
+    const data = preloaded ?? ((await response.json()) as { error?: string; message?: string });
+    const code = errorCode ?? data.error;
+    if (code === 'INVALID_CREDENTIALS') return 'Неверный email или пароль';
+    if (code === 'EMAIL_EXISTS') return 'Пользователь с таким email уже зарегистрирован';
+    if (code === 'USER_NOT_FOUND') {
       return 'Пользователь не найден. Попросите его зарегистрироваться на rehears.ru/login';
     }
-    if (data.error === 'INVALID_GOOGLE_TOKEN') return 'Не удалось войти через Google';
-    if (data.error) return data.error;
+    if (code === 'INVALID_GOOGLE_TOKEN') return 'Не удалось войти через Google';
+    if (code === 'WRONG_PASSWORD') return 'Неверный текущий пароль';
+    if (code === 'INVALID_PASSWORD') return 'Новый пароль должен быть не короче 8 символов';
+    if (code === 'INVALID_NAME') return 'Укажите имя';
+    if (code === 'MAIL_NOT_CONFIGURED') {
+      return 'Почта на сервере не настроена. Обратитесь к администратору (SMTP в .env).';
+    }
+    if (code === 'MAIL_FAILED') return 'Не удалось отправить письмо. Попробуйте позже.';
+    if (code === 'INVALID_EMAIL') return 'Укажите email';
+    if (code) return code;
+    if (data.message) return data.message;
   } catch {
     // ignore JSON parse errors
   }

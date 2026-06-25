@@ -4,9 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
 import { enrichSessionPayload } from './platformAdmin.js';
+import { isMailConfigured, sendPasswordResetEmail } from './mail.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
+const PASSWORD_RESET_COOLDOWN_MS = 2 * 60 * 1000;
+const passwordResetCooldown = new Map<string, number>();
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -27,6 +30,40 @@ function verifyPassword(password: string, stored: string): boolean {
   } catch {
     return false;
   }
+}
+
+function generateOneTimePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const part = () =>
+    Array.from({ length: 4 }, () => chars[randomBytes(1)[0] % chars.length]).join('');
+  return `${part()}-${part()}-${part()}`;
+}
+
+type UserRow = {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string | null;
+};
+
+function toAuthUser(row: Pick<UserRow, 'id' | 'email' | 'name' | 'password_hash'>): AuthUser {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    hasPassword: Boolean(row.password_hash),
+  };
+}
+
+function buildSessionPayload(db: AppDatabase, userId: string): AuthSessionPayload {
+  const row = db
+    .prepare(`SELECT id, email, name, password_hash FROM users WHERE id = ?`)
+    .get(userId) as UserRow | undefined;
+  if (!row) throw new Error('USER_NOT_FOUND');
+  return {
+    user: toAuthUser(row),
+    theaters: getUserTheaters(db, userId),
+  };
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -108,8 +145,8 @@ function createSession(db: AppDatabase, userId: string, res: Response): AuthUser
   ).run(sessionId, userId, hashToken(token), sessionExpiryIso());
   setSessionCookie(res, token);
 
-  const user = db.prepare(`SELECT id, email, name FROM users WHERE id = ?`).get(userId) as AuthUser;
-  return user;
+  const user = db.prepare(`SELECT id, email, name, password_hash FROM users WHERE id = ?`).get(userId) as UserRow;
+  return toAuthUser(user);
 }
 
 export function getSessionPayload(req: Request, db: AppDatabase = getDb()): AuthSessionPayload | null {
@@ -118,20 +155,20 @@ export function getSessionPayload(req: Request, db: AppDatabase = getDb()): Auth
 
   const row = db
     .prepare(
-      `SELECT s.user_id, s.expires_at, u.id, u.email, u.name
+      `SELECT s.user_id, s.expires_at, u.id, u.email, u.name, u.password_hash
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ?`
     )
     .get(hashToken(token)) as
-    | { user_id: string; expires_at: string; id: string; email: string; name: string }
+    | { user_id: string; expires_at: string; id: string; email: string; name: string; password_hash: string | null }
     | undefined;
 
   if (!row) return null;
   if (new Date(row.expires_at).getTime() <= Date.now()) return null;
 
   return {
-    user: { id: row.id, email: row.email, name: row.name },
+    user: toAuthUser(row),
     theaters: getUserTheaters(db, row.user_id),
   };
 }
@@ -179,6 +216,10 @@ async function verifyGoogleCredential(credential: string): Promise<{ sub: string
 }
 
 export function registerAuthRoutes(app: import('express').Express) {
+  app.get('/api/auth/config', (_req, res) => {
+    res.json({ mailConfigured: isMailConfigured() });
+  });
+
   app.get('/api/auth/me', (req, res) => {
     const session = getSessionPayload(req);
     if (!session) {
@@ -221,7 +262,7 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     assignOrphanTheaters(db, userId);
     const user = createSession(db, userId, res);
-    res.json(enrichSessionPayload({ user, theaters: getUserTheaters(db, userId) }));
+    res.json(enrichSessionPayload(buildSessionPayload(db, user.id)));
   });
 
   app.post('/api/auth/login', (req, res) => {
@@ -244,12 +285,105 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     assignOrphanTheaters(db, row.id);
     createSession(db, row.id, res);
-    res.json(
-      enrichSessionPayload({
-        user: { id: row.id, email: row.email, name: row.name },
-        theaters: getUserTheaters(db, row.id),
-      })
+    res.json(enrichSessionPayload(buildSessionPayload(db, row.id)));
+  });
+
+  app.patch('/api/auth/profile', (req, res) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
+    const currentPassword =
+      typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+
+    if (name === undefined && !newPassword) {
+      res.status(400).json({ error: 'INVALID_BODY' });
+      return;
+    }
+
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT id, email, name, password_hash FROM users WHERE id = ?`)
+      .get(session.user.id) as UserRow | undefined;
+    if (!row) {
+      res.status(404).json({ error: 'USER_NOT_FOUND' });
+      return;
+    }
+
+    if (name !== undefined) {
+      if (!name) {
+        res.status(400).json({ error: 'INVALID_NAME' });
+        return;
+      }
+      db.prepare(`UPDATE users SET name = ? WHERE id = ?`).run(name, row.id);
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        res.status(400).json({ error: 'INVALID_PASSWORD' });
+        return;
+      }
+      if (row.password_hash) {
+        if (!currentPassword || !verifyPassword(currentPassword, row.password_hash)) {
+          res.status(401).json({ error: 'WRONG_PASSWORD' });
+          return;
+        }
+      }
+      db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(
+        hashPassword(newPassword),
+        row.id
+      );
+    }
+
+    res.json(enrichSessionPayload(buildSessionPayload(db, row.id)));
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const genericMessage =
+      'Если аккаунт с таким email зарегистрирован, на почту отправлен одноразовый пароль.';
+
+    if (!email) {
+      res.status(400).json({ error: 'INVALID_EMAIL' });
+      return;
+    }
+
+    if (!isMailConfigured()) {
+      res.status(503).json({ error: 'MAIL_NOT_CONFIGURED' });
+      return;
+    }
+
+    const lastSent = passwordResetCooldown.get(email);
+    if (lastSent && Date.now() - lastSent < PASSWORD_RESET_COOLDOWN_MS) {
+      res.json({ ok: true, message: genericMessage });
+      return;
+    }
+
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT id, email, name FROM users WHERE email = ?`)
+      .get(email) as Pick<UserRow, 'id' | 'email' | 'name'> | undefined;
+
+    if (!row) {
+      res.json({ ok: true, message: genericMessage });
+      return;
+    }
+
+    const oneTimePassword = generateOneTimePassword();
+    db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(
+      hashPassword(oneTimePassword),
+      row.id
     );
+
+    try {
+      await sendPasswordResetEmail(row.email, row.name, oneTimePassword);
+      passwordResetCooldown.set(email, Date.now());
+      res.json({ ok: true, message: genericMessage });
+    } catch (error) {
+      console.error('[auth] forgot-password mail failed', error);
+      res.status(503).json({ error: 'MAIL_FAILED' });
+    }
   });
 
   app.post('/api/auth/google', async (req, res) => {
@@ -263,26 +397,32 @@ export function registerAuthRoutes(app: import('express').Express) {
       const googleUser = await verifyGoogleCredential(credential);
       const db = getDb();
       let row = db
-        .prepare(`SELECT id, email, name FROM users WHERE google_sub = ? OR email = ?`)
-        .get(googleUser.sub, googleUser.email) as AuthUser | undefined;
+        .prepare(`SELECT id, email, name, password_hash FROM users WHERE google_sub = ? OR email = ?`)
+        .get(googleUser.sub, googleUser.email) as UserRow | undefined;
 
       if (!row) {
         const userId = uuidv4();
         db.prepare(
           `INSERT INTO users (id, email, name, password_hash, google_sub, created_at) VALUES (?, ?, ?, NULL, ?, ?)`
         ).run(userId, googleUser.email, googleUser.name, googleUser.sub, new Date().toISOString());
-        row = { id: userId, email: googleUser.email, name: googleUser.name };
+        row = {
+          id: userId,
+          email: googleUser.email,
+          name: googleUser.name,
+          password_hash: null,
+        };
       } else {
         db.prepare(`UPDATE users SET google_sub = ?, name = ? WHERE id = ?`).run(
           googleUser.sub,
           googleUser.name,
           row.id
         );
+        row = { ...row, name: googleUser.name };
       }
 
       assignOrphanTheaters(db, row.id);
       createSession(db, row.id, res);
-      res.json(enrichSessionPayload({ user: row, theaters: getUserTheaters(db, row.id) }));
+      res.json(enrichSessionPayload(buildSessionPayload(db, row.id)));
     } catch (error) {
       console.error('[auth] google failed', error);
       res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN' });

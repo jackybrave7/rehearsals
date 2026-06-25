@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS theaters (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   notes TEXT,
-  owner_user_id TEXT REFERENCES users(id)
+  owner_user_id TEXT REFERENCES users(id),
+  telegram_chat_id TEXT,
+  reminder_settings TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS theater_members (
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS actors (
   phone TEXT,
   email TEXT,
   telegram_username TEXT,
+  telegram_chat_id TEXT,
   notes TEXT,
   unavailability TEXT NOT NULL DEFAULT '[]'
 );

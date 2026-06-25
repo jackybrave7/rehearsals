@@ -1,6 +1,7 @@
 import { Building2, Check, ChevronDown, Pencil, Plus } from 'lucide-react';
 import { DeleteButton } from './DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { getActiveTheater } from '../store/selectors';
 import { generateId } from '../utils/id';
@@ -12,6 +13,7 @@ type TheaterSwitcherProps = {
 
 export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherProps) {
   const { state, dispatch } = useRehearsalStore();
+  const { grantTheaterAccess } = useAuth();
   const { confirmDelete, prompt } = useConfirmDialog();
   const activeTheater = getActiveTheater(state);
 
@@ -28,7 +30,9 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
       confirmLabel: 'Создать',
     });
     if (!name) return;
-    dispatch({ type: 'ADD_THEATER', payload: { id: generateId(), name } });
+    const id = generateId();
+    grantTheaterAccess(id, 'owner');
+    dispatch({ type: 'ADD_THEATER', payload: { id, name } });
   };
 
   const renameTheater = async () => {

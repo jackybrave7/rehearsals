@@ -14,6 +14,7 @@ import { useMemo } from 'react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { ActorAvatar } from '../components/ActorAvatar';
+import { ActorTelegramBotLink } from '../components/ActorTelegramBotLink';
 import { Button } from '../components/Button';
 import { getActorUnavailabilityBadge } from '../utils/actorAvailability';
 import { getActorWorkload, groupRolesByPlay } from '../utils/actorInsights';
@@ -109,6 +110,15 @@ export function ActorDetailPage() {
               <p>Контакты не указаны.</p>
             )}
             {actor.notes && <p className="pt-2 text-muted">{actor.notes}</p>}
+            {actor.status === 'active' && (
+              <div className="pt-3">
+                <ActorTelegramBotLink
+                  actorId={actor.id}
+                  theaterId={actor.theaterId ?? state.activeTheaterId}
+                  telegramChatId={actor.telegramChatId}
+                />
+              </div>
+            )}
           </div>
         </section>
 

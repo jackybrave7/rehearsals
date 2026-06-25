@@ -25,6 +25,45 @@ function getAccessibleTheaterIds(session: AuthSessionPayload): Set<string> {
   return new Set(session.theaters.map((t) => t.theaterId));
 }
 
+function getNewTheaterIdsForUser(
+  db: AppDatabase,
+  clientState: AppState,
+  dbState: AppState,
+  session: AuthSessionPayload
+): Set<string> {
+  const knownInDb = new Set(dbState.theaters.map((theater) => theater.id));
+  const created = new Set<string>();
+
+  for (const theater of clientState.theaters) {
+    if (knownInDb.has(theater.id)) continue;
+
+    const row = db.prepare(`SELECT owner_user_id FROM theaters WHERE id = ?`).get(theater.id) as
+      | { owner_user_id: string | null }
+      | undefined;
+
+    if (row?.owner_user_id && row.owner_user_id !== session.user.id) {
+      throw new Error('FORBIDDEN');
+    }
+
+    created.add(theater.id);
+  }
+
+  return created;
+}
+
+function expandTheaterAccess(
+  session: AuthSessionPayload,
+  newTheaterIds: Set<string>
+): { accessibleIds: Set<string>; editableIds: Set<string> } {
+  const accessibleIds = getAccessibleTheaterIds(session);
+  const editableIds = getEditableTheaterIds(session);
+  for (const theaterId of newTheaterIds) {
+    accessibleIds.add(theaterId);
+    editableIds.add(theaterId);
+  }
+  return { accessibleIds, editableIds };
+}
+
 function mergeStateForSave(
   clientState: AppState,
   dbState: AppState,
@@ -77,15 +116,6 @@ export function saveStateForUser(
   session: AuthSessionPayload,
   db: AppDatabase = getDb()
 ): void {
-  const accessibleIds = getAccessibleTheaterIds(session);
-  const editableIds = getEditableTheaterIds(session);
-
-  for (const theater of clientState.theaters) {
-    if (!accessibleIds.has(theater.id)) {
-      throw new Error('FORBIDDEN');
-    }
-  }
-
   const theaterIds = session.theaters.map((t) => t.theaterId);
   const loadOptions: LoadStateOptions = { userId: session.user.id, theaterIds };
   const dbState =
@@ -106,6 +136,15 @@ export function saveStateForUser(
       rehearsals: [],
       appMeta: {},
     } satisfies AppState);
+
+  const newTheaterIds = getNewTheaterIdsForUser(db, clientState, dbState, session);
+  const { accessibleIds, editableIds } = expandTheaterAccess(session, newTheaterIds);
+
+  for (const theater of clientState.theaters) {
+    if (!accessibleIds.has(theater.id)) {
+      throw new Error('FORBIDDEN');
+    }
+  }
 
   const mergedForCheck = mergeStateForSave(clientState, dbState, editableIds, accessibleIds);
   if (wouldLoseUserData(mergedForCheck, dbState)) {
@@ -137,7 +176,7 @@ export function saveStateForUser(
 
   const tx = db.transaction(() => {
     for (const theaterId of editableIds) {
-      if (!canEditTheater(session, theaterId)) continue;
+      if (!newTheaterIds.has(theaterId) && !canEditTheater(session, theaterId)) continue;
       const existsInDb = dbState.theaters.some((t) => t.id === theaterId);
       const existsInClient = clientTheaterIds.has(theaterId);
       if (!existsInClient && existsInDb) {

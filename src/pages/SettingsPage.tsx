@@ -1,16 +1,24 @@
-import { Check, Palette, Sparkles, AlertTriangle, LogOut, Clock, Bell, BarChart3 } from 'lucide-react';
+import { Check, Palette, Sparkles, Drama, AlertTriangle, LogOut, Clock, Bell, BarChart3, Send, Building2, Settings2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
-import { getShowRehearsalWarnings } from '../store/selectors';
+import { getShowRehearsalWarnings, getActiveTheater } from '../store/selectors';
 import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
 import { Input } from '../components/FormFields';
-import { fetchTelegramConfigured } from '../api/telegram';
+import { Button } from '../components/Button';
 import {
-  DEFAULT_REMINDER_SETTINGS,
-  resolveReminderSettings,
+  fetchTelegramStatus,
+  sendTelegramTestMessage,
+  type TelegramStatus,
+} from '../api/telegram';
+import {
+  DEFAULT_THEATER_REMINDER_SETTINGS,
+  REMINDER_TYPE_LABELS,
+  REMINDER_TYPES,
+  resolveTheaterReminderSettings,
+  type ReminderType,
 } from '../utils/reminders';
 import {
   DEFAULT_SCENE_TIMING_SETTINGS,
@@ -26,7 +34,7 @@ const options: Array<{
 }> = [
   {
     id: 'theater',
-    title: 'Театр',
+    title: 'Театр-театр',
     description: 'Классический тёмный интерфейс с боковым меню и полным обзором данных.',
     preview: 'Тёмный · золото · sidebar',
   },
@@ -39,52 +47,134 @@ const options: Array<{
   },
 ];
 
+type SettingsTab = 'general' | 'theater';
+
 export function SettingsPage() {
   const { design, setDesign } = useDesign();
   const { state, dispatch, readOnly } = useRehearsalStore();
-  const { user, logout, isPlatformAdmin } = useAuth();
+  const { user, logout, isPlatformAdmin, updateProfile } = useAuth();
   const showRehearsalWarnings = getShowRehearsalWarnings(state);
   const sceneTiming = resolveSceneTimingSettings(state.appMeta);
-  const reminders = resolveReminderSettings(state.appMeta);
-  const [telegramConfigured, setTelegramConfigured] = useState(false);
-  const [customOffset, setCustomOffset] = useState('');
+  const activeTheater = getActiveTheater(state);
+  const theaterReminders = resolveTheaterReminderSettings(activeTheater ?? {}, state.appMeta);
+  const [tab, setTab] = useState<SettingsTab>('general');
+  const [profileName, setProfileName] = useState(user?.name ?? '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
+  const [telegramChatInput, setTelegramChatInput] = useState('');
+  const [telegramTestPending, setTelegramTestPending] = useState(false);
+  const [telegramTestMessage, setTelegramTestMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void fetchTelegramConfigured().then(setTelegramConfigured);
-  }, []);
+    setProfileName(user?.name ?? '');
+  }, [user?.name]);
 
-  const updateReminders = (patch: Partial<typeof reminders>) => {
+  useEffect(() => {
+    if (!state.activeTheaterId) {
+      setTelegramStatus(null);
+      return;
+    }
+    void fetchTelegramStatus(state.activeTheaterId).then(setTelegramStatus);
+  }, [state.activeTheaterId, activeTheater?.telegramChatId]);
+
+  useEffect(() => {
+    setTelegramChatInput(activeTheater?.telegramChatId ?? '');
+  }, [activeTheater?.id, activeTheater?.telegramChatId]);
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    setProfileMessage(null);
+    setProfileError(null);
+    try {
+      const payload: { name?: string; currentPassword?: string; newPassword?: string } = {};
+      const trimmedName = profileName.trim();
+      if (trimmedName && trimmedName !== user?.name) {
+        payload.name = trimmedName;
+      }
+      if (newPassword) {
+        payload.newPassword = newPassword;
+        if (user?.hasPassword) {
+          payload.currentPassword = currentPassword;
+        }
+      }
+      if (!payload.name && !payload.newPassword) {
+        setProfileError('Нет изменений для сохранения');
+        return;
+      }
+      await updateProfile(payload);
+      setCurrentPassword('');
+      setNewPassword('');
+      setProfileMessage('Профиль обновлён');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Не удалось сохранить');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const updateTheaterReminders = (patch: Partial<typeof theaterReminders>) => {
+    if (!activeTheater || readOnly) return;
     dispatch({
-      type: 'UPDATE_APP_META',
+      type: 'UPDATE_THEATER',
       payload: {
-        reminders: {
-          ...reminders,
+        ...activeTheater,
+        reminderSettings: {
+          ...theaterReminders,
           ...patch,
         },
       },
     });
   };
 
-  const toggleOffset = (hours: number) => {
-    const next = reminders.offsetsHours.includes(hours)
-      ? reminders.offsetsHours.filter((value) => value !== hours)
-      : [...reminders.offsetsHours, hours];
-    updateReminders({
-      offsetsHours: next.length > 0 ? [...next].sort((a, b) => b - a) : DEFAULT_REMINDER_SETTINGS.offsetsHours,
+  const toggleReminderType = (type: ReminderType) => {
+    const isOn = theaterReminders.types.includes(type);
+    if (isOn && theaterReminders.types.length === 1) return;
+    const next = isOn
+      ? theaterReminders.types.filter((value) => value !== type)
+      : [...theaterReminders.types, type];
+    updateTheaterReminders({
+      types: REMINDER_TYPES.filter((item) => next.includes(item)),
     });
   };
 
-  const addCustomOffset = () => {
-    const hours = Number(customOffset);
-    if (!Number.isFinite(hours) || hours <= 0 || hours > 168) return;
-    if (reminders.offsetsHours.includes(hours)) {
-      setCustomOffset('');
+  const saveTelegramChat = () => {
+    if (!activeTheater || readOnly) return;
+    dispatch({
+      type: 'UPDATE_THEATER',
+      payload: {
+        ...activeTheater,
+        telegramChatId: telegramChatInput.trim() || undefined,
+      },
+    });
+    setTelegramTestMessage('Chat ID сохранён');
+    window.setTimeout(() => setTelegramTestMessage(null), 2500);
+  };
+
+  const testTelegramChat = async () => {
+    if (!state.activeTheaterId || readOnly || !activeTheater) return;
+    const chatId = telegramChatInput.trim();
+    if (!chatId) {
+      setTelegramTestMessage('Укажите Chat ID');
       return;
     }
-    updateReminders({
-      offsetsHours: [...reminders.offsetsHours, hours].sort((a, b) => b - a),
-    });
-    setCustomOffset('');
+    setTelegramTestPending(true);
+    setTelegramTestMessage(null);
+    try {
+      await sendTelegramTestMessage(state.activeTheaterId, chatId);
+      dispatch({
+        type: 'UPDATE_THEATER',
+        payload: { ...activeTheater, telegramChatId: chatId },
+      });
+      setTelegramTestMessage('Тестовое сообщение отправлено в группу');
+    } catch (error) {
+      setTelegramTestMessage(error instanceof Error ? error.message : 'Не удалось отправить');
+    } finally {
+      setTelegramTestPending(false);
+    }
   };
 
   const updateSceneTiming = (patch: Partial<typeof sceneTiming>) => {
@@ -102,11 +192,44 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold text-white">Настройки</h1>
-        <p className="mt-1 text-muted">Общие параметры приложения</p>
+      <header className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Настройки</h1>
+          <p className="mt-1 text-muted">
+            {tab === 'general'
+              ? 'Оформление, аккаунт и общие параметры приложения'
+              : activeTheater
+                ? `Параметры театра «${activeTheater.name}»`
+                : 'Выберите театр в меню слева'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-xl bg-black/20 p-1">
+          <button
+            type="button"
+            onClick={() => setTab('general')}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm transition-colors sm:flex-none ${
+              tab === 'general' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+            }`}
+          >
+            <Settings2 size={16} />
+            Общие
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('theater')}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm transition-colors sm:flex-none ${
+              tab === 'theater' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+            }`}
+          >
+            <Building2 size={16} />
+            {activeTheater ? `Театр: ${activeTheater.name}` : 'Театр'}
+          </button>
+        </div>
       </header>
 
+      {tab === 'general' ? (
+        <>
       {isPlatformAdmin ? (
         <section className="rounded-2xl border border-gold/20 bg-gold/5 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -154,7 +277,12 @@ export function SettingsPage() {
                       : 'border-black/5 bg-gradient-to-br from-[#ffffff] to-[#f3f4f6] shadow-inner'
                   }`}
                 >
-                  <div className="flex h-full items-end p-3">
+                  <div className="flex h-full items-end justify-between p-3">
+                    {option.id === 'theater' ? (
+                      <Drama size={28} className="text-gold-light/70" aria-hidden />
+                    ) : (
+                      <span />
+                    )}
                     <span
                       className={`text-xs font-medium ${
                         option.id === 'theater' ? 'text-gold-light/80' : 'text-black/45'
@@ -168,6 +296,7 @@ export function SettingsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                      {option.id === 'theater' && <Drama size={18} className="text-gold" />}
                       {option.id === 'zen' && <Sparkles size={18} className="text-gold" />}
                       {option.title}
                     </h2>
@@ -194,30 +323,63 @@ export function SettingsPage() {
           <LogOut size={16} />
           Аккаунт
         </div>
-        <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
-          <p className="text-sm text-muted">Вы вошли как</p>
-          <p className="mt-1 text-lg font-medium text-white">{user?.name || user?.email}</p>
-          <p className="text-sm text-muted">{user?.email}</p>
-          <button
-            type="button"
-            onClick={() => void logout().then(() => {
-              window.location.href = '/login';
-            })}
-            className="mt-4 rounded-xl border border-gold/20 px-4 py-2 text-sm text-gold-light transition-colors hover:bg-gold/10"
-          >
-            Выйти
-          </button>
+        <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
+          <div>
+            <p className="text-sm text-muted">Вы вошли как</p>
+            <p className="text-sm text-muted">{user?.email}</p>
+          </div>
+          <Input
+            label="Имя"
+            value={profileName}
+            onChange={(event) => setProfileName(event.target.value)}
+            placeholder="Как к вам обращаться"
+          />
+          {user?.hasPassword ? (
+            <Input
+              label="Текущий пароль"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              autoComplete="current-password"
+            />
+          ) : (
+            <p className="text-sm text-muted">
+              Вход через Google — можно задать пароль для входа по email.
+            </p>
+          )}
+          <Input
+            label={user?.hasPassword ? 'Новый пароль' : 'Пароль для входа по email'}
+            type="password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            autoComplete="new-password"
+            placeholder="Минимум 8 символов"
+          />
+          {profileError ? <p className="text-sm text-amber-200">{profileError}</p> : null}
+          {profileMessage ? <p className="text-sm text-emerald-300/90">{profileMessage}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void saveProfile()} disabled={profileSaving}>
+              {profileSaving ? 'Сохранение…' : 'Сохранить профиль'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => void logout().then(() => {
+                window.location.href = '/login';
+              })}
+              className="rounded-xl border border-gold/20 px-4 py-2 text-sm text-gold-light transition-colors hover:bg-gold/10"
+            >
+              Выйти
+            </button>
+          </div>
         </div>
       </section>
-
-      <TheaterMembersPanel />
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
           <Clock size={16} />
           Хронометраж сцен
         </div>
-        <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
           <p className="text-sm leading-relaxed text-muted">
             Прогноз по печатным знакам с пробелами. Если у сцены есть текст из Google Docs — он
             точнее описания. По умолчанию: 1 авторский лист ={' '}
@@ -282,96 +444,6 @@ export function SettingsPage() {
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
-          <Bell size={16} />
-          Напоминания
-        </div>
-
-        {!telegramConfigured ? (
-          <div className="rounded-2xl border border-dashed border-gold/20 bg-surface/40 p-5 text-sm text-muted">
-            Подключите бота: задайте <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> и{' '}
-            <code className="text-gold-light">TELEGRAM_CHAT_ID</code> в <code>.env</code> и перезапустите API.
-          </div>
-        ) : (
-          <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
-            <label className="flex cursor-pointer items-start gap-4">
-              <input
-                type="checkbox"
-                checked={reminders.enabled}
-                disabled={readOnly}
-                onChange={(event) => updateReminders({ enabled: event.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-gold/30 accent-gold"
-              />
-              <span className="min-w-0">
-                <span className="block text-base font-medium text-white">
-                  Авто-напоминания в Telegram
-                </span>
-                <span className="mt-1 block text-sm leading-relaxed text-muted">
-                  Бот отправит план репетиции за выбранное время до начала. Часовой пояс театра —
-                  UTC+3 (Москва), настраивается через{' '}
-                  <code className="text-gold-light/80">REHEARSAL_UTC_OFFSET_HOURS</code> на сервере.
-                </span>
-              </span>
-            </label>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted">За сколько часов напоминать</p>
-              <div className="flex flex-wrap gap-2">
-                {[24, 2].map((hours) => (
-                  <button
-                    key={hours}
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => toggleOffset(hours)}
-                    className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-                      reminders.offsetsHours.includes(hours)
-                        ? 'bg-gold/20 text-gold-light'
-                        : 'bg-white/5 text-muted hover:bg-white/10'
-                    }`}
-                  >
-                    за {hours} ч
-                  </button>
-                ))}
-                {reminders.offsetsHours
-                  .filter((hours) => hours !== 24 && hours !== 2)
-                  .map((hours) => (
-                    <button
-                      key={hours}
-                      type="button"
-                      disabled={readOnly}
-                      onClick={() => toggleOffset(hours)}
-                      className="rounded-full bg-gold/20 px-3 py-1.5 text-sm text-gold-light"
-                    >
-                      за {hours} ч ×
-                    </button>
-                  ))}
-              </div>
-              {!readOnly && (
-                <div className="flex flex-wrap items-end gap-2">
-                  <Input
-                    label="Свой интервал (часы)"
-                    type="number"
-                    min={1}
-                    max={168}
-                    value={customOffset}
-                    onChange={(event) => setCustomOffset(event.target.value)}
-                    className="max-w-[10rem]"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomOffset}
-                    className="rounded-xl border border-gold/20 px-4 py-2.5 text-sm text-gold-light hover:bg-gold/10"
-                  >
-                    Добавить
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
           <AlertTriangle size={16} />
           Репетиции
         </div>
@@ -400,6 +472,190 @@ export function SettingsPage() {
           </span>
         </label>
       </section>
+        </>
+      ) : (
+        <>
+      {!activeTheater ? (
+        <div className="rounded-2xl border border-dashed border-gold/20 bg-surface/40 p-8 text-center text-sm text-muted">
+          Сначала выберите или создайте театр в боковом меню.
+        </div>
+      ) : (
+        <>
+          <TheaterMembersPanel />
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+              <Send size={16} />
+              Telegram чат театра
+            </div>
+
+            {!telegramStatus?.botConfigured ? (
+              <div className="rounded-2xl border border-dashed border-gold/20 bg-surface/40 p-5 text-sm text-muted">
+                Бот сервиса пока не настроен на сервере. Администратору нужно задать{' '}
+                <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code>.
+              </div>
+            ) : (
+              <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
+                <p className="text-sm leading-relaxed text-muted">
+                  Добавьте бота{' '}
+                  {telegramStatus.botUsername ? (
+                    <code className="text-gold-light">@{telegramStatus.botUsername}</code>
+                  ) : (
+                    'Репетиции'
+                  )}{' '}
+                  в рабочую группу театра — для <strong className="text-white/80">ручной</strong> рассылки плана
+                  с карточки репетиции. Авто-напоминания участникам идут в личку, не сюда.
+                </p>
+                <p className="text-sm text-muted">
+                  Напишите в группу после добавления бота, затем откройте{' '}
+                  <code className="text-gold-light/80">getUpdates</code> и скопируйте{' '}
+                  <code className="text-gold-light/80">chat.id</code>. Если группа стала супергруппой, id
+                  обычно начинается с <code className="text-gold-light/80">-100</code> (старый id перестаёт
+                  работать).
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <Input
+                    label="Chat ID"
+                    value={telegramChatInput}
+                    disabled={readOnly}
+                    onChange={(event) => setTelegramChatInput(event.target.value)}
+                    placeholder="-1001234567890"
+                    className="min-w-[14rem] flex-1"
+                  />
+                  {!readOnly && (
+                    <>
+                      <Button variant="secondary" onClick={saveTelegramChat}>
+                        Сохранить
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void testTelegramChat()}
+                        disabled={telegramTestPending || !telegramChatInput.trim()}
+                      >
+                        {telegramTestPending ? 'Отправка…' : 'Проверить'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {telegramStatus.chatConfigured ? (
+                  <p className="text-sm text-emerald-300/90">Чат подключён — можно отправлять напоминания</p>
+                ) : (
+                  <p className="text-sm text-muted">Укажите Chat ID и нажмите «Проверить»</p>
+                )}
+                {telegramTestMessage ? (
+                  <p
+                    className={`text-sm ${
+                      telegramTestMessage.includes('отправлено')
+                        ? 'text-gold-light'
+                        : 'text-amber-200'
+                    }`}
+                  >
+                    {telegramTestMessage}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+              <Bell size={16} />
+              Напоминания
+            </div>
+
+            {!telegramStatus?.botConfigured ? (
+              <div className="space-y-3 rounded-2xl border border-amber-500/25 bg-amber-950/20 p-5 text-sm">
+                {theaterReminders.enabled ? (
+                  <p className="text-amber-100">
+                    <strong className="font-medium">Напоминания включены в настройках театра</strong>, но планировщик
+                    на сервере не работает — сообщения не уйдут, пока не настроен бот.
+                  </p>
+                ) : null}
+                <p className="text-muted">
+                  Задайте <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code> и перезапустите
+                  API (<code>restart.bat</code>). Без перезапуска планировщик остаётся выключенным, даже если токен уже
+                  в файле.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
+                {theaterReminders.enabled && telegramStatus.remindersSchedulerActive ? (
+                  <p className="text-sm text-emerald-300/90">
+                    Планировщик активен — проверка каждые {telegramStatus.reminderTickMinutes} мин, окно отправки{' '}
+                    {telegramStatus.reminderWindowMinutes} мин
+                    {telegramStatus.botUsername ? (
+                      <>
+                        {' '}
+                        · бот{' '}
+                        <a
+                          href={`https://t.me/${telegramStatus.botUsername}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gold-light underline-offset-2 hover:underline"
+                        >
+                          @{telegramStatus.botUsername}
+                        </a>
+                      </>
+                    ) : null}
+                    .
+                  </p>
+                ) : null}
+                <label className="flex cursor-pointer items-start gap-4">
+                  <input
+                    type="checkbox"
+                    checked={theaterReminders.enabled}
+                    disabled={readOnly}
+                    onChange={(event) => updateTheaterReminders({ enabled: event.target.checked })}
+                    className="mt-1 h-4 w-4 rounded border-gold/30 accent-gold"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-base font-medium text-white">
+                      Личные напоминания участникам
+                    </span>
+                    <span className="mt-1 block text-sm leading-relaxed text-muted">
+                      Бот отправит план репетиции в личку каждому участнику, у кого подключён Telegram.
+                      Общий чат театра выше — только для ручной рассылки.
+                    </span>
+                  </span>
+                </label>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-muted">Когда напоминать</p>
+                  <div className="flex flex-wrap gap-2">
+                    {REMINDER_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        disabled={readOnly}
+                        onClick={() => toggleReminderType(type)}
+                        className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+                          theaterReminders.types.includes(type)
+                            ? 'bg-gold/20 text-gold-light'
+                            : 'bg-white/5 text-muted hover:bg-white/10'
+                        }`}
+                      >
+                        {REMINDER_TYPE_LABELS[type]}
+                      </button>
+                    ))}
+                  </div>
+                  {theaterReminders.types.includes('morning_of') ? (
+                    <p className="text-xs text-muted">
+                      «Утром» — около {theaterReminders.morningHour ?? DEFAULT_THEATER_REMINDER_SETTINGS.morningHour}:00
+                      по времени театра (UTC+3, настраивается на сервере).
+                    </p>
+                  ) : null}
+                </div>
+
+                <p className="text-sm text-muted">
+                  Участники подключают бота в карточке участника → «Подключить Telegram».
+                </p>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+        </>
+      )}
     </div>
   );
 }

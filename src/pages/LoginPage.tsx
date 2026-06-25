@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Film } from 'lucide-react';
 import { useAuth } from '../store/AuthContext';
+import { fetchAuthConfig, requestPasswordReset } from '../api/auth';
 import { Button } from '../components/Button';
 
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
@@ -34,14 +35,20 @@ export function LoginPage() {
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mailConfigured, setMailConfigured] = useState(false);
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/app';
+
+  useEffect(() => {
+    void fetchAuthConfig().then((config) => setMailConfigured(config.mailConfigured));
+  }, []);
 
   useEffect(() => {
     if (!clientId || !googleButtonRef.current || loading || user) return;
@@ -88,7 +95,13 @@ export function LoginPage() {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setInfo(null);
     try {
+      if (mode === 'forgot') {
+        const message = await requestPasswordReset(email);
+        setInfo(message);
+        return;
+      }
       if (mode === 'login') {
         await login(email, password);
       } else {
@@ -100,6 +113,12 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
+    setMode(next);
+    setError(null);
+    setInfo(null);
   };
 
   return (
@@ -115,26 +134,35 @@ export function LoginPage() {
           </div>
         </div>
 
-        <div className="mb-6 flex gap-2 rounded-xl bg-black/20 p-1">
-          <button
-            type="button"
-            onClick={() => setMode('login')}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-              mode === 'login' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-            }`}
-          >
-            Вход
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('register')}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-              mode === 'register' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-            }`}
-          >
-            Регистрация
-          </button>
-        </div>
+        {mode !== 'forgot' ? (
+          <div className="mb-6 flex gap-2 rounded-xl bg-black/20 p-1">
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                mode === 'login' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+              }`}
+            >
+              Вход
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('register')}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                mode === 'register' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+              }`}
+            >
+              Регистрация
+            </button>
+          </div>
+        ) : (
+          <div className="mb-6">
+            <h2 className="text-lg font-medium text-white">Восстановление пароля</h2>
+            <p className="mt-1 text-sm text-muted">
+              Отправим одноразовый пароль на email. После входа смените его в Настройках.
+            </p>
+          </div>
+        )}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           {mode === 'register' && (
@@ -162,21 +190,43 @@ export function LoginPage() {
             />
           </label>
 
-          <label className="block">
-            <span className="mb-1 block text-sm text-muted">Пароль</span>
-            <input
-              type="password"
-              required
-              minLength={mode === 'register' ? 8 : undefined}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
-            {mode === 'register' && (
-              <span className="mt-1 block text-xs text-muted">Минимум 8 символов</span>
-            )}
-          </label>
+          {mode !== 'forgot' && (
+            <label className="block">
+              <span className="mb-1 block text-sm text-muted">Пароль</span>
+              <input
+                type="password"
+                required
+                minLength={mode === 'register' ? 8 : undefined}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+              {mode === 'register' && (
+                <span className="mt-1 block text-xs text-muted">Минимум 8 символов</span>
+              )}
+            </label>
+          )}
+
+          {mode === 'login' && mailConfigured && (
+            <button
+              type="button"
+              onClick={() => switchMode('forgot')}
+              className="text-sm text-gold-light hover:underline"
+            >
+              Забыли пароль?
+            </button>
+          )}
+
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="text-sm text-muted hover:text-white"
+            >
+              ← Назад ко входу
+            </button>
+          )}
 
           {error && (
             <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
@@ -184,12 +234,24 @@ export function LoginPage() {
             </div>
           )}
 
+          {info && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-200">
+              {info}
+            </div>
+          )}
+
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+            {submitting
+              ? 'Подождите…'
+              : mode === 'login'
+                ? 'Войти'
+                : mode === 'register'
+                  ? 'Создать аккаунт'
+                  : 'Отправить пароль на почту'}
           </Button>
         </form>
 
-        {clientId ? (
+        {mode !== 'forgot' && clientId ? (
           <div className="mt-6 space-y-3">
             <div className="text-center text-xs uppercase tracking-wide text-muted">или</div>
             <div ref={googleButtonRef} className="flex justify-center" />

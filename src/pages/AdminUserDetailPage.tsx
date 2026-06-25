@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
@@ -8,15 +8,19 @@ import {
   Film,
   RefreshCw,
   Shield,
+  Trash2,
   Users,
   HardDrive,
 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
-import { fetchAdminUserDetail } from '../api/adminUsers';
+import { deleteAdminUser, fetchAdminUserDetail } from '../api/adminUsers';
 import type { AdminUserDetail } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
+import { useAuth } from '../store/AuthContext';
+import { useConfirmDialog } from '../components/ConfirmDialogContext';
+import { Button } from '../components/Button';
 
 function authLabel(detail: AdminUserDetail): string {
   const methods: string[] = [];
@@ -27,9 +31,15 @@ function authLabel(detail: AdminUserDetail): string {
 
 export function AdminUserDetailPage() {
   const { userId } = useParams();
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const { confirmDelete } = useConfirmDialog();
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const isSelf = Boolean(userId && currentUser?.id === userId);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -48,6 +58,48 @@ export function AdminUserDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handleDeleteUser = async () => {
+    if (!detail || !userId || isSelf || deleting) return;
+
+    const ownedCount = detail.ownedTheaterCount;
+    const memberOnlyCount = detail.theaterCount - ownedCount;
+    const parts = [
+      'Аккаунт, сессии и настройки будут удалены без возможности восстановления.',
+      ownedCount > 0
+        ? `${ownedCount} театр(ов) во владении и весь их контент (постановки, репетиции, участники).`
+        : null,
+      memberOnlyCount > 0
+        ? `Доступ к ${memberOnlyCount} театр(ам), где пользователь не владелец, будет отозван — сами театры останутся.`
+        : null,
+      detail.filesCount > 0 ? `${detail.filesCount} загруженных файлов.` : null,
+    ].filter(Boolean);
+
+    const confirmed = await confirmDelete({
+      title: `Удалить пользователя «${detail.name}»?`,
+      message: parts.join(' '),
+      confirmLabel: 'Удалить пользователя',
+    });
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAdminUser(userId);
+      navigate(appPaths.adminUsers, { replace: true });
+    } catch (deleteUserError) {
+      const code = deleteUserError instanceof Error ? deleteUserError.message : 'DELETE_USER_FAILED';
+      if (code === 'CANNOT_DELETE_SELF') {
+        setDeleteError('Нельзя удалить свой аккаунт из админки');
+      } else if (code === 'NOT_FOUND') {
+        setDeleteError('Пользователь уже удалён');
+      } else {
+        setDeleteError('Не удалось удалить пользователя');
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (!userId) {
     return <NavigateToUsers />;
@@ -95,6 +147,7 @@ export function AdminUserDetailPage() {
       </header>
 
       <AdminErrorBanner error={error} />
+      <AdminErrorBanner error={deleteError} />
 
       {loading && !detail ? (
         <div className="rounded-2xl border border-dashed border-gold/20 p-10 text-center text-muted">
@@ -163,6 +216,28 @@ export function AdminUserDetailPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-red-500/20 bg-red-950/10 p-5">
+            <h2 className="text-lg font-semibold text-red-200">Опасная зона</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Полное удаление аккаунта и всех связанных данных. Действие необратимо.
+            </p>
+            {isSelf ? (
+              <p className="mt-3 text-sm text-amber-200">
+                Нельзя удалить свой аккаунт из админки — используйте другой администраторский вход.
+              </p>
+            ) : (
+              <Button
+                variant="danger"
+                className="mt-4"
+                disabled={deleting}
+                onClick={() => void handleDeleteUser()}
+              >
+                <Trash2 size={16} />
+                {deleting ? 'Удаление…' : 'Удалить пользователя'}
+              </Button>
             )}
           </section>
 

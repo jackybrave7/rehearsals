@@ -5,6 +5,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
 import { NoTheaterGate } from './NoTheaterGate';
+import { ReminderSchedulerBanner } from './ReminderSchedulerBanner';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
   const { saveError, saveStatus, readOnly } = useRehearsalStore();
@@ -81,6 +82,7 @@ export function Layout() {
     return (
       <ZenShell
         statusBar={<StatusBar compact />}
+        reminderBanner={<ReminderSchedulerBanner />}
         recoveryBar={<RecoveryBar />}
       />
     );
@@ -91,6 +93,7 @@ export function Layout() {
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <StatusBar />
+        <ReminderSchedulerBanner />
         <RecoveryBar />
         <WorkContextBar variant="theater" />
         <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">

@@ -60,6 +60,7 @@ type DialogState =
       kind: 'confirmDelete';
       options: ConfirmDeleteOptions & { confirmWord: string };
       value: string;
+      openId: number;
       resolve: (value: boolean) => void;
     }
   | { kind: 'alert'; options: AlertOptions; resolve: () => void }
@@ -67,6 +68,7 @@ type DialogState =
       kind: 'prompt';
       options: PromptOptions;
       value: string;
+      openId: number;
       resolve: (value: string | null) => void;
     };
 
@@ -79,6 +81,10 @@ function matchesDeleteWord(value: string, confirmWord: string): boolean {
 export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogOpenIdRef = useRef(0);
+
+  const dialogOpenId =
+    dialog?.kind === 'prompt' || dialog?.kind === 'confirmDelete' ? dialog.openId : null;
 
   useEffect(() => {
     if (dialog?.kind !== 'prompt' && dialog?.kind !== 'confirmDelete') return;
@@ -89,7 +95,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
       }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [dialog]);
+  }, [dialog?.kind, dialogOpenId]);
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -99,10 +105,12 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
 
   const confirmDelete = useCallback((options: ConfirmDeleteOptions) => {
     return new Promise<boolean>((resolve) => {
+      dialogOpenIdRef.current += 1;
       setDialog({
         kind: 'confirmDelete',
         options: { confirmWord: DEFAULT_DELETE_WORD, ...options },
         value: '',
+        openId: dialogOpenIdRef.current,
         resolve,
       });
     });
@@ -116,10 +124,12 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
 
   const prompt = useCallback((options: PromptOptions) => {
     return new Promise<string | null>((resolve) => {
+      dialogOpenIdRef.current += 1;
       setDialog({
         kind: 'prompt',
         options,
         value: options.defaultValue ?? '',
+        openId: dialogOpenIdRef.current,
         resolve,
       });
     });

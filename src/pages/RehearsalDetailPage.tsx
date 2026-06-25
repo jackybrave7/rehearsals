@@ -9,17 +9,17 @@ import {
   Copy,
   GripVertical,
   MapPin,
-  Pencil,
   Send,
   UserPlus,
 } from 'lucide-react';
-import { DeleteButton } from '../components/DeleteButton';
+import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { generateId } from '../utils/id';
 import { addMinutes } from '../utils/time';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { recalculateScheduleStartTimes, setPlanPoolDragData } from '../utils/schedulePlan';
-import { fetchTelegramConfigured, sendTelegramHtmlMessage } from '../api/telegram';
+import { fetchTelegramStatus, sendTelegramHtmlMessage } from '../api/telegram';
 import { resolveRehearsalLocation } from '../utils/venue';
 import {
   buildRehearsalTelegramBotMessage,
@@ -72,7 +72,6 @@ import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
-import { RehearsalCalendarActions } from '../components/RehearsalCalendarActions';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
 import {
   dismissRehearsalWarning,
@@ -107,6 +106,7 @@ const attendanceColors: Record<AttendanceStatus, string> = {
 export function RehearsalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { state, dispatch, readOnly } = useRehearsalStore();
+  const { user } = useAuth();
   const { confirm } = useConfirmDialog();
   const navigate = useNavigate();
   const rehearsal = state.rehearsals.find((r) => r.id === id);
@@ -133,9 +133,10 @@ export function RehearsalDetailPage() {
   });
 
   useEffect(() => {
-    if (!telegramModalOpen) return;
-    void fetchTelegramConfigured().then(setTelegramConfigured);
-  }, [telegramModalOpen]);
+    const theaterId = rehearsal?.theaterId ?? state.activeTheaterId;
+    if (!telegramModalOpen || !theaterId) return;
+    void fetchTelegramStatus(theaterId).then((status) => setTelegramConfigured(status.configured));
+  }, [telegramModalOpen, rehearsal?.theaterId, state.activeTheaterId]);
 
   const rehearsalInsights = useMemo(() => {
     if (!rehearsal) {
@@ -433,11 +434,21 @@ export function RehearsalDetailPage() {
   };
 
   const handleSendTelegram = async () => {
+    const theaterId = rehearsal.theaterId ?? state.activeTheaterId;
+    if (!theaterId) {
+      setTelegramSendError('Не выбран театр для отправки');
+      return;
+    }
     setTelegramSending(true);
     setTelegramSendError(null);
     setTelegramSent(false);
     try {
-      await sendTelegramHtmlMessage(buildRehearsalTelegramBotMessage(state, rehearsal));
+      await sendTelegramHtmlMessage(
+        theaterId,
+        buildRehearsalTelegramBotMessage(state, rehearsal, {
+          initiatedBy: user?.name?.trim() || user?.email,
+        })
+      );
       setTelegramSent(true);
       window.setTimeout(() => setTelegramSent(false), 3000);
     } catch (error) {
@@ -456,8 +467,8 @@ export function RehearsalDetailPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <Link
             to={appPaths.rehearsals}
             className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-gold"
@@ -485,21 +496,14 @@ export function RehearsalDetailPage() {
           </div>
           {rehearsal.notes && <p className="mt-3 text-muted">{rehearsal.notes}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <RehearsalCalendarActions
-            rehearsal={rehearsal}
-            title={calendarTitle}
-            location={rehearsalLocation}
-            compact
-          />
-          <Button variant="secondary" onClick={openTelegramExport}>
-            <Send size={16} /> Telegram
-          </Button>
-          <Button variant="secondary" onClick={openEditRehearsal}>
-            <Pencil size={16} /> Редактировать
-          </Button>
-          <DeleteButton label="Удалить репетицию" onClick={deleteRehearsal} />
-        </div>
+        <RehearsalActionsMenu
+          rehearsal={rehearsal}
+          title={calendarTitle}
+          location={rehearsalLocation}
+          onTelegram={openTelegramExport}
+          onEdit={readOnly ? undefined : openEditRehearsal}
+          onDelete={readOnly ? undefined : deleteRehearsal}
+        />
       </div>
 
       {showRehearsalWarnings && (
@@ -538,16 +542,30 @@ export function RehearsalDetailPage() {
             )}
             {(rehearsal.remindersSent ?? []).length > 0 ? (
               <ul className="space-y-1 text-sm text-muted">
-                {(rehearsal.remindersSent ?? []).map((entry, index) => (
-                  <li key={`${entry.kind}-${entry.at}-${index}`}>
-                    Напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)} отправлено в{' '}
-                    {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
-                  </li>
-                ))}
+                {(rehearsal.remindersSent ?? []).map((entry, index) => {
+                  const actorLabel = entry.actorId
+                    ? state.actors.find((actor) => actor.id === entry.actorId)?.name ?? 'участнику'
+                    : null;
+                  return (
+                    <li key={`${entry.kind}-${entry.actorId ?? ''}-${entry.at}-${index}`}>
+                      {actorLabel ? (
+                        <>
+                          {actorLabel}: напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)}{' '}
+                          отправлено в {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
+                        </>
+                      ) : (
+                        <>
+                          Напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)} отправлено в{' '}
+                          {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-sm text-muted">
-                Авто-напоминания ещё не отправлялись. Настройте в разделе «Настройки».
+                Личные напоминания ещё не отправлялись. Включите в «Настройках» и подключите бота у участников.
               </p>
             )}
           </div>
@@ -1042,9 +1060,8 @@ export function RehearsalDetailPage() {
         <div className="space-y-4">
           <p className="text-sm text-muted">
             Telegram не принимает ссылки из буфера браузера. При «Скопировать» под каждой сценой
-            будет строка 🔗 — она кликабельна в чате. Чтобы названия сцен были ссылками (как на
-            скрине), настройте бота в <code className="text-gold/80">.env</code> и нажмите
-            «Отправить в Telegram».
+            будет строка 🔗 — она кликабельна в чате. Чтобы названия сцен были ссылками, подключите
+            чат театра в настройках и нажмите «Отправить в Telegram».
           </p>
           <textarea
             readOnly

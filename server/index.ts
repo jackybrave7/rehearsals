@@ -7,8 +7,9 @@ import { loadStateForUser, saveStateForUser } from './stateUserScope.js';
 import { registerAuthRoutes, requireAuth } from './auth.js';
 import { registerFileRoutes } from './fileRoutes.js';
 import { registerAdminRoutes } from './adminStats.js';
+import { registerAdminDeleteUserRoutes } from './adminDeleteUser.js';
 import type { AppState } from '../src/types/index.js';
-import { getTelegramConfig, sendTelegramHtmlMessage } from './telegram.js';
+import { registerTelegramRoutes } from './telegramRoutes.js';
 import {
   getDbInfo,
   listBackupFiles,
@@ -17,6 +18,7 @@ import {
 } from './backup.js';
 import { handleFetchGoogleDocument } from './googleDocs.js';
 import { startReminderScheduler } from './reminderScheduler.js';
+import { startTelegramLinkPoller } from './telegramLinkPoller.js';
 
 loadEnvFile();
 
@@ -29,6 +31,8 @@ app.use(express.json({ limit: '25mb' }));
 registerAuthRoutes(app);
 registerFileRoutes(app);
 registerAdminRoutes(app);
+registerAdminDeleteUserRoutes(app);
+registerTelegramRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });
@@ -85,35 +89,8 @@ app.get('/api/state', (req, res) => {
   res.json(state);
 });
 
-app.get('/api/telegram/config', (_req, res) => {
-  res.json({ configured: Boolean(getTelegramConfig()) });
-});
-
 app.get('/api/google-docs/documents/:documentId', (req, res) => {
   void handleFetchGoogleDocument(req, res);
-});
-
-app.post('/api/telegram/send', async (req, res) => {
-  const config = getTelegramConfig();
-  if (!config) {
-    res.status(503).json({ error: 'NOT_CONFIGURED' });
-    return;
-  }
-
-  const html = req.body?.html;
-  if (typeof html !== 'string' || !html.trim()) {
-    res.status(400).json({ error: 'INVALID_BODY' });
-    return;
-  }
-
-  try {
-    await sendTelegramHtmlMessage(config, html.trim());
-    res.json({ ok: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'SEND_FAILED';
-    console.error('[api] telegram send failed', message);
-    res.status(500).json({ error: 'SEND_FAILED', message });
-  }
 });
 
 app.put('/api/state', (req, res) => {
@@ -149,6 +126,7 @@ const server = app.listen(PORT, () => {
   console.log(`[api] SQLite: ${getDbPath()}`);
   console.log(`[api] http://localhost:${PORT}`);
   startReminderScheduler();
+  startTelegramLinkPoller();
 });
 
 function shutdown() {

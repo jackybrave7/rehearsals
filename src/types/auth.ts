@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  hasPassword?: boolean;
 }
 
 export interface TheaterAccessInfo {

@@ -1,21 +1,30 @@
 import type { AppState, Rehearsal } from '../src/types/index.js';
 import { getDb, type AppDatabase } from './db.js';
 import { loadState } from './stateRepository.js';
-import { getTelegramConfig, sendTelegramHtmlMessage } from './telegram.js';
-import { buildRehearsalTelegramBotMessage } from '../src/utils/rehearsalTelegramExport.js';
+import { getTelegramBotToken, sendTelegramHtmlMessage } from './telegram.js';
+import { buildActorReminderTelegramBotMessage } from '../src/utils/rehearsalTelegramExport.js';
+import { getParticipatingActorIds } from '../src/utils/rehearsalActors.js';
 import {
-  getReminderKind,
   hasReminderBeenSent,
   isRehearsalInFuture,
-  isReminderDue,
-  parseRehearsalStartUtc,
-  resolveReminderSettings,
+  isReminderTypeDue,
+  resolveTheaterReminderSettings,
   type RehearsalReminderSent,
+  type ReminderType,
 } from '../src/utils/reminders.js';
 
 const TICK_MS = Number(process.env.REMINDER_TICK_MINUTES ?? 5) * 60 * 1000;
 const WINDOW_MINUTES = Number(process.env.REMINDER_WINDOW_MINUTES ?? 10);
 const UTC_OFFSET_HOURS = Number(process.env.REHEARSAL_UTC_OFFSET_HOURS ?? 3);
+const MORNING_HOUR = Number(process.env.REMINDER_MORNING_HOUR ?? 9);
+
+export function getReminderSchedulerConfig() {
+  return {
+    active: Boolean(getTelegramBotToken()),
+    tickMinutes: Number(process.env.REMINDER_TICK_MINUTES ?? 5),
+    windowMinutes: WINDOW_MINUTES,
+  };
+}
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -45,14 +54,6 @@ function getOwnerTheaterIds(db: AppDatabase, userId: string): string[] {
   return [...new Set(rows.map((row) => row.id))];
 }
 
-function loadOwnerReminderSettings(db: AppDatabase, userId: string) {
-  const row = db.prepare(`SELECT app_meta FROM user_settings WHERE user_id = ?`).get(userId) as
-    | { app_meta: string }
-    | undefined;
-  const appMeta = parseJson<AppState['appMeta']>(row?.app_meta, {});
-  return resolveReminderSettings(appMeta);
-}
-
 function appendReminderSent(
   db: AppDatabase,
   rehearsalId: string,
@@ -73,7 +74,8 @@ async function processRehearsalReminder(
   db: AppDatabase,
   rehearsalRow: Record<string, unknown>,
   state: AppState,
-  offsetsHours: number[],
+  reminderTypes: ReminderType[],
+  morningHour: number,
   now: Date
 ): Promise<void> {
   const rehearsal = state.rehearsals.find((item) => item.id === String(rehearsalRow.id));
@@ -83,36 +85,53 @@ async function processRehearsalReminder(
   const startTime = String(rehearsalRow.start_time);
   if (!isRehearsalInFuture(date, startTime, now, UTC_OFFSET_HOURS)) return;
 
-  const rehearsalStart = parseRehearsalStartUtc(date, startTime, UTC_OFFSET_HOURS);
-  const config = getTelegramConfig();
-  if (!config) return;
+  const token = getTelegramBotToken();
+  if (!token) return;
 
-  for (const offsetHours of offsetsHours) {
-    if (!isReminderDue(rehearsalStart, offsetHours, now, WINDOW_MINUTES)) continue;
+  const participatingActorIds = getParticipatingActorIds(state, rehearsal);
 
-    const kind = getReminderKind(offsetHours);
-    if (hasReminderBeenSent(rehearsal.remindersSent, kind, offsetHours)) continue;
+  for (const actorId of participatingActorIds) {
+    const actor = state.actors.find((item) => item.id === actorId);
+    const chatId = actor?.telegramChatId?.trim();
+    if (!chatId) continue;
 
-    const html = buildRehearsalTelegramBotMessage(state, rehearsal);
-    await sendTelegramHtmlMessage(config, html);
+    for (const reminderType of reminderTypes) {
+      if (
+        !isReminderTypeDue(
+          reminderType,
+          date,
+          startTime,
+          now,
+          WINDOW_MINUTES,
+          UTC_OFFSET_HOURS,
+          morningHour
+        )
+      ) {
+        continue;
+      }
 
-    const entry: RehearsalReminderSent = {
-      kind,
-      at: now.toISOString(),
-      ...(kind === 'custom' ? { offsetHours } : {}),
-    };
-    appendReminderSent(db, rehearsal.id, entry);
-    rehearsal.remindersSent = [...(rehearsal.remindersSent ?? []), entry];
+      if (hasReminderBeenSent(rehearsal.remindersSent, reminderType, actorId)) continue;
 
-    console.log(
-      `[reminders] sent ${kind} for rehearsal ${rehearsal.id} (${date} ${startTime})`
-    );
+      const html = buildActorReminderTelegramBotMessage(state, rehearsal, actorId);
+      await sendTelegramHtmlMessage(chatId, html, token);
+
+      const entry: RehearsalReminderSent = {
+        kind: reminderType,
+        at: now.toISOString(),
+        actorId,
+      };
+      appendReminderSent(db, rehearsal.id, entry);
+      rehearsal.remindersSent = [...(rehearsal.remindersSent ?? []), entry];
+
+      console.log(
+        `[reminders] sent ${reminderType} to actor ${actorId} for rehearsal ${rehearsal.id} (${date} ${startTime})`
+      );
+    }
   }
 }
 
 export async function runReminderTick(db: AppDatabase = getDb()): Promise<void> {
-  const config = getTelegramConfig();
-  if (!config) return;
+  if (!getTelegramBotToken()) return;
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -122,19 +141,11 @@ export async function runReminderTick(db: AppDatabase = getDb()): Promise<void> 
     .all(today) as Array<Record<string, unknown>>;
 
   const stateCache = new Map<string, AppState>();
-  const settingsCache = new Map<string, ReturnType<typeof resolveReminderSettings>>();
 
   for (const row of rows) {
     const theaterId = (row.theater_id as string | null) ?? undefined;
     const ownerId = getTheaterOwnerUserId(db, theaterId);
-    if (!ownerId) continue;
-
-    let settings = settingsCache.get(ownerId);
-    if (!settings) {
-      settings = loadOwnerReminderSettings(db, ownerId);
-      settingsCache.set(ownerId, settings);
-    }
-    if (!settings.enabled) continue;
+    if (!ownerId || !theaterId) continue;
 
     let state = stateCache.get(ownerId);
     if (!state) {
@@ -145,8 +156,19 @@ export async function runReminderTick(db: AppDatabase = getDb()): Promise<void> 
       stateCache.set(ownerId, state);
     }
 
+    const theater = state.theaters.find((item) => item.id === theaterId);
+    const settings = resolveTheaterReminderSettings(theater ?? {}, state.appMeta);
+    if (!settings.enabled || settings.types.length === 0) continue;
+
     try {
-      await processRehearsalReminder(db, row, state, settings.offsetsHours, now);
+      await processRehearsalReminder(
+        db,
+        row,
+        state,
+        settings.types,
+        settings.morningHour ?? MORNING_HOUR,
+        now
+      );
     } catch (error) {
       console.error(`[reminders] failed for rehearsal ${row.id}`, error);
     }
@@ -154,14 +176,14 @@ export async function runReminderTick(db: AppDatabase = getDb()): Promise<void> 
 }
 
 export function startReminderScheduler(db: AppDatabase = getDb()): () => void {
-  const config = getTelegramConfig();
-  if (!config) {
+  const config = getReminderSchedulerConfig();
+  if (!config.active) {
     console.log('[reminders] Telegram bot not configured — scheduler disabled');
     return () => undefined;
   }
 
   console.log(
-    `[reminders] scheduler every ${TICK_MS / 60000} min, window ${WINDOW_MINUTES} min, UTC offset +${UTC_OFFSET_HOURS}`
+    `[reminders] personal reminders every ${config.tickMinutes} min, window ${config.windowMinutes} min, UTC+${UTC_OFFSET_HOURS}, morning ${MORNING_HOUR}:00`
   );
 
   const tick = () => {

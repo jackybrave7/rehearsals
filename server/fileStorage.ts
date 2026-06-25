@@ -110,3 +110,25 @@ export function saveDataUrlAsFile(
   const buffer = Buffer.from(match[2], 'base64');
   return saveBufferAsFile(db, ownerUserId, buffer, originalName, mimeType);
 }
+
+export function deleteStoredFile(db: AppDatabase, fileId: string): void {
+  const filePath = getFileStoragePath(fileId);
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`[files] failed to delete file ${fileId}`, error);
+  }
+  db.prepare('DELETE FROM files WHERE id = ?').run(fileId);
+}
+
+export function deleteUserFiles(db: AppDatabase, userId: string): number {
+  const rows = db.prepare('SELECT id FROM files WHERE owner_user_id = ?').all(userId) as Array<{
+    id: string;
+  }>;
+  for (const row of rows) {
+    deleteStoredFile(db, row.id);
+  }
+  return rows.length;
+}
