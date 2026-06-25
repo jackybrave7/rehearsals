@@ -95,6 +95,26 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d ваш-домен.ru
 ```
 
+## Docker (текущий прод)
+
+На VPS API может работать в контейнере `rehearsals-api`. Для исходящих запросов к `api.telegram.org` нужен **`--network host`** — иначе из bridge-сети Docker бывает `fetch failed` / `UND_ERR_CONNECT_TIMEOUT`.
+
+```bash
+cd /var/www/rehearsals
+docker stop rehearsals-api 2>/dev/null; docker rm rehearsals-api 2>/dev/null
+docker run -d \
+  --name rehearsals-api \
+  --restart unless-stopped \
+  --network host \
+  -v /var/www/rehearsals:/app \
+  --env-file /var/www/rehearsals/.env \
+  -e NODE_OPTIONS=--dns-result-order=ipv4first \
+  -w /app node:22-bookworm-slim \
+  sh -c 'rm -rf node_modules && npm install --omit=dev && npm start'
+```
+
+`TELEGRAM_BOT_TOKEN` задаётся в `/var/www/rehearsals/.env` (не в git). После правки — `docker restart rehearsals-api`.
+
 ## Обновление после изменений в git
 
 ```bash

@@ -6,6 +6,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActiveActors, getArchivedActors, formatActorRolesSummary } from '../store/selectors';
 import { uploadFile } from '../api/files';
 import { generateId } from '../utils/id';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import { formatPhone, formatPhoneInput, parsePhoneForSave } from '../utils/phone';
 import { getActorUnavailabilityBadge } from '../utils/actorAvailability';
 import {
@@ -264,9 +265,9 @@ export function ActorsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Участники</h1>
+          <h1 className={pageTitleClass}>Участники</h1>
           <p className="mt-1 text-muted">
             {activeActors.length} активных
             {archivedActors.length > 0 && ` · ${archivedActors.length} в архиве`}

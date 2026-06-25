@@ -18,6 +18,7 @@ import { useDesign } from '../store/DesignContext';
 import { ZenDashboard } from '../components/zen/ZenDashboard';
 import { PlayOverviewMini } from './OverviewPage';
 import { appPaths } from '../navigation/appPaths';
+import { pageTitleClass } from '../utils/pageLayout';
 
 export function DashboardPage() {
   const { isZen } = useDesign();
@@ -61,7 +62,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-3xl font-bold text-white">Обзор</h1>
+        <h1 className={pageTitleClass}>Обзор</h1>
         {activePlay ? (
           <p className="mt-1 text-muted">
             «{activePlay.title}» — {activePlay.author}
@@ -101,7 +102,7 @@ export function DashboardPage() {
       <PlayOverviewMini />
 
       <section>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-white">Ближайшие репетиции</h2>
           <Link to={appPaths.rehearsals} className="text-sm text-gold hover:underline">
             Все репетиции
@@ -122,7 +123,7 @@ export function DashboardPage() {
               <Link
                 key={r.id}
                 to={appPaths.rehearsal(r.id)}
-                className="flex items-center justify-between rounded-xl border border-gold/10 bg-surface/40 px-5 py-4 transition-colors hover:border-gold/25"
+                className="flex flex-col gap-2 rounded-xl border border-gold/10 bg-surface/40 px-4 py-3 transition-colors hover:border-gold/25 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4"
               >
                 <div>
                   <p className="font-medium text-white capitalize">

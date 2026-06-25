@@ -277,8 +277,8 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
             Список ролей пуст
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-gold/10">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-gold/10">
+            <table className="w-full min-w-[28rem] text-sm">
               <thead className="bg-background/40 text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">Роль</th>

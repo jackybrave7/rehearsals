@@ -7,6 +7,7 @@ import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActiveActors, getPlayScenes, getTheaterPlays, getTheaterTasks } from '../store/selectors';
 import { generateId } from '../utils/id';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import type { Task, TaskPriority } from '../types';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
@@ -201,9 +202,9 @@ export function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Задачи</h1>
+          <h1 className={pageTitleClass}>Задачи</h1>
           <p className="mt-1 text-muted">Подготовка к показам: сроки, приоритеты, привязка к постановкам</p>
         </div>
         <Button onClick={openCreate}>

@@ -17,6 +17,7 @@ import {
 } from '../store/selectors';
 import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import type { Rehearsal } from '../types';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
@@ -131,9 +132,9 @@ export function RehearsalsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Репетиции</h1>
+          <h1 className={pageTitleClass}>Репетиции</h1>
           <p className="mt-1 text-muted">Календарь и расписание</p>
         </div>
         <div className="flex gap-3">

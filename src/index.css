@@ -119,6 +119,21 @@ html[data-design='zen'] ::-webkit-scrollbar-thumb:hover {
   animation: zen-drawer-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+@keyframes theater-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.theater-mobile-drawer {
+  animation: theater-drawer-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .zen-card {
   border-radius: 1.25rem;
   border: 1px solid var(--color-border);

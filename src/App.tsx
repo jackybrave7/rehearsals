@@ -15,6 +15,7 @@ import { TasksPage } from './pages/TasksPage';
 import { RehearsalsPage } from './pages/RehearsalsPage';
 import { RehearsalDetailPage } from './pages/RehearsalDetailPage';
 import { VenuesPage } from './pages/VenuesPage';
+import { GuidePage } from './pages/GuidePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="rehearsals" element={<Navigate to="/app/rehearsals" replace />} />
               <Route path="rehearsals/:id" element={<LegacyRehearsalRedirect />} />
               <Route path="settings" element={<Navigate to="/app/settings" replace />} />
+              <Route path="guide" element={<Navigate to="/app/guide" replace />} />
               <Route
                 path="app"
                 element={
@@ -68,6 +70,7 @@ export default function App() {
                 <Route path="rehearsals" element={<RehearsalsPage />} />
                 <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="guide" element={<GuidePage />} />
                 <Route
                   path="admin"
                   element={

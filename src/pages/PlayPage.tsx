@@ -15,6 +15,7 @@ import { Input, Textarea } from '../components/FormFields';
 import { CastDistributionPanel } from '../components/CastDistributionPanel';
 import { getTheaterPlays } from '../store/selectors';
 import { useHashScroll } from '../hooks/useHashScroll';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 
 const emptyPlay = (): Omit<Play, 'id'> => ({
   title: '',
@@ -143,9 +144,9 @@ export function PlayPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Постановки</h1>
+          <h1 className={pageTitleClass}>Постановки</h1>
           <p className="mt-1 text-muted">Несколько спектаклей в работе одновременно</p>
         </div>
         <Button onClick={openCreate}>

@@ -9,6 +9,7 @@ import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea } from '../components/FormFields';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 
 const emptyVenue = (): Omit<Venue, 'id'> => ({
   name: '',
@@ -59,9 +60,9 @@ export function VenuesPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Площадки</h1>
+          <h1 className={pageTitleClass}>Площадки</h1>
           <p className="mt-1 text-muted">Репетиционные площадки и залы</p>
         </div>
         <Button onClick={openCreate}>

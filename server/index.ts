@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import dns from 'node:dns';
 import { closeDb, getDb, getDbPath } from './db.js';
 import { loadEnvFile } from './env.js';
 import { isEmptyState, loadState, saveState } from './stateRepository.js';
@@ -19,6 +20,9 @@ import {
 import { handleFetchGoogleDocument } from './googleDocs.js';
 import { startReminderScheduler } from './reminderScheduler.js';
 import { startTelegramLinkPoller } from './telegramLinkPoller.js';
+
+// Docker на VPS часто резолвит api.telegram.org в IPv6 без маршрута — fetch таймаутится.
+dns.setDefaultResultOrder('ipv4first');
 
 loadEnvFile();
 

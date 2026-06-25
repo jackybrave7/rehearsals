@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { ZenShell } from './zen/ZenShell';
 import { WorkContextBar } from './WorkContextBar';
@@ -77,6 +79,20 @@ function RecoveryBar() {
 
 export function Layout() {
   const { isZen } = useDesign();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (isZen || !menuOpen) return;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isZen, menuOpen]);
 
   if (isZen) {
     return (
@@ -90,16 +106,32 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <StatusBar />
-        <ReminderSchedulerBanner />
-        <RecoveryBar />
-        <WorkContextBar variant="theater" />
-        <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">
+      <Sidebar className="hidden lg:flex" />
+      <main className="flex min-w-0 flex-1 flex-col overflow-auto">
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm lg:static lg:bg-transparent lg:backdrop-blur-none">
+          <StatusBar />
+          <ReminderSchedulerBanner />
+          <RecoveryBar />
+          <WorkContextBar variant="theater" onMenuClick={() => setMenuOpen(true)} />
+        </div>
+        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:px-5 sm:py-6 lg:px-8">
           <NoTheaterGate />
         </div>
       </main>
+
+      {menuOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            aria-label="Закрыть меню"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="theater-mobile-drawer absolute left-0 top-0 h-full w-[min(100%,18rem)]">
+            <Sidebar drawer onNavigate={() => setMenuOpen(false)} className="h-full border-r-0" />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
 import { generateId } from '../utils/id';
+import { pageTitleClass } from '../utils/pageLayout';
 import { addMinutes } from '../utils/time';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { recalculateScheduleStartTimes, setPlanPoolDragData } from '../utils/schedulePlan';
@@ -467,7 +468,7 @@ export function RehearsalDetailPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <Link
             to={appPaths.rehearsals}
@@ -475,7 +476,7 @@ export function RehearsalDetailPage() {
           >
             <ArrowLeft size={16} /> К календарю
           </Link>
-          <h1 className="text-3xl font-bold capitalize text-white">
+          <h1 className={`${pageTitleClass} capitalize`}>
             {format(parseISO(rehearsal.date), 'EEEE, d MMMM yyyy', { locale: ru })}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-4 text-muted">
@@ -496,6 +497,7 @@ export function RehearsalDetailPage() {
           </div>
           {rehearsal.notes && <p className="mt-3 text-muted">{rehearsal.notes}</p>}
         </div>
+        <div className="shrink-0 self-start sm:self-auto">
         <RehearsalActionsMenu
           rehearsal={rehearsal}
           title={calendarTitle}
@@ -504,6 +506,7 @@ export function RehearsalDetailPage() {
           onEdit={readOnly ? undefined : openEditRehearsal}
           onDelete={readOnly ? undefined : deleteRehearsal}
         />
+        </div>
       </div>
 
       {showRehearsalWarnings && (

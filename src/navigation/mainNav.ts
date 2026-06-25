@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BookMarked,
   CalendarDays,
   CheckSquare,
   Film,
@@ -37,6 +38,7 @@ export const mainNavItems: MainNavItem[] = [
   { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции' },
   { to: appPaths.venues, icon: MapPin, label: 'Площадки' },
   { to: appPaths.tasks, icon: CheckSquare, label: 'Задачи' },
+  { to: appPaths.guide, icon: BookMarked, label: 'Руководство' },
   { to: appPaths.settings, icon: Settings, label: 'Настройки' },
 ];
 
@@ -45,6 +47,7 @@ export function resolveMainNavTitle(pathname: string, variant: 'theater' | 'zen'
   if (pathname.startsWith(`${appPaths.adminUsers}/`)) return 'Пользователь';
   if (pathname === appPaths.adminUsers) return 'Пользователи';
   if (pathname === appPaths.admin) return 'Админка';
+  if (pathname === appPaths.guide) return 'Руководство';
   const item = mainNavItems.find((entry) => entry.to === pathname);
   if (!item) return 'Репетиции';
   return getMainNavLabel(item, variant);

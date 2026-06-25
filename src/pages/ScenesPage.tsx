@@ -9,6 +9,7 @@ import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { formatDuration } from '../utils/time';
 import { getSceneShortLabel, groupScenesByAct } from '../utils/sceneLabels';
+import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import type { Scene, ScenePriority, SceneStatus } from '../types';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
@@ -286,9 +287,9 @@ export function ScenesPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className={pageHeaderClass}>
         <div>
-          <h1 className="text-3xl font-bold text-white">Сцены</h1>
+          <h1 className={pageTitleClass}>Сцены</h1>
           <p className="mt-1 text-muted">
             «{activePlay.title}» —{' '}
             {hasActiveFilters

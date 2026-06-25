@@ -11,6 +11,7 @@ export const appPaths = {
   venues: `${APP_BASE}/venues`,
   tasks: `${APP_BASE}/tasks`,
   settings: `${APP_BASE}/settings`,
+  guide: `${APP_BASE}/guide`,
   admin: `${APP_BASE}/admin`,
   adminUsers: `${APP_BASE}/admin/users`,
   adminUser: (id: string) => `${APP_BASE}/admin/users/${id}`,

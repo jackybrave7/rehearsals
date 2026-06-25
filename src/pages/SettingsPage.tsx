@@ -25,6 +25,7 @@ import {
   resolveSceneTimingSettings,
 } from '../utils/sceneTiming';
 import { appPaths } from '../navigation/appPaths';
+import { pageTitleClass } from '../utils/pageLayout';
 
 const options: Array<{
   id: AppDesign;
@@ -194,7 +195,7 @@ export function SettingsPage() {
     <div className="space-y-8">
       <header className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Настройки</h1>
+          <h1 className={pageTitleClass}>Настройки</h1>
           <p className="mt-1 text-muted">
             {tab === 'general'
               ? 'Оформление, аккаунт и общие параметры приложения'
@@ -513,7 +514,7 @@ export function SettingsPage() {
                   обычно начинается с <code className="text-gold-light/80">-100</code> (старый id перестаёт
                   работать).
                 </p>
-                <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                   <Input
                     label="Chat ID"
                     value={telegramChatInput}
