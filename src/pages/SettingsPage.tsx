@@ -59,6 +59,7 @@ export function SettingsPage() {
   const activeTheater = getActiveTheater(state);
   const theaterReminders = resolveTheaterReminderSettings(activeTheater ?? {}, state.appMeta);
   const [tab, setTab] = useState<SettingsTab>('general');
+  const [adminRevealOpen, setAdminRevealOpen] = useState(false);
   const [profileName, setProfileName] = useState(user?.name ?? '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -231,26 +232,6 @@ export function SettingsPage() {
 
       {tab === 'general' ? (
         <>
-      {isPlatformAdmin ? (
-        <section className="rounded-2xl border border-gold/20 bg-gold/5 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="mb-1 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gold-light">
-                <BarChart3 size={16} />
-                Администрирование
-              </div>
-              <p className="text-sm text-muted">Статистика использования платформы по всем театрам</p>
-            </div>
-            <Link
-              to={appPaths.admin}
-              className="rounded-xl border border-gold/25 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/40"
-            >
-              Открыть админку
-            </Link>
-          </div>
-        </section>
-      ) : null}
-
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
           <Palette size={16} />
@@ -657,6 +638,43 @@ export function SettingsPage() {
       )}
         </>
       )}
+
+      {isPlatformAdmin ? (
+        <section className="mt-4 border-t border-gold/10 pt-6">
+          <button
+            type="button"
+            onClick={() => setAdminRevealOpen((open) => !open)}
+            aria-expanded={adminRevealOpen}
+            aria-label={adminRevealOpen ? 'Свернуть' : 'Дополнительные параметры'}
+            className="w-full rounded-xl border border-dashed border-gold/20 bg-surface/20 px-4 py-3 text-center text-sm text-muted/40 transition-colors hover:border-gold/30 hover:bg-surface/40 hover:text-muted/70"
+          >
+            {adminRevealOpen ? (
+              <span className="text-muted/70">Свернуть</span>
+            ) : (
+              <span aria-hidden>···</span>
+            )}
+          </button>
+          {adminRevealOpen ? (
+            <div className="mt-2 rounded-xl border border-dashed border-gold/25 bg-surface/30 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="mb-1 flex items-center gap-2 text-sm font-medium text-gold-light">
+                    <BarChart3 size={16} />
+                    Администрирование платформы
+                  </div>
+                  <p className="text-xs text-muted">Статистика по всем театрам и пользователям</p>
+                </div>
+                <Link
+                  to={appPaths.admin}
+                  className="inline-flex shrink-0 items-center justify-center rounded-xl border border-gold/25 bg-surface/80 px-4 py-2 text-sm text-gold-light transition-colors hover:border-gold/40"
+                >
+                  Открыть админку
+                </Link>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }
