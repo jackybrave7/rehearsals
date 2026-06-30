@@ -188,7 +188,7 @@ export function MarketingPage() {
               </a>
             </div>
             <p className="mt-6 text-sm text-muted/80">
-              Self-hosted · данные у вас · русский интерфейс
+              Онлайн-сервис · совместная работа · русский интерфейс
             </p>
           </div>
         </section>

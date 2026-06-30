@@ -566,7 +566,7 @@ export function RehearsalScheduleEditor({
             })}
           </div>
           {sortedSchedule.length > 0 && (
-            <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-relaxed text-amber-100/90">
+            <p className="notice-warning rounded-xl px-4 py-3 text-sm font-medium leading-relaxed">
               Текущий план будет заменён. Ручные правки и порядок блоков пропадут.
             </p>
           )}

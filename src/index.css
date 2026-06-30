@@ -742,6 +742,12 @@ html[data-design='zen'] .delete-btn:hover {
   color: #b91c1c;
 }
 
+.notice-warning {
+  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
 .rehearsal-warnings {
   border: 1px solid var(--color-warning-border);
   background: var(--color-warning-bg);
