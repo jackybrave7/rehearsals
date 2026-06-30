@@ -38,6 +38,16 @@ if "%SKIP_GIT%"=="0" (
   )
 ) else (
   echo [git] Skipped ^(--skip-git^)
+  for /f "delims=" %%H in ('git rev-parse HEAD 2^>nul') do set "LOCAL_HEAD=%%H"
+  for /f "tokens=1" %%H in ('git ls-remote origin HEAD 2^>nul') do set "REMOTE_HEAD=%%H"
+  if defined LOCAL_HEAD if defined REMOTE_HEAD if not "!LOCAL_HEAD!"=="!REMOTE_HEAD!" (
+    echo.
+    echo WARNING: local is ahead of origin — server will NOT get your latest code.
+    echo   local:  !LOCAL_HEAD:~0,7!
+    echo   remote: !REMOTE_HEAD:~0,7!
+    echo Run without --skip-git, or: git push origin HEAD
+    echo.
+  )
   echo.
 )
 
@@ -152,5 +162,21 @@ if errorlevel 1 (
   echo ERROR: git push failed
   exit /b 1
 )
+
+for /f "delims=" %%H in ('git rev-parse HEAD') do set "LOCAL_HEAD=%%H"
+for /f "tokens=1" %%H in ('git ls-remote origin HEAD 2^>nul') do set "REMOTE_HEAD=%%H"
+if not defined REMOTE_HEAD (
+  echo ERROR: could not read remote HEAD after push
+  exit /b 1
+)
+if not "!LOCAL_HEAD!"=="!REMOTE_HEAD!" (
+  echo.
+  echo ERROR: local commit was not published to origin.
+  echo   local:  !LOCAL_HEAD!
+  echo   remote: !REMOTE_HEAD!
+  echo Push manually: git push origin HEAD
+  exit /b 1
+)
+echo [git] remote is up to date: !LOCAL_HEAD:~0,7!
 echo.
 exit /b 0

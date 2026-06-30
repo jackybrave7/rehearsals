@@ -154,6 +154,7 @@ echo "[deploy] git pull..."
 git fetch origin
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 git reset --hard "origin/${BRANCH}"
+echo "[deploy] code at $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
 
 if [ ! -f .env ]; then
   echo "[deploy] WARNING: .env missing. Copy from .env.example before build."

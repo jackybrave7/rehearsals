@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import type { PlayRole, Scene, SceneStatus } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getSceneRoles } from '../store/selectors';
@@ -334,14 +334,31 @@ export function ScenePicker({
                         (role) => role.kind === 'character'
                       );
                       return (
-                        <li key={scene.id}>
-                          <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-white/5">
+                        <li
+                          key={scene.id}
+                          className={selected ? 'bg-emerald-500/[0.07]' : undefined}
+                        >
+                          <label
+                            className={`flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors ${
+                              selected ? 'hover:bg-emerald-500/10' : 'hover:bg-white/5'
+                            }`}
+                          >
                             <input
                               type="checkbox"
                               checked={selected}
                               onChange={() => toggleScene(scene.id)}
-                              className="mt-1 h-4 w-4 shrink-0 rounded border-gold/30 bg-background accent-gold"
+                              className="sr-only"
                             />
+                            <span
+                              aria-hidden
+                              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all ${
+                                selected
+                                  ? 'border-emerald-400 bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 ring-2 ring-emerald-400/30'
+                                  : 'border-white/20 bg-background/40 text-transparent hover:border-emerald-400/50'
+                              }`}
+                            >
+                              <Check size={20} strokeWidth={3} />
+                            </span>
                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gold/10 text-xs font-semibold text-gold">
                               {scene.number}
                             </span>
