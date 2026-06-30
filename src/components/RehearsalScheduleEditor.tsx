@@ -17,7 +17,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { getSceneCharacterNames } from '../utils/sceneLabels';
 import { Button } from './Button';
 import { DeleteButton } from './DeleteButton';
-import { useConfirmDialog } from './ConfirmDialogContext';
+import { Modal } from './Modal';
 import { SceneScriptLink } from './SceneScriptLink';
 import { addMinutes, formatDuration, timeToMinutes } from '../utils/time';
 import {
@@ -28,10 +28,16 @@ import {
   getScheduleTotalMinutes,
   insertScheduleBlockAt,
   moveScheduleBlock,
+  PLAN_GENERATION_MODE_LABELS,
   readPlanDragPayload,
   recalculateScheduleStartTimes,
   setPlanScheduleDragData,
+  type PlanGenerationMode,
 } from '../utils/schedulePlan';
+import {
+  getActorIdsMapForSceneIds,
+  resolveRehearsalPerformanceId,
+} from '../utils/rehearsalActors';
 import {
   canMarkBlockCompletion,
   canMarkScheduleCompletion,
@@ -64,6 +70,23 @@ const blockTypeColors: Record<ScheduleBlockType, string> = {
   custom: 'border-l-gray-500',
 };
 
+const PLAN_GENERATION_OPTIONS: {
+  mode: PlanGenerationMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    mode: 'chronology',
+    label: PLAN_GENERATION_MODE_LABELS.chronology,
+    description: 'Сцены в порядке следования в пьесе',
+  },
+  {
+    mode: 'by-actors',
+    label: PLAN_GENERATION_MODE_LABELS['by-actors'],
+    description: 'Сцены с общим составом ставятся рядом; при равенстве — по хронологии',
+  },
+];
+
 interface RehearsalScheduleEditorProps {
   rehearsal: Rehearsal;
   play?: Play;
@@ -88,9 +111,10 @@ export function RehearsalScheduleEditor({
   readOnly = false,
 }: RehearsalScheduleEditorProps) {
   const { state } = useRehearsalStore();
-  const { confirm } = useConfirmDialog();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [generatePlanModalOpen, setGeneratePlanModalOpen] = useState(false);
+  const [planGenerationMode, setPlanGenerationMode] = useState<PlanGenerationMode>('chronology');
 
   const sortedSchedule = useMemo(
     () => [...rehearsal.schedule].sort((a, b) => a.startTime.localeCompare(b.startTime)),
@@ -110,27 +134,34 @@ export function RehearsalScheduleEditor({
     onScheduleChange(recalculateScheduleStartTimes(schedule, rehearsal.startTime));
   };
 
-  const handleGeneratePlan = async () => {
+  const openGeneratePlanModal = () => {
     if (linkedScenes.length === 0 && linkedTasks.length === 0) return;
-    if (sortedSchedule.length > 0) {
-      const confirmed = await confirm({
-        title: 'Сформировать план заново?',
-        message:
-          'Текущий план по времени будет заменён автоматически сгенерированным из выбранных сцен и задач. Ручные правки и порядок блоков пропадут.',
-        confirmLabel: 'Заменить план',
-        variant: 'danger',
-      });
-      if (!confirmed) return;
-    }
+    setPlanGenerationMode('chronology');
+    setGeneratePlanModalOpen(true);
+  };
+
+  const confirmGeneratePlan = () => {
     applySchedule(
       buildScheduleFromRehearsalItems(
         rehearsal.startTime,
         rehearsal.sceneIds,
         rehearsal.taskIds,
         linkedScenes,
-        linkedTasks
+        linkedTasks,
+        {
+          mode: planGenerationMode,
+          actorIdsBySceneId:
+            planGenerationMode === 'by-actors'
+              ? getActorIdsMapForSceneIds(
+                  state,
+                  resolveRehearsalPerformanceId(state, rehearsal),
+                  rehearsal.sceneIds
+                )
+              : undefined,
+        }
       )
     );
+    setGeneratePlanModalOpen(false);
   };
 
   const handleDropAt = (event: React.DragEvent, targetIndex: number) => {
@@ -269,7 +300,7 @@ export function RehearsalScheduleEditor({
             </>
           )}
           {(linkedScenes.length > 0 || linkedTasks.length > 0) && (
-            <Button variant="secondary" onClick={handleGeneratePlan}>
+            <Button variant="secondary" onClick={openGeneratePlanModal} disabled={readOnly}>
               <Wand2 size={16} />
               Сформировать план
             </Button>
@@ -483,6 +514,64 @@ export function RehearsalScheduleEditor({
           })}
         </div>
       )}
+
+      <Modal
+        open={generatePlanModalOpen}
+        onClose={() => setGeneratePlanModalOpen(false)}
+        title="Сформировать план"
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" onClick={() => setGeneratePlanModalOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              variant={sortedSchedule.length > 0 ? 'danger' : 'primary'}
+              onClick={confirmGeneratePlan}
+            >
+              {sortedSchedule.length > 0 ? 'Заменить план' : 'Сформировать'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">Выберите, как расставить сцены в плане:</p>
+          <div className="space-y-2">
+            {PLAN_GENERATION_OPTIONS.map((option) => {
+              const selected = planGenerationMode === option.mode;
+              return (
+                <label
+                  key={option.mode}
+                  className={`flex cursor-pointer gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                    selected
+                      ? 'border-gold/40 bg-gold/10 ring-1 ring-gold/20'
+                      : 'border-gold/10 bg-background/20 hover:border-gold/20'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="plan-generation-mode"
+                    value={option.mode}
+                    checked={selected}
+                    onChange={() => setPlanGenerationMode(option.mode)}
+                    className="mt-1 accent-gold"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-white">{option.label}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+                      {option.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {sortedSchedule.length > 0 && (
+            <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-relaxed text-amber-100/90">
+              Текущий план будет заменён. Ручные правки и порядок блоков пропадут.
+            </p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

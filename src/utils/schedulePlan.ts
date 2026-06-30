@@ -94,21 +94,94 @@ export function createBlockFromTask(task: Task): ScheduleBlock {
   };
 }
 
+export type PlanGenerationMode = 'chronology' | 'by-actors';
+
+export const PLAN_GENERATION_MODE_LABELS: Record<PlanGenerationMode, string> = {
+  chronology: 'Хронология сцен',
+  'by-actors': 'Группировка по актёрам',
+};
+
+function compareSceneChronology(
+  sceneById: Map<string, Scene>,
+  sceneIdA: string,
+  sceneIdB: string
+): number {
+  const sceneA = sceneById.get(sceneIdA);
+  const sceneB = sceneById.get(sceneIdB);
+  return (sceneA?.number ?? 0) - (sceneB?.number ?? 0);
+}
+
+function countActorOverlap(
+  actorIdsBySceneId: Map<string, string[]>,
+  sceneIdA: string,
+  sceneIdB: string
+): number {
+  const actorsA = new Set(actorIdsBySceneId.get(sceneIdA) ?? []);
+  const actorsB = actorIdsBySceneId.get(sceneIdB) ?? [];
+  return actorsB.filter((actorId) => actorsA.has(actorId)).length;
+}
+
+export function orderSceneIdsForPlan(
+  sceneIds: string[],
+  scenes: Scene[],
+  mode: PlanGenerationMode,
+  actorIdsBySceneId: Map<string, string[]> = new Map()
+): string[] {
+  const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
+  const knownIds = sceneIds.filter((sceneId) => sceneById.has(sceneId));
+  if (knownIds.length <= 1 || mode === 'chronology') {
+    return [...knownIds].sort((a, b) => compareSceneChronology(sceneById, a, b));
+  }
+
+  const remaining = new Set(knownIds);
+  const order: string[] = [];
+  let current = [...remaining].sort((a, b) => compareSceneChronology(sceneById, a, b))[0];
+
+  while (remaining.size > 0) {
+    remaining.delete(current);
+    order.push(current);
+    if (remaining.size === 0) break;
+
+    let nextId = current;
+    let bestOverlap = -1;
+    let bestChronology = Number.POSITIVE_INFINITY;
+
+    for (const candidate of remaining) {
+      const overlap = countActorOverlap(actorIdsBySceneId, current, candidate);
+      const chronology = sceneById.get(candidate)?.number ?? 0;
+      if (
+        overlap > bestOverlap ||
+        (overlap === bestOverlap && chronology < bestChronology)
+      ) {
+        bestOverlap = overlap;
+        bestChronology = chronology;
+        nextId = candidate;
+      }
+    }
+
+    current = nextId;
+  }
+
+  return order;
+}
+
 export function buildScheduleFromRehearsalItems(
   startTime: string,
   sceneIds: string[],
   taskIds: string[],
   scenes: Scene[],
-  tasks: Task[]
+  tasks: Task[],
+  options?: {
+    mode?: PlanGenerationMode;
+    actorIdsBySceneId?: Map<string, string[]>;
+  }
 ): ScheduleBlock[] {
   const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
   const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const mode = options?.mode ?? 'chronology';
+  const actorIdsBySceneId = options?.actorIdsBySceneId ?? new Map();
 
-  const orderedSceneIds = [...sceneIds].sort((a, b) => {
-    const sceneA = sceneById.get(a);
-    const sceneB = sceneById.get(b);
-    return (sceneA?.number ?? 0) - (sceneB?.number ?? 0);
-  });
+  const orderedSceneIds = orderSceneIdsForPlan(sceneIds, scenes, mode, actorIdsBySceneId);
 
   const blocks: ScheduleBlock[] = [];
 

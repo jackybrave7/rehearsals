@@ -28,7 +28,7 @@ export function createTemplateFromRehearsal(
 export function applyTemplateToRehearsal(
   template: RehearsalTemplate,
   startTime: string
-): Pick<Rehearsal, 'schedule' | 'sceneIds' | 'taskIds' | 'startTime' | 'endTime'> {
+): Pick<Rehearsal, 'schedule' | 'startTime' | 'endTime'> {
   const schedule: ScheduleBlock[] = template.blocks.map((block) => ({
     ...block,
     id: generateId(),
@@ -38,8 +38,6 @@ export function applyTemplateToRehearsal(
   return {
     startTime: template.startTime || startTime,
     endTime: template.endTime,
-    sceneIds: [...template.sceneIds],
-    taskIds: [...template.taskIds],
     schedule: recalculateScheduleStartTimes(schedule, template.startTime || startTime),
   };
 }

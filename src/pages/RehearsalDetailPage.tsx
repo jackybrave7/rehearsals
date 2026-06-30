@@ -30,7 +30,7 @@ import {
 import { formatReminderKindLabel } from '../utils/reminders';
 import { getSceneShortLabel } from '../utils/sceneLabels';
 import {
-  applySceneIdsToSchedule,
+  removeDeselectedScenesFromSchedule,
   getSceneDurationsFromSchedule,
   getSceneIdsFromSchedule,
   updateSceneDurationInSchedule,
@@ -245,7 +245,10 @@ export function RehearsalDetailPage() {
     const { id: _id, ...rest } = rehearsal;
     setEditForm({
       ...rest,
-      sceneIds: getSceneIdsFromSchedule(rehearsal.schedule),
+      sceneIds:
+        rehearsal.sceneIds.length > 0
+          ? rehearsal.sceneIds
+          : getSceneIdsFromSchedule(rehearsal.schedule),
     });
     setEditModalOpen(true);
   };
@@ -289,18 +292,12 @@ export function RehearsalDetailPage() {
 
   const handleEditScenesChange = (sceneIds: string[]) => {
     if (!editForm) return;
-    const schedule = applySceneIdsToSchedule(
-      editForm,
-      sceneIds,
-      playScenes,
-      getSceneDurationsFromSchedule(editForm.schedule)
-    );
-    const syncedSceneIds = getSceneIdsFromSchedule(schedule);
+    const schedule = removeDeselectedScenesFromSchedule(editForm, sceneIds);
     setEditForm({
       ...editForm,
-      sceneIds: syncedSceneIds,
+      sceneIds,
       schedule,
-      actorIds: mergeActorsForNewScenes(state, editForm, editForm.sceneIds, syncedSceneIds),
+      actorIds: mergeActorsForNewScenes(state, editForm, editForm.sceneIds, sceneIds),
     });
   };
 
@@ -348,7 +345,7 @@ export function RehearsalDetailPage() {
     }));
   };
 
-  const linkedScenes = getSceneIdsFromSchedule(rehearsal.schedule)
+  const linkedScenes = rehearsal.sceneIds
     .map((sid) => state.scenes.find((s) => s.id === sid))
     .filter((scene): scene is Scene => Boolean(scene));
   const playScenes = getPlayScenes(state, rehearsal.playId ?? state.activePlayId);
@@ -898,11 +895,11 @@ export function RehearsalDetailPage() {
                 excludeRehearsalId={rehearsal.id}
               />
             )}
-            {editForm.sceneIds.length > 0 && (
+            {getSceneIdsFromSchedule(editForm.schedule).length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm text-muted">Длительность сцен в плане (мин)</p>
                 <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-3">
-                  {editForm.sceneIds.map((sceneId) => {
+                  {getSceneIdsFromSchedule(editForm.schedule).map((sceneId) => {
                     const scene = playScenes.find((item) => item.id === sceneId);
                     if (!scene) return null;
                     const durations = getSceneDurationsFromSchedule(editForm.schedule);

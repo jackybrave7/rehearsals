@@ -37,6 +37,18 @@ export function getActorIdsForSceneIds(
   return [...actorIds];
 }
 
+export function getActorIdsMapForSceneIds(
+  state: AppState,
+  performanceId: string | undefined,
+  sceneIds: string[]
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const sceneId of sceneIds) {
+    map.set(sceneId, getActorIdsForSceneIds(state, performanceId, [sceneId]));
+  }
+  return map;
+}
+
 export function mergeActorsForNewScenes(
   state: AppState,
   rehearsal: Pick<Rehearsal, 'playId' | 'performanceId' | 'actorIds'>,

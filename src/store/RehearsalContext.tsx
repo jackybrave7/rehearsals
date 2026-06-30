@@ -51,10 +51,8 @@ import {
   resolveParticipantOrder,
 } from '../utils/rehearsalActors';
 import {
-  applySceneIdsToSchedule,
-  getSceneDurationsFromSchedule,
   getSceneIdsFromSchedule,
-  syncRehearsalSceneIdsFromSchedule,
+  removeDeselectedScenesFromSchedule,
 } from '../utils/scheduleSync';
 import { fetchAppState, fetchBackupList, fetchLatestBackupState, restoreBackupState, saveAppStateWithRetry, checkApiHealth, type SaveStatus } from '../api/storage';
 import { scoreAppState } from '../utils/appStateScore';
@@ -630,18 +628,17 @@ function prepareNewRehearsal(state: AppState, rehearsalPayload: Rehearsal): Rehe
     ...rehearsalPayload,
     theaterId: rehearsalPayload.theaterId ?? state.activeTheaterId ?? undefined,
   };
-  const playScenes = state.scenes.filter((scene) => scene.playId === rehearsalWithTheater.playId);
-  const schedule =
-    rehearsalWithTheater.schedule.length > 0
-      ? rehearsalWithTheater.schedule
-      : applySceneIdsToSchedule(rehearsalWithTheater, rehearsalWithTheater.sceneIds, playScenes);
-  const sceneIds = getSceneIdsFromSchedule(schedule);
+  const schedule = rehearsalWithTheater.schedule;
+  const sceneIds =
+    rehearsalWithTheater.sceneIds.length > 0
+      ? rehearsalWithTheater.sceneIds
+      : getSceneIdsFromSchedule(schedule);
   const actorIds = mergeActorsForSceneIds(state, rehearsalWithTheater, sceneIds);
   const rehearsalDraft = { ...rehearsalWithTheater, schedule, sceneIds, actorIds };
-  return syncRehearsalSceneIdsFromSchedule({
+  return {
     ...rehearsalDraft,
     participantOrder: resolveParticipantOrder(state, rehearsalDraft),
-  });
+  };
 }
 
 type Action =
@@ -1003,24 +1000,13 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'UPDATE_REHEARSAL': {
       const previous = state.rehearsals.find((r) => r.id === action.payload.id);
-      const playScenes = state.scenes.filter((scene) => scene.playId === action.payload.playId);
-      let schedule = action.payload.schedule;
-      if (previous && action.payload.sceneIds.length > 0) {
-        schedule = applySceneIdsToSchedule(
-          { schedule: action.payload.schedule, startTime: action.payload.startTime },
-          action.payload.sceneIds,
-          playScenes,
-          getSceneDurationsFromSchedule(action.payload.schedule)
-        );
-      }
-      const sceneIds = getSceneIdsFromSchedule(schedule);
+      const schedule = removeDeselectedScenesFromSchedule(
+        { schedule: action.payload.schedule, startTime: action.payload.startTime },
+        action.payload.sceneIds
+      );
+      const sceneIds = action.payload.sceneIds;
       const actorIds = previous
-        ? mergeActorsForNewScenes(
-            state,
-            action.payload,
-            previous.sceneIds,
-            sceneIds
-          )
+        ? mergeActorsForNewScenes(state, action.payload, previous.sceneIds, sceneIds)
         : action.payload.actorIds;
       const rehearsalDraft = clearRemindersOnScheduleChange(
         { ...action.payload, schedule, sceneIds, actorIds },
@@ -1033,12 +1019,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         rehearsals: state.rehearsals.map((r) =>
-          r.id === action.payload.id
-            ? syncRehearsalSceneIdsFromSchedule({
-                ...rehearsalDraft,
-                participantOrder,
-              })
-            : r
+          r.id === action.payload.id ? { ...rehearsalDraft, participantOrder } : r
         ),
       };
     }
@@ -1089,12 +1070,11 @@ function reducer(state: AppState, action: Action): AppState {
         rehearsals: state.rehearsals.map((r) => {
           if (r.id !== action.payload.rehearsalId) return r;
           const actorIds = mergeActorsForNewScheduleBlocks(state, r, action.payload.schedule);
-          const sceneIds = getSceneIdsFromSchedule(action.payload.schedule);
-          const rehearsalDraft = { ...r, schedule: action.payload.schedule, actorIds, sceneIds };
-          return syncRehearsalSceneIdsFromSchedule({
+          const rehearsalDraft = { ...r, schedule: action.payload.schedule, actorIds };
+          return {
             ...rehearsalDraft,
             participantOrder: resolveParticipantOrder(state, rehearsalDraft),
-          });
+          };
         }),
       };
     default:

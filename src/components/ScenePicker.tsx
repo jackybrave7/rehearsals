@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import type { PlayRole, Scene, SceneStatus } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { getSceneRoles } from '../store/selectors';
 import { groupScenesByAct, getSceneShortLabel } from '../utils/sceneLabels';
 import { buildSceneRehearsalDatesMap } from '../utils/sceneRehearsalHistory';
 import {
@@ -329,6 +330,9 @@ export function ScenePicker({
                     {groupScenes.map((scene) => {
                       const selected = selectedIds.includes(scene.id);
                       const pastDates = sceneRehearsalDates.get(scene.id);
+                      const sceneCharacters = getSceneRoles(state, scene).filter(
+                        (role) => role.kind === 'character'
+                      );
                       return (
                         <li key={scene.id}>
                           <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-white/5">
@@ -358,6 +362,18 @@ export function ScenePicker({
                               {scene.description && (
                                 <span className="mt-1 block text-xs leading-relaxed text-muted">
                                   {scene.description}
+                                </span>
+                              )}
+                              {sceneCharacters.length > 0 && (
+                                <span className="mt-1.5 flex flex-wrap gap-1">
+                                  {sceneCharacters.map((role) => (
+                                    <span
+                                      key={role.id}
+                                      className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold-light"
+                                    >
+                                      {role.name.split(',')[0]}
+                                    </span>
+                                  ))}
                                 </span>
                               )}
                               {pastDates && pastDates.length > 0 && (

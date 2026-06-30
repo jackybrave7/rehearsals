@@ -11,7 +11,6 @@ import {
   getSeriesWeekdayLabel,
 } from '../utils/rehearsalPlanning';
 import { generateId } from '../utils/id';
-import { mergeActorsForSceneIds } from '../utils/rehearsalActors';
 import { Button } from './Button';
 import { DeleteButton } from './DeleteButton';
 import { useConfirmDialog } from './ConfirmDialogContext';
@@ -56,13 +55,11 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
     const template = templates.find((item) => item.id === selectedTemplateId);
     if (!template) return;
     const applied = applyTemplateToRehearsal(template, rehearsal.startTime);
-    const actorIds = mergeActorsForSceneIds(state, { ...rehearsal, ...applied }, applied.sceneIds);
     dispatch({
       type: 'UPDATE_REHEARSAL',
       payload: {
         ...rehearsal,
         ...applied,
-        actorIds,
       },
     });
     setTemplateModalOpen(false);

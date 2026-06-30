@@ -26,6 +26,17 @@ export function getSceneDurationsFromSchedule(schedule: ScheduleBlock[]): Record
   return durations;
 }
 
+export function removeDeselectedScenesFromSchedule(
+  rehearsal: Pick<Rehearsal, 'schedule' | 'startTime'>,
+  selectedSceneIds: string[]
+): ScheduleBlock[] {
+  const selected = new Set(selectedSceneIds);
+  const schedule = rehearsal.schedule.filter(
+    (block) => !(block.type === 'scene' && block.sceneId && !selected.has(block.sceneId))
+  );
+  return recalculateScheduleStartTimes(schedule, rehearsal.startTime);
+}
+
 export function applySceneIdsToSchedule(
   rehearsal: Pick<Rehearsal, 'schedule' | 'startTime'>,
   nextSceneIds: string[],
