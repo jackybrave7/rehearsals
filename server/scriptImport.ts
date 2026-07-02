@@ -69,7 +69,7 @@ export async function handleParseScriptImport(req: Request, res: Response): Prom
   const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
   const scenes = Array.isArray(req.body?.scenes) ? (req.body.scenes as Scene[]) : null;
 
-  if (!fileId || !scenes || scenes.length === 0) {
+  if (!fileId || !scenes) {
     res.status(400).json({ error: 'INVALID_BODY' });
     return;
   }
@@ -97,6 +97,7 @@ export async function handleParseScriptImport(req: Request, res: Response): Prom
 
     res.json({
       anchorCount: anchors.length,
+      anchors,
       matches,
       characterCounts: Object.fromEntries(characterCounts.entries()),
     });

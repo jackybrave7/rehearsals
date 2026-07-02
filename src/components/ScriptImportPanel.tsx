@@ -11,7 +11,9 @@ import {
   parseScriptFileId,
 } from '../utils/scriptDocument';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
+import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
+import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
 import { Button } from './Button';
 
@@ -76,7 +78,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         scriptImportSyncedAt: undefined,
       });
       dispatch({ type: 'UPDATE_PLAY', payload: updatedPlay });
-      setSyncMessage(`Файл «${file.name}» загружен. Нажмите «Сопоставить сцены», чтобы привязать заголовки.`);
+      setSyncMessage(
+        scenes.length === 0
+          ? `Файл «${file.name}» загружен. Нажмите «Импортировать сцены», чтобы создать список из заголовков файла.`
+          : `Файл «${file.name}» загружен. Нажмите «Сопоставить сцены», чтобы привязать заголовки.`
+      );
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : 'Не удалось загрузить файл');
     } finally {
@@ -95,14 +101,40 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
       setSyncError('Сначала загрузите файл сценария (.txt или .docx).');
       return;
     }
-    if (scenes.length === 0) {
-      setSyncError('Добавьте сцены в списке выше.');
-      return;
-    }
 
     setIsSyncing(true);
     try {
-      const { matches, anchorCount, characterCounts } = await parseScriptImport(currentFileId, scenes);
+      let targetScenes = scenes;
+      let createdCount = 0;
+
+      if (targetScenes.length === 0) {
+        const { anchors } = await parseScriptImport(currentFileId, []);
+        if (anchors.length === 0) {
+          setSyncError(
+            'В файле не найдены заголовки сцен. Оформите названия как отдельные строки: «АКТ 1, сц. 2» или стили «Заголовок» в Word.'
+          );
+          return;
+        }
+
+        const createdScenes: Scene[] = anchors.map((anchor, index) => ({
+          id: generateId(),
+          playId: play.id,
+          number: index + 1,
+          title: anchor.text,
+          status: 'not_started',
+          priority: 'medium',
+          roleIds: [],
+          estimatedMinutes: DEFAULT_SCENE_REHEARSAL_MINUTES,
+        }));
+        createdScenes.forEach((scene) => dispatch({ type: 'ADD_SCENE', payload: scene }));
+        targetScenes = createdScenes;
+        createdCount = createdScenes.length;
+      }
+
+      const { matches, anchorCount, characterCounts } = await parseScriptImport(
+        currentFileId,
+        targetScenes
+      );
 
       if (matches.length === 0) {
         setSyncError(
@@ -145,9 +177,12 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
       }
 
       setSyncMessage(
-        (matches.length === scenes.length
-          ? `Сопоставлено ${matches.length} из ${scenes.length} сцен (в файле ${anchorCount} заголовков).`
-          : `Сопоставлено ${matches.length} из ${scenes.length} сцен. В файле ${anchorCount} заголовков — часть из них не сцены.`) +
+        (createdCount > 0
+          ? `Создано ${createdCount} сцен из файла. `
+          : '') +
+          (matches.length === targetScenes.length
+            ? `Сопоставлено ${matches.length} из ${targetScenes.length} сцен (в файле ${anchorCount} заголовков).`
+            : `Сопоставлено ${matches.length} из ${targetScenes.length} сцен. В файле ${anchorCount} заголовков — часть из них не сцены.`) +
           (countEntries.length > 0 ? ` Подсчитаны знаки для ${countEntries.length} сцен.` : '')
       );
     } catch (error) {
@@ -169,7 +204,9 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
             Без Google: скачайте пьесу из Google Docs как Word или текст и загрузите сюда.
             {linkedCount > 0
               ? ` Привязано ${linkedCount} из ${scenes.length} сцен`
-              : ' Сопоставление по заголовкам «АКТ», «сц.» и стилям Word'}
+              : scenes.length === 0
+                ? ' Можно создать сцены из заголовков файла'
+                : ' Сопоставление по заголовкам «АКТ», «сц.» и стилям Word'}
             {countedCount > 0 ? ` · хронометраж для ${countedCount} сцен` : ''}
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
@@ -212,10 +249,10 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
               <Button
                 variant="secondary"
                 onClick={() => void handleSync()}
-                disabled={isSyncing || !fileId || scenes.length === 0}
+                disabled={isSyncing || !fileId}
               >
                 {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Сопоставить сцены
+                {scenes.length === 0 ? 'Импортировать сцены' : 'Сопоставить сцены'}
               </Button>
             </>
           )}
@@ -234,7 +271,7 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         <ol className="mt-2 list-decimal space-y-1 pl-4">
           <li>В Google Docs: Файл → Скачать → Microsoft Word (.docx) или Обычный текст (.txt).</li>
           <li>Названия сцен — отдельными строками, как в списке сцен (лучше стиль «Заголовок 1–2» в Word).</li>
-          <li>Загрузите файл и нажмите «Сопоставить сцены» — ссылки откроют файл на сервере.</li>
+          <li>Загрузите файл и нажмите «Импортировать сцены» — список сцен создастся из заголовков (или «Сопоставить», если сцены уже есть).</li>
         </ol>
       </div>
     </section>
