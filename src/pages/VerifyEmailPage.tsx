@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Film, CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
 import { verifyEmail } from '../api/auth';
 import { Button } from '../components/Button';
 
@@ -22,8 +23,8 @@ export function VerifyEmailPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 text-center shadow-2xl">
-        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/20 text-gold">
-          <Film size={26} />
+        <div className="mx-auto mb-6">
+          <AppLogo size="lg" className="justify-center" />
         </div>
 
         {status === 'loading' && (

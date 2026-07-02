@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Film, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
 import { useAuth } from '../store/AuthContext';
 import { fetchAuthConfig, requestPasswordReset, resendEmailVerification } from '../api/auth';
 import { Button } from '../components/Button';
@@ -108,9 +109,7 @@ export function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 shadow-2xl">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/20 text-gold">
-              <Film size={24} />
-            </div>
+            <AppLogo size="lg" />
             <div>
               <h1 className="text-2xl font-bold text-gold-light">Репетиции</h1>
               <p className="text-sm text-muted">Вход в планировщик постановки</p>

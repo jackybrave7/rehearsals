@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Film, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
@@ -48,9 +49,7 @@ export function Sidebar({ className = '', drawer = false, onNavigate }: SidebarP
     >
       <div className={`border-b border-gold/10 ${isCollapsed ? 'px-2 py-4' : 'px-4 py-5'}`}>
         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-3' : 'gap-3'}`}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/20 text-gold">
-            <Film size={22} />
-          </div>
+          <AppLogo size="md" />
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-bold text-gold-light">Репетиции</h1>
