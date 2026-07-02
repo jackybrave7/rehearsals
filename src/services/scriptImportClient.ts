@@ -1,5 +1,5 @@
 import type { Scene } from '../types';
-import type { SceneAnchorMatch } from '../utils/googleDocs';
+import type { DocTextAnchor, SceneAnchorMatch } from '../utils/googleDocs';
 import { API_BASE } from '../api/apiBase';
 
 export class ScriptImportClientError extends Error {
@@ -19,6 +19,7 @@ export async function parseScriptImport(
 ): Promise<{
   matches: SceneAnchorMatch[];
   anchorCount: number;
+  anchors: DocTextAnchor[];
   characterCounts: Record<string, number>;
 }> {
   let response: Response;
@@ -49,6 +50,7 @@ export async function parseScriptImport(
     message?: string;
     matches?: SceneAnchorMatch[];
     anchorCount?: number;
+    anchors?: DocTextAnchor[];
     characterCounts?: Record<string, number>;
   } | null;
 
@@ -59,6 +61,7 @@ export async function parseScriptImport(
   return {
     matches: body?.matches ?? [],
     anchorCount: body?.anchorCount ?? 0,
+    anchors: body?.anchors ?? [],
     characterCounts: body?.characterCounts ?? {},
   };
 }
