@@ -15,4 +15,4 @@ export const PRO_PRICING = {
   yearlyRub: 4900,
 } as const;
 
-export const SUPPORT_EMAIL = 'hello@rehears.ru';
+export const SUPPORT_EMAIL = 'support@rehears.ru';

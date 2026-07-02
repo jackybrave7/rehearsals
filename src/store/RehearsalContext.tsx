@@ -1104,7 +1104,7 @@ interface RehearsalContextValue {
 const RehearsalContext = createContext<RehearsalContextValue | null>(null);
 
 export function RehearsalProvider({ children }: { children: ReactNode }) {
-  const { canEditTheater, refreshSession } = useAuth();
+  const { getTheaterRole, refreshSession } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1115,7 +1115,8 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   const saveTimerRef = useRef<number | null>(null);
   stateRef.current = state;
-  const readOnly = !canEditTheater(state.activeTheaterId);
+  const readOnly =
+    state.activeTheaterId != null && getTheaterRole(state.activeTheaterId) === 'observer';
 
   const retryConnection = () => setLoadAttempt((value) => value + 1);
 

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { useForceZenTheme } from '../hooks/useForceZenTheme';
 import {
   PRICING_COPY,
   PricingCtaLink,
@@ -14,7 +13,6 @@ import {
 } from '../content/pricing';
 
 export function PricingPage() {
-  useForceZenTheme();
   const [yearly, setYearly] = useState(false);
 
   return (

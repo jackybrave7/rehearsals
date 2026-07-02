@@ -1,12 +1,9 @@
 import { Building2, Check, ChevronDown, Pencil, Plus } from 'lucide-react';
 import { DeleteButton } from './DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { getActiveTheater } from '../store/selectors';
-import { generateId } from '../utils/id';
-import { canCreateTheater } from '../utils/subscription';
-import { useSubscription } from '../hooks/useSubscription';
+import { useCreateTheater } from '../hooks/useCreateTheater';
 
 type TheaterSwitcherProps = {
   variant: 'sidebar' | 'zen';
@@ -15,37 +12,13 @@ type TheaterSwitcherProps = {
 
 export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherProps) {
   const { state, dispatch } = useRehearsalStore();
-  const { grantTheaterAccess, theaters: accessTheaters } = useAuth();
-  const { isPro } = useSubscription();
-  const { confirmDelete, prompt, alert } = useConfirmDialog();
+  const { confirmDelete, prompt } = useConfirmDialog();
+  const { createTheater } = useCreateTheater();
   const activeTheater = getActiveTheater(state);
 
   const setActiveTheater = (theaterId: string) => {
     dispatch({ type: 'SET_ACTIVE_THEATER', payload: theaterId });
     onTheaterChange?.();
-  };
-
-  const createTheater = async () => {
-    const ownedCount = accessTheaters.filter((entry) => entry.role === 'owner').length;
-    if (!canCreateTheater(ownedCount, isPro)) {
-      await alert({
-        title: 'Лимит тарифа Free',
-        message:
-          'На бесплатном тарифе доступен один театр. Перейдите на Pro, чтобы вести несколько коллективов.',
-        okLabel: 'Понятно',
-      });
-      return;
-    }
-    const name = await prompt({
-      title: 'Новый театр',
-      message: 'Название театра или коллектива',
-      placeholder: 'Например, Libertad',
-      confirmLabel: 'Создать',
-    });
-    if (!name) return;
-    const id = generateId();
-    grantTheaterAccess(id, 'owner');
-    dispatch({ type: 'ADD_THEATER', payload: { id, name } });
   };
 
   const renameTheater = async () => {

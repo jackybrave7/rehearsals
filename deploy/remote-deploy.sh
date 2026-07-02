@@ -156,7 +156,12 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 git reset --hard "origin/${BRANCH}"
 echo "[deploy] code at $(git rev-parse --short HEAD) ($(git log -1 --format='%s'))"
 
-if [ ! -f .env ]; then
+if [ -f .env ]; then
+  if ! grep -q '^SMTP_HOST=' .env; then
+    echo "[deploy] WARNING: SMTP_HOST not set in .env — registration email and password reset will fail."
+    echo "[deploy] Add SMTP_* vars on the server (see .env.example), then: docker restart rehearsals-api"
+  fi
+else
   echo "[deploy] WARNING: .env missing. Copy from .env.example before build."
 fi
 

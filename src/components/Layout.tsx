@@ -4,28 +4,28 @@ import { Sidebar } from './Sidebar';
 import { ZenShell } from './zen/ZenShell';
 import { WorkContextBar } from './WorkContextBar';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
 import { NoTheaterGate } from './NoTheaterGate';
 import { ReminderSchedulerBanner } from './ReminderSchedulerBanner';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
+  const { theaters } = useAuth();
   const { saveError, saveStatus, readOnly } = useRehearsalStore();
+
+  if (theaters.length === 0) return null;
 
   const message = readOnly
     ? compact
       ? 'Только просмотр'
       : 'Режим наблюдателя · изменения не сохраняются'
     : saveStatus === 'saving'
-      ? compact
-        ? 'Сохранение…'
-        : 'Сохранение в базу…'
+      ? 'Сохранение…'
       : saveStatus === 'saved' && !saveError
-        ? compact
-          ? 'SQLite · сохранено'
-          : 'Все данные в SQLite · сохранено'
+        ? 'Данные сохранены'
         : saveStatus === 'error'
-          ? (saveError ?? 'Ошибка сохранения в базу')
+          ? (saveError ?? 'Ошибка сохранения')
           : saveError;
 
   if (!message) return null;
@@ -56,8 +56,8 @@ function StatusBar({ compact = false }: { compact?: boolean }) {
 }
 
 function RecoveryBar() {
-  const { backupFiles, restoreLatestBackup, state, retryConnection } = useRehearsalStore();
-  const showRecovery = state.rehearsals.length === 0 && backupFiles.length > 0;
+  const { backupFiles, restoreLatestBackup, retryConnection, loadError } = useRehearsalStore();
+  const showRecovery = Boolean(loadError) && backupFiles.length > 0;
   if (!showRecovery) return null;
 
   return (

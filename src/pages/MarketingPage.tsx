@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
-import { useForceZenTheme } from '../hooks/useForceZenTheme';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import {
@@ -144,8 +143,6 @@ function ComparisonCell({ value }: { value: boolean | 'partial' }) {
 }
 
 export function MarketingPage() {
-  useForceZenTheme();
-
   return (
     <div className="marketing-page zen-page min-h-screen bg-background text-foreground">
       <MarketingHeader current="home" />

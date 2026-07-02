@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
+import { isPromoPath } from '../navigation/promoPaths';
 
 export type AppDesign = 'theater' | 'zen';
 
@@ -12,8 +14,13 @@ function readDesign(): AppDesign {
   }
 }
 
+function applyDocumentDesign(design: AppDesign) {
+  document.documentElement.dataset.design = design;
+}
+
 if (typeof document !== 'undefined') {
-  document.documentElement.dataset.design = readDesign();
+  const path = window.location.pathname;
+  applyDocumentDesign(isPromoPath(path) ? 'zen' : readDesign());
 }
 
 type DesignContextValue = {
@@ -25,19 +32,25 @@ type DesignContextValue = {
 const DesignContext = createContext<DesignContextValue | null>(null);
 
 export function DesignProvider({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
   const [design, setDesign] = useState<AppDesign>(readDesign);
+  const onPromo = isPromoPath(pathname);
 
   useEffect(() => {
-    document.documentElement.dataset.design = design;
+    if (onPromo) {
+      applyDocumentDesign('zen');
+      return;
+    }
+    applyDocumentDesign(design);
     try {
       localStorage.setItem(STORAGE_KEY, design);
     } catch {
       // ignore
     }
-  }, [design]);
+  }, [design, onPromo]);
 
   return (
-    <DesignContext.Provider value={{ design, setDesign, isZen: design === 'zen' }}>
+    <DesignContext.Provider value={{ design, setDesign, isZen: onPromo || design === 'zen' }}>
       {children}
     </DesignContext.Provider>
   );

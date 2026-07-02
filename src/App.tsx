@@ -28,6 +28,7 @@ import { TermsPage } from './pages/legal/TermsPage';
 import { PrivacyPage } from './pages/legal/PrivacyPage';
 import { OfferPage } from './pages/legal/OfferPage';
 import { AdminRoute } from './components/AdminRoute';
+import { ScrollToTop } from './components/ScrollToTop';
 import { appPaths } from './navigation/appPaths';
 
 function LegacyRehearsalRedirect() {
@@ -38,9 +39,10 @@ function LegacyRehearsalRedirect() {
 export default function App() {
   return (
     <AuthProvider>
-      <DesignProvider>
-        <ConfirmDialogProvider>
-          <BrowserRouter>
+      <ConfirmDialogProvider>
+        <BrowserRouter>
+          <DesignProvider>
+            <ScrollToTop />
             <Routes>
               <Route index element={<MarketingPage />} />
               <Route path="pricing" element={<PricingPage />} />
@@ -107,9 +109,9 @@ export default function App() {
                 />
               </Route>
             </Routes>
-          </BrowserRouter>
-        </ConfirmDialogProvider>
-      </DesignProvider>
+          </DesignProvider>
+        </BrowserRouter>
+      </ConfirmDialogProvider>
     </AuthProvider>
   );
 }

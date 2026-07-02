@@ -5,7 +5,7 @@ export const LEGAL_OPERATOR = {
   inn: '772023445483',
   ogrnip: '324774600516113',
   region: 'г. Москва, Россия',
-  email: 'hello@rehears.ru',
+  email: 'support@rehears.ru',
   siteUrl: 'https://rehears.ru',
   serviceName: 'Репетиции',
 } as const;

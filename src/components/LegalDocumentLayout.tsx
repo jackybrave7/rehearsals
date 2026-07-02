@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { MarketingHeader } from './MarketingHeader';
 import { MarketingFooter } from './MarketingFooter';
-import { useForceZenTheme } from '../hooks/useForceZenTheme';
 import { LEGAL_DOCUMENTS } from '../content/legalOperator';
 
 interface LegalDocumentLayoutProps {
@@ -12,8 +11,6 @@ interface LegalDocumentLayoutProps {
 }
 
 export function LegalDocumentLayout({ title, updatedAt, children }: LegalDocumentLayoutProps) {
-  useForceZenTheme();
-
   return (
     <div className="marketing-page zen-page min-h-screen bg-background text-foreground">
       <MarketingHeader />

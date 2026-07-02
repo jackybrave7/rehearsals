@@ -8,6 +8,18 @@
       name="description"
       content="Планировщик театральных репетиций: сцены, состав, почасовой план и рассылка в Telegram. Google Docs, self-hosted, для независимых коллективов."
     />
+    <script>
+      (function () {
+        var path = location.pathname.replace(/\/$/, '') || '/';
+        var promo =
+          path === '/' ||
+          path === '/pricing' ||
+          path === '/login' ||
+          path === '/verify-email' ||
+          path.indexOf('/legal/') === 0;
+        if (promo) document.documentElement.dataset.design = 'zen';
+      })();
+    </script>
     <title>Репетиции — планировщик постановки</title>
   </head>
   <body>
