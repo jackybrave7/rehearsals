@@ -52,13 +52,8 @@ export function MarketingFooter() {
           </div>
         </div>
 
-        <div className="mt-10 border-t border-border pt-6 text-sm text-muted">
-          <p>
-            © {new Date().getFullYear()} {LEGAL_OPERATOR.fullName}
-          </p>
-          <p className="mt-2">
-            {LEGAL_OPERATOR.region} · ИНН {LEGAL_OPERATOR.inn} · ОГРНИП {LEGAL_OPERATOR.ogrnip}
-          </p>
+        <div className="mt-10 border-t border-border pt-6 text-center text-sm text-muted">
+          <p>© {new Date().getFullYear()}</p>
         </div>
       </div>
     </footer>
