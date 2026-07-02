@@ -3,6 +3,8 @@ import { getDay } from 'date-fns';
 import { BookmarkPlus, CalendarRange, Wand2 } from 'lucide-react';
 import type { Rehearsal, RehearsalSeries } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { UpgradePrompt } from './UpgradePrompt';
 import { getRehearsalTemplates } from '../store/selectors';
 import {
   applyTemplateToRehearsal,
@@ -23,6 +25,7 @@ interface RehearsalPlanningPanelProps {
 
 export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProps) {
   const { state, dispatch } = useRehearsalStore();
+  const { isPro } = useSubscription();
   const { confirm } = useConfirmDialog();
   const templates = useMemo(
     () => getRehearsalTemplates(state, state.activeTheaterId),
@@ -117,21 +120,31 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
           Планирование
         </h2>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => setTemplateModalOpen(true)}>
-            <BookmarkPlus size={15} />
-            Шаблон
-          </Button>
-          <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => setSeriesModalOpen(true)}>
-            <CalendarRange size={15} />
-            Серия
-          </Button>
-        </div>
+        {!isPro ? (
+          <UpgradePrompt
+            compact
+            title="Шаблоны и серии — в Pro"
+            description="Сохраняйте план репетиции и разворачивайте повторяющееся расписание."
+          />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => setTemplateModalOpen(true)}>
+              <BookmarkPlus size={15} />
+              Шаблон
+            </Button>
+            <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => setSeriesModalOpen(true)}>
+              <CalendarRange size={15} />
+              Серия
+            </Button>
+          </div>
+        )}
         {rehearsal.seriesId && (
           <p className="mt-2 text-xs text-muted">Часть повторяющейся серии — дату можно править отдельно.</p>
         )}
       </section>
 
+      {isPro && (
+      <>
       <Modal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title="Шаблон репетиции"
         footer={
           <div className="flex justify-end gap-2">
@@ -228,6 +241,8 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
           </label>
         </div>
       </Modal>
+      </>
+      )}
     </>
   );
 }

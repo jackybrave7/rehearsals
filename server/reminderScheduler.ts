@@ -12,6 +12,7 @@ import {
   type RehearsalReminderSent,
   type ReminderType,
 } from '../src/utils/reminders.js';
+import { getUserSubscriptionPlan } from './subscription.js';
 
 const TICK_MS = Number(process.env.REMINDER_TICK_MINUTES ?? 5) * 60 * 1000;
 const WINDOW_MINUTES = Number(process.env.REMINDER_WINDOW_MINUTES ?? 10);
@@ -146,6 +147,12 @@ export async function runReminderTick(db: AppDatabase = getDb()): Promise<void> 
     const theaterId = (row.theater_id as string | null) ?? undefined;
     const ownerId = getTheaterOwnerUserId(db, theaterId);
     if (!ownerId || !theaterId) continue;
+
+    const ownerRow = db
+      .prepare(`SELECT email FROM users WHERE id = ?`)
+      .get(ownerId) as { email: string } | undefined;
+    if (!ownerRow) continue;
+    if (getUserSubscriptionPlan(db, ownerId, ownerRow.email) !== 'pro') continue;
 
     let state = stateCache.get(ownerId);
     if (!state) {

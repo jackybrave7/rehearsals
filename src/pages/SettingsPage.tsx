@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { UpgradePrompt } from '../components/UpgradePrompt';
+import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
+import { supportMailto } from '../content/pricing';
 import { getShowRehearsalWarnings, getActiveTheater } from '../store/selectors';
 import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
 import { Input } from '../components/FormFields';
@@ -54,6 +58,7 @@ export function SettingsPage() {
   const { design, setDesign } = useDesign();
   const { state, dispatch, readOnly } = useRehearsalStore();
   const { user, logout, isPlatformAdmin, updateProfile } = useAuth();
+  const { plan, isPro } = useSubscription();
   const showRehearsalWarnings = getShowRehearsalWarnings(state);
   const sceneTiming = resolveSceneTimingSettings(state.appMeta);
   const activeTheater = getActiveTheater(state);
@@ -120,6 +125,7 @@ export function SettingsPage() {
 
   const updateTheaterReminders = (patch: Partial<typeof theaterReminders>) => {
     if (!activeTheater || readOnly) return;
+    if (!isPro && patch.enabled) return;
     dispatch({
       type: 'UPDATE_THEATER',
       payload: {
@@ -234,6 +240,38 @@ export function SettingsPage() {
         <>
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+          <BarChart3 size={16} />
+          Тариф
+        </div>
+        <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-2xl font-bold text-white">{SUBSCRIPTION_PLAN_LABELS[plan]}</p>
+              <p className="mt-1 text-sm text-muted">
+                {isPro
+                  ? 'Без лимита постановок, шаблоны, серии и авто-напоминания в Telegram.'
+                  : 'Одна активная постановка и один театр. Ручная рассылка в Telegram доступна.'}
+              </p>
+            </div>
+            {!isPro && (
+              <div className="flex flex-wrap gap-2">
+                <Link to={appPaths.pricing} className="zen-primary-btn rounded-lg px-4 py-2 text-sm font-semibold">
+                  Тарифы
+                </Link>
+                <a
+                  href={supportMailto('Подключение Pro')}
+                  className="rounded-lg border border-gold/20 px-4 py-2 text-sm text-muted hover:text-white"
+                >
+                  Запросить Pro
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
           <Palette size={16} />
           Оформление
         </div>
@@ -325,9 +363,7 @@ export function SettingsPage() {
               autoComplete="current-password"
             />
           ) : (
-            <p className="text-sm text-muted">
-              Вход через Google — можно задать пароль для входа по email.
-            </p>
+            <p className="text-sm text-muted">Задайте пароль для входа по email.</p>
           )}
           <Input
             label={user?.hasPassword ? 'Новый пароль' : 'Пароль для входа по email'}
@@ -545,7 +581,12 @@ export function SettingsPage() {
               Напоминания
             </div>
 
-            {!telegramStatus?.botConfigured ? (
+            {!isPro ? (
+              <UpgradePrompt
+                title="Личные авто-напоминания — в Pro"
+                description="Бот сам отправит план репетиции каждому участнику в личку Telegram. На Free — ручная рассылка в чат театра."
+              />
+            ) : !telegramStatus?.botConfigured ? (
               <div className="space-y-3 rounded-2xl border border-amber-500/25 bg-amber-950/20 p-5 text-sm">
                 {theaterReminders.enabled ? (
                   <p className="text-amber-100">

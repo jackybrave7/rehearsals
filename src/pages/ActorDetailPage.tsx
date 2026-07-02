@@ -16,6 +16,8 @@ import { useDesign } from '../store/DesignContext';
 import { ActorAvatar } from '../components/ActorAvatar';
 import { ActorTelegramBotLink } from '../components/ActorTelegramBotLink';
 import { Button } from '../components/Button';
+import { UpgradePrompt } from '../components/UpgradePrompt';
+import { useSubscription } from '../hooks/useSubscription';
 import { getActorUnavailabilityBadge } from '../utils/actorAvailability';
 import { getActorWorkload, groupRolesByPlay } from '../utils/actorInsights';
 import { formatPhone } from '../utils/phone';
@@ -41,6 +43,7 @@ export function ActorDetailPage() {
   const navigate = useNavigate();
   const { state } = useRehearsalStore();
   const { isZen } = useDesign();
+  const { isPro } = useSubscription();
   const actor = state.actors.find((item) => item.id === id);
   const venues = getTheaterVenues(state);
 
@@ -127,31 +130,41 @@ export function ActorDetailPage() {
             <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
               Посещаемость
             </h2>
-            <p className="mb-3 text-3xl font-bold text-white">{workload.attendance.ratePercent}%</p>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(attendanceLabels) as Array<keyof typeof attendanceLabels>).map(
-                (key) => (
-                  <span
-                    key={key}
-                    className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-muted"
-                  >
-                    {attendanceLabels[key]}: {workload.attendance[key]}
-                  </span>
-                )
-              )}
-            </div>
-            {workload.staleRehearsal && (
-              <p className="mt-3 text-sm text-amber-200">
-                Давно не репетировал(а)
-                {workload.daysSinceLastRehearsal !== null &&
-                  ` — ${workload.daysSinceLastRehearsal} дн. назад`}
-              </p>
-            )}
-            {workload.lastRehearsedAt && !workload.staleRehearsal && (
-              <p className="mt-3 text-sm text-muted">
-                Последняя репетиция:{' '}
-                {format(parseISO(workload.lastRehearsedAt), 'd MMMM yyyy', { locale: ru })}
-              </p>
+            {isPro ? (
+              <>
+                <p className="mb-3 text-3xl font-bold text-white">{workload.attendance.ratePercent}%</p>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(attendanceLabels) as Array<keyof typeof attendanceLabels>).map(
+                    (key) => (
+                      <span
+                        key={key}
+                        className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-muted"
+                      >
+                        {attendanceLabels[key]}: {workload.attendance[key]}
+                      </span>
+                    )
+                  )}
+                </div>
+                {workload.staleRehearsal && (
+                  <p className="mt-3 text-sm text-amber-200">
+                    Давно не репетировал(а)
+                    {workload.daysSinceLastRehearsal !== null &&
+                      ` — ${workload.daysSinceLastRehearsal} дн. назад`}
+                  </p>
+                )}
+                {workload.lastRehearsedAt && !workload.staleRehearsal && (
+                  <p className="mt-3 text-sm text-muted">
+                    Последняя репетиция:{' '}
+                    {format(parseISO(workload.lastRehearsedAt), 'd MMMM yyyy', { locale: ru })}
+                  </p>
+                )}
+              </>
+            ) : (
+              <UpgradePrompt
+                compact
+                title="Аналитика посещаемости — в Pro"
+                description="Процент явок, история репетиций и давность последнего выхода."
+              />
             )}
           </section>
         )}

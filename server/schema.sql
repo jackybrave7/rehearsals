@@ -15,7 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   password_hash TEXT,
   google_sub TEXT UNIQUE,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  subscription_plan TEXT NOT NULL DEFAULT 'free' CHECK (subscription_plan IN ('free', 'pro')),
+  email_verified_at TEXT,
+  email_verification_token_hash TEXT,
+  email_verification_expires_at TEXT,
+  terms_accepted_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -64,7 +69,8 @@ CREATE TABLE IF NOT EXISTS plays (
   script_file_data_url TEXT,
   script_file_url TEXT,
   script_file_mime_type TEXT,
-  script_file_size INTEGER
+  script_file_size INTEGER,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (

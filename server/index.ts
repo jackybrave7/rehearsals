@@ -9,6 +9,7 @@ import { registerAuthRoutes, requireAuth } from './auth.js';
 import { registerFileRoutes } from './fileRoutes.js';
 import { registerAdminRoutes } from './adminStats.js';
 import { registerAdminDeleteUserRoutes } from './adminDeleteUser.js';
+import { registerAdminSubscriptionRoutes } from './adminSubscription.js';
 import type { AppState } from '../src/types/index.js';
 import { registerTelegramRoutes } from './telegramRoutes.js';
 import {
@@ -36,6 +37,7 @@ registerAuthRoutes(app);
 registerFileRoutes(app);
 registerAdminRoutes(app);
 registerAdminDeleteUserRoutes(app);
+registerAdminSubscriptionRoutes(app);
 registerTelegramRoutes(app);
 
 app.get('/api/health', (_req, res) => {
@@ -117,7 +119,13 @@ app.put('/api/state', (req, res) => {
     console.error('[api] save failed', error);
     const message = error instanceof Error ? error.message : 'SAVE_FAILED';
     const status =
-      message === 'FORBIDDEN' ? 403 : message === 'WOULD_LOSE_USER_DATA' ? 409 : 500;
+      message === 'FORBIDDEN'
+        ? 403
+        : message === 'WOULD_LOSE_USER_DATA'
+          ? 409
+          : message === 'SUBSCRIPTION_THEATER_LIMIT' || message === 'SUBSCRIPTION_PLAY_LIMIT'
+            ? 402
+            : 500;
     res.status(status).json({
       error: message === 'WOULD_LOSE_USER_DATA' ? 'WOULD_LOSE_USER_DATA' : message,
       message,

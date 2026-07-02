@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus } from 'lucide-react';
+import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus, Archive, ArchiveRestore } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { UpgradePrompt } from '../components/UpgradePrompt';
 import { generateId } from '../utils/id';
 import { formatFileSize } from '../utils/file';
 import { uploadFile } from '../api/files';
@@ -16,6 +19,12 @@ import { CastDistributionPanel } from '../components/CastDistributionPanel';
 import { getTheaterPlays } from '../store/selectors';
 import { useHashScroll } from '../hooks/useHashScroll';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
+import {
+  canCreateActivePlay,
+  countOwnedActivePlays,
+  getOwnedTheaterIdsFromAccess,
+  isPlayReadOnly,
+} from '../utils/subscription';
 
 const emptyPlay = (): Omit<Play, 'id'> => ({
   title: '',
@@ -32,14 +41,27 @@ const emptyPlay = (): Omit<Play, 'id'> => ({
 
 export function PlayPage() {
   const { state, dispatch } = useRehearsalStore();
-  const { confirmDelete } = useConfirmDialog();
+  const { theaters: accessTheaters } = useAuth();
+  const { isPro } = useSubscription();
+  const { confirmDelete, alert } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyPlay());
   const [fileError, setFileError] = useState<string | null>(null);
   const theaterPlays = getTheaterPlays(state);
+  const ownedTheaterIds = getOwnedTheaterIdsFromAccess(accessTheaters);
+  const ownedActivePlayCount = countOwnedActivePlays(state, ownedTheaterIds);
 
-  const openCreate = () => {
+  const openCreate = async () => {
+    if (!canCreateActivePlay(ownedActivePlayCount, isPro)) {
+      await alert({
+        title: 'Лимит тарифа Free',
+        message:
+          'На бесплатном тарифе доступна одна активная постановка. Архивируйте текущую или перейдите на Pro.',
+        okLabel: 'Понятно',
+      });
+      return;
+    }
     setEditingId(null);
     setForm(emptyPlay());
     setFileError(null);
@@ -91,6 +113,35 @@ export function PlayPage() {
       scriptFileSize: undefined,
     }));
     setFileError(null);
+  };
+
+  const toggleArchive = (play: Play) => {
+    const archiving = !play.archivedAt;
+    if (archiving && !isPro) {
+      const otherActive = state.plays.filter(
+        (item) =>
+          item.id !== play.id &&
+          item.theaterId &&
+          ownedTheaterIds.has(item.theaterId) &&
+          !item.archivedAt
+      ).length;
+      if (otherActive > 0) return;
+    }
+    if (!archiving && !canCreateActivePlay(ownedActivePlayCount, isPro)) {
+      void alert({
+        title: 'Лимит тарифа Free',
+        message: 'Сначала архивируйте активную постановку или перейдите на Pro.',
+        okLabel: 'Понятно',
+      });
+      return;
+    }
+    dispatch({
+      type: 'UPDATE_PLAY',
+      payload: {
+        ...play,
+        archivedAt: archiving ? new Date().toISOString() : undefined,
+      },
+    });
   };
 
   const handleSave = () => {
@@ -147,19 +198,29 @@ export function PlayPage() {
       <header className={pageHeaderClass}>
         <div>
           <h1 className={pageTitleClass}>Постановки</h1>
-          <p className="mt-1 text-muted">Несколько спектаклей в работе одновременно</p>
+          <p className="mt-1 text-muted">
+            {isPro ? 'Несколько спектаклей в работе одновременно' : 'На Free — одна активная постановка'}
+          </p>
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={() => void openCreate()}>
           <Plus size={18} />
           Добавить постановку
         </Button>
       </header>
 
+      {!isPro && (
+        <UpgradePrompt
+          compact
+          title="Нужен второй спектакль?"
+          description="На Pro — без лимита постановок и театров, плюс шаблоны и авто-напоминания."
+        />
+      )}
+
       {theaterPlays.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gold/20 p-12 text-center">
           <BookOpen size={48} className="mx-auto text-gold/30" />
           <p className="mt-4 text-muted">Добавьте постановку, чтобы начать планирование сцен</p>
-          <Button className="mt-4" onClick={openCreate}>
+          <Button className="mt-4" onClick={() => void openCreate()}>
             Добавить постановку
           </Button>
         </div>
@@ -176,9 +237,9 @@ export function PlayPage() {
                     selectedPlayId === play.id
                       ? 'bg-gold/15 text-gold-light'
                       : 'text-muted hover:bg-white/5 hover:text-white'
-                  }`}
+                  } ${play.archivedAt ? 'opacity-70' : ''}`}
                 >
-                  «{play.title}»
+                  «{play.title}»{play.archivedAt ? ' · архив' : ''}
                 </button>
               ))}
             </div>
@@ -186,6 +247,7 @@ export function PlayPage() {
 
           {selectedPlay && (() => {
             const play = selectedPlay;
+            const playReadOnly = isPlayReadOnly(play, isPro);
             const sceneCount = state.scenes.filter((s) => s.playId === play.id).length;
             const roleCount = state.playRoles.filter(
               (r) => r.playId === play.id && r.kind === 'character'
@@ -194,6 +256,11 @@ export function PlayPage() {
 
             return (
               <div className="rounded-2xl border border-gold/30 bg-surface/80 p-6">
+                {playReadOnly && (
+                  <p className="mb-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted">
+                    Архивная постановка на тарифе Free — только просмотр. Восстановите или перейдите на Pro.
+                  </p>
+                )}
                 <div className="flex items-start gap-5">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
                     <BookOpen size={28} />
@@ -242,19 +309,45 @@ export function PlayPage() {
                     <Button
                       variant="ghost"
                       className="!px-3 !py-1.5 text-sm"
-                      onClick={() => openEdit(play)}
+                      onClick={() => toggleArchive(play)}
                     >
-                      <Pencil size={16} />
-                      Редактировать
+                      {play.archivedAt ? (
+                        <>
+                          <ArchiveRestore size={16} />
+                          Восстановить
+                        </>
+                      ) : (
+                        <>
+                          <Archive size={16} />
+                          В архив
+                        </>
+                      )}
                     </Button>
-                    <DeleteButton
-                      label={`Удалить постановку «${play.title}»`}
-                      className="mt-1.5"
-                      onClick={() => handleDelete(play)}
-                    />
+                    {!playReadOnly && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          className="!px-3 !py-1.5 text-sm"
+                          onClick={() => openEdit(play)}
+                        >
+                          <Pencil size={16} />
+                          Редактировать
+                        </Button>
+                        <DeleteButton
+                          label={`Удалить постановку «${play.title}»`}
+                          className="mt-1.5"
+                          onClick={() => handleDelete(play)}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
-                <CastDistributionPanel playId={play.id} />
+                {!playReadOnly && <CastDistributionPanel playId={play.id} />}
+                {playReadOnly && (
+                  <p className="mt-4 text-sm text-muted">
+                    Состав и распределение ролей доступны на Pro или после восстановления постановки.
+                  </p>
+                )}
               </div>
             );
           })()}

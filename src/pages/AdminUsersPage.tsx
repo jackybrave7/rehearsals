@@ -9,11 +9,11 @@ import { fetchAdminUsers } from '../api/adminUsers';
 import type { AdminUserSummary } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
+import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
 
 function authLabel(user: AdminUserSummary): string {
   const methods: string[] = [];
   if (user.authMethods.password) methods.push('пароль');
-  if (user.authMethods.google) methods.push('Google');
   return methods.length > 0 ? methods.join(' · ') : '—';
 }
 
@@ -105,6 +105,7 @@ export function AdminUsersPage() {
                 <th className="px-4 py-3 font-medium">Пользователь</th>
                 <th className="px-4 py-3 font-medium">Регистрация</th>
                 <th className="px-4 py-3 font-medium">Вход</th>
+                <th className="px-4 py-3 font-medium">Тариф</th>
                 <th className="px-4 py-3 font-medium">Театры</th>
                 <th className="px-4 py-3 font-medium">Контент</th>
                 <th className="px-4 py-3 font-medium">Активность</th>
@@ -127,6 +128,17 @@ export function AdminUsersPage() {
                     {format(parseISO(user.createdAt), 'd MMM yyyy', { locale: ru })}
                   </td>
                   <td className="px-4 py-3 text-muted">{authLabel(user)}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        user.subscriptionPlan === 'pro'
+                          ? 'bg-accent/15 text-accent'
+                          : 'bg-white/5 text-muted'
+                      }`}
+                    >
+                      {SUBSCRIPTION_PLAN_LABELS[user.subscriptionPlan]}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <p>{user.theaterCount}</p>
                     {user.ownedTheaterCount > 0 ? (

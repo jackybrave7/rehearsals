@@ -13,6 +13,12 @@ async function parseSaveError(response: Response): Promise<string> {
     if (data.error === 'FORBIDDEN') {
       return 'FORBIDDEN';
     }
+    if (data.error === 'SUBSCRIPTION_THEATER_LIMIT') {
+      return 'SUBSCRIPTION_THEATER_LIMIT';
+    }
+    if (data.error === 'SUBSCRIPTION_PLAY_LIMIT') {
+      return 'SUBSCRIPTION_PLAY_LIMIT';
+    }
     return data.message ?? data.error ?? `SAVE_STATE_${response.status}`;
   } catch {
     return `SAVE_STATE_${response.status}`;

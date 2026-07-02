@@ -239,8 +239,8 @@ export function insertStateEntities(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
       google_docs_links_synced_at, script_file_name, script_file_data_url, script_file_url,
-      script_file_mime_type, script_file_size
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      script_file_mime_type, script_file_size, archived_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
     const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
@@ -258,7 +258,8 @@ export function insertStateEntities(
       legacyDataUrl,
       play.scriptFileUrl ?? null,
       play.scriptFileMimeType ?? null,
-      play.scriptFileSize ?? null
+      play.scriptFileSize ?? null,
+      play.archivedAt ?? null
     );
   }
 
@@ -597,6 +598,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       scriptFileDataUrl: (row.script_file_data_url as string | null) ?? undefined,
       scriptFileMimeType: (row.script_file_mime_type as string | null) ?? undefined,
       scriptFileSize: (row.script_file_size as number | null) ?? undefined,
+      archivedAt: (row.archived_at as string | null) ?? undefined,
     })
   );
 

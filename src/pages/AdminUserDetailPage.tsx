@@ -14,10 +14,11 @@ import {
 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
-import { deleteAdminUser, fetchAdminUserDetail } from '../api/adminUsers';
+import { deleteAdminUser, fetchAdminUserDetail, updateAdminUserSubscription } from '../api/adminUsers';
 import type { AdminUserDetail } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
+import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
 import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Button } from '../components/Button';
@@ -25,20 +26,21 @@ import { Button } from '../components/Button';
 function authLabel(detail: AdminUserDetail): string {
   const methods: string[] = [];
   if (detail.authMethods.password) methods.push('пароль');
-  if (detail.authMethods.google) methods.push('Google');
   return methods.length > 0 ? methods.join(' · ') : '—';
 }
 
 export function AdminUserDetailPage() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshSession } = useAuth();
   const { confirmDelete } = useConfirmDialog();
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
   const isSelf = Boolean(userId && currentUser?.id === userId);
 
   const load = useCallback(async () => {
@@ -58,6 +60,29 @@ export function AdminUserDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handlePlanChange = async (plan: 'free' | 'pro') => {
+    if (!detail || !userId || planSaving) return;
+    setPlanSaving(true);
+    setError(null);
+    setPlanNotice(null);
+    try {
+      const result = await updateAdminUserSubscription(userId, plan);
+      if (isSelf) {
+        await refreshSession();
+      }
+      await load();
+      if (plan === 'pro' && result.mailSent) {
+        setPlanNotice('Тариф Pro подключён, пользователю отправлено письмо.');
+      } else if (plan === 'pro' && result.mailSent === false) {
+        setPlanNotice('Тариф Pro подключён, но письмо не отправлено — проверьте SMTP в .env.');
+      }
+    } catch {
+      setError('Не удалось обновить тариф');
+    } finally {
+      setPlanSaving(false);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!detail || !userId || isSelf || deleting) return;
@@ -171,6 +196,30 @@ export function AdminUserDetailPage() {
               sub={formatBytes(detail.filesBytes)}
               icon={HardDrive}
             />
+          </section>
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+            <h2 className="mb-2 text-lg font-semibold text-white">Тариф</h2>
+            <p className="mb-4 text-sm text-muted">
+              Сейчас: <strong className="text-white">{SUBSCRIPTION_PLAN_LABELS[detail.subscriptionPlan]}</strong>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={detail.subscriptionPlan === 'free' ? 'primary' : 'secondary'}
+                disabled={planSaving || detail.subscriptionPlan === 'free'}
+                onClick={() => void handlePlanChange('free')}
+              >
+                Free
+              </Button>
+              <Button
+                variant={detail.subscriptionPlan === 'pro' ? 'primary' : 'secondary'}
+                disabled={planSaving || detail.subscriptionPlan === 'pro'}
+                onClick={() => void handlePlanChange('pro')}
+              >
+                Pro
+              </Button>
+            </div>
+            {planNotice && <p className="mt-3 text-sm text-emerald-300">{planNotice}</p>}
           </section>
 
           <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">

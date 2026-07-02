@@ -98,6 +98,8 @@ export interface Play {
   scriptFileDataUrl?: string;
   scriptFileMimeType?: string;
   scriptFileSize?: number;
+  /** Архивная постановка — на Free только просмотр */
+  archivedAt?: string;
 }
 
 export type SceneStatus = 'not_started' | 'in_progress' | 'ready';

@@ -4,6 +4,9 @@ import { DeleteButton } from '../components/DeleteButton';
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { isPlayReadOnly } from '../utils/subscription';
+import { UpgradePrompt } from '../components/UpgradePrompt';
 import { getActivePlay, getPlayRoles, getPlayScenes, getSceneRoles, getSelectedPerformance, getActorNamesForRoleInPerformance, formatPerformanceLabel } from '../store/selectors';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
@@ -66,8 +69,10 @@ const priorityColors: Record<ScenePriority, string> = {
 
 export function ScenesPage() {
   const { state, dispatch } = useRehearsalStore();
+  const { isPro } = useSubscription();
   const { confirm } = useConfirmDialog();
   const activePlay = getActivePlay(state);
+  const playReadOnly = activePlay ? isPlayReadOnly(activePlay, isPro) : false;
   const playScenes = getPlayScenes(state, state.activePlayId);
   const selectedPerformance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
   const characterRoles = getPlayRoles(state, activePlay?.id ?? '', 'character');
@@ -81,7 +86,7 @@ export function ScenesPage() {
   const [scriptLinkInput, setScriptLinkInput] = useState('');
 
   const openCreate = () => {
-    if (!activePlay) return;
+    if (!activePlay || playReadOnly) return;
     setEditing(null);
     setForm({ ...emptyScene(), number: playScenes.length + 1 });
     setScriptLinkInput('');
@@ -106,7 +111,7 @@ export function ScenesPage() {
   };
 
   const handleSave = () => {
-    if (!activePlay || !form.title.trim()) return;
+    if (!activePlay || !form.title.trim() || playReadOnly) return;
     const manualAnchor = scriptLinkInput.trim()
       ? parseAnchorFromGoogleDocsUrl(scriptLinkInput.trim())
       : undefined;
@@ -130,6 +135,7 @@ export function ScenesPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (playReadOnly) return;
     const confirmed = await confirm({
       title: 'Удалить сцену?',
       message: 'Сцена будет удалена из постановки и всех связанных планов.',
@@ -141,7 +147,7 @@ export function ScenesPage() {
   };
 
   const handleStatusChange = (scene: Scene, status: SceneStatus) => {
-    if (scene.status === status) return;
+    if (playReadOnly || scene.status === status) return;
     dispatch({ type: 'UPDATE_SCENE', payload: { ...scene, status } });
   };
 
@@ -305,11 +311,18 @@ export function ScenesPage() {
             </p>
           )}
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} disabled={playReadOnly}>
           <Plus size={18} />
           Добавить сцену
         </Button>
       </header>
+
+      {playReadOnly && (
+        <UpgradePrompt
+          title="Архивная постановка — только просмотр"
+          description="На тарифе Free архивные постановки нельзя редактировать. Восстановите постановку или перейдите на Pro."
+        />
+      )}
 
       <PremiereBanner state={state} playId={activePlay.id} />
 
@@ -551,6 +564,7 @@ export function ScenesPage() {
                           onChange={(e) =>
                             handleStatusChange(scene, e.target.value as SceneStatus)
                           }
+                          disabled={playReadOnly}
                           aria-label={`Статус сцены ${scene.number}`}
                           className={`cursor-pointer rounded-full border border-transparent px-2 py-0.5 text-[10px] transition-colors focus:border-gold/30 focus:outline-none focus:ring-1 focus:ring-gold/30 ${statusColors[scene.status]}`}
                         >
@@ -563,18 +577,22 @@ export function ScenesPage() {
                           )}
                         </select>
                         <div className="card-actions flex min-h-10 gap-0.5">
-                          <Button
-                            variant="ghost"
-                            className="!px-1.5 !py-1"
-                            onClick={() => openEdit(scene)}
-                          >
-                            <Pencil size={14} />
-                          </Button>
-                          <DeleteButton
-                            label={`Удалить сцену ${scene.number}`}
-                            iconSize={14}
-                            onClick={() => handleDelete(scene.id)}
-                          />
+                          {!playReadOnly && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                className="!px-1.5 !py-1"
+                                onClick={() => openEdit(scene)}
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                              <DeleteButton
+                                label={`Удалить сцену ${scene.number}`}
+                                iconSize={14}
+                                onClick={() => handleDelete(scene.id)}
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

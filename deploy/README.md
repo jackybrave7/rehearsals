@@ -48,7 +48,7 @@ API_PORT=3001
 
 По желанию: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
-**Google Docs:** `VITE_GOOGLE_CLIENT_ID` подставляется **на этапе сборки**. Задайте его в `.env` **до** `npm run build` и добавьте прод-домен в [Google Cloud Console](https://console.cloud.google.com/) → Authorized JavaScript origins.
+**Google Docs (опционально):** `VITE_GOOGLE_CLIENT_ID` — только для синхронизации текста из Google Docs, не для входа в аккаунт. Подставляется **на этапе сборки**. Задайте в `.env` **до** `npm run build`.
 
 ## 4. Сборка и первый запуск API
 

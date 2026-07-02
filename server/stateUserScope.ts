@@ -14,6 +14,7 @@ import {
   wouldLoseUserData,
 } from './stateRepository.js';
 import { migrateEmbeddedFilesIfNeeded } from './fileMigration.js';
+import { validateSubscriptionLimits } from './subscription.js';
 
 function getEditableTheaterIds(session: AuthSessionPayload): Set<string> {
   return new Set(
@@ -150,6 +151,15 @@ export function saveStateForUser(
   if (wouldLoseUserData(mergedForCheck, dbState)) {
     throw new Error('WOULD_LOSE_USER_DATA');
   }
+
+  validateSubscriptionLimits(
+    db,
+    session.user.id,
+    session.user.email,
+    mergedForCheck,
+    dbState,
+    newTheaterIds
+  );
 
   if (!isEmptyState(dbState)) {
     backupState(dbState);

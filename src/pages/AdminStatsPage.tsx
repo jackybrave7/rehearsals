@@ -93,7 +93,6 @@ export function AdminStatsPage() {
               <StatCard label="Пользователей" value={stats.users.total} sub={`+${stats.users.newLast30Days} за 30 дн.`} icon={Users} />
               <StatCard label="Активных сессий" value={stats.sessions.active} sub={`${stats.sessions.activeUsers} пользователей`} icon={UserPlus} />
               <StatCard label="Вход по паролю" value={stats.users.withPassword} icon={Users} />
-              <StatCard label="Вход через Google" value={stats.users.withGoogle} icon={Users} />
             </div>
           </section>
 

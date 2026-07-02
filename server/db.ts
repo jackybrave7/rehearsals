@@ -90,6 +90,12 @@ export function getDb(): AppDatabase {
     `ALTER TABLE theaters ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE theaters ADD COLUMN reminder_settings TEXT`,
     `ALTER TABLE actors ADD COLUMN telegram_chat_id TEXT`,
+    `ALTER TABLE users ADD COLUMN subscription_plan TEXT NOT NULL DEFAULT 'free'`,
+    `ALTER TABLE plays ADD COLUMN archived_at TEXT`,
+    `ALTER TABLE users ADD COLUMN email_verified_at TEXT`,
+    `ALTER TABLE users ADD COLUMN email_verification_token_hash TEXT`,
+    `ALTER TABLE users ADD COLUMN email_verification_expires_at TEXT`,
+    `ALTER TABLE users ADD COLUMN terms_accepted_at TEXT`,
   ]) {
     try {
       db.exec(migration);
@@ -114,6 +120,10 @@ export function getDb(): AppDatabase {
      SELECT id, owner_user_id, 'owner', datetime('now')
      FROM theaters
      WHERE owner_user_id IS NOT NULL`
+  ).run();
+
+  db.prepare(
+    `UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL`
   ).run();
 
   dbInstance = wrapDatabase(db);

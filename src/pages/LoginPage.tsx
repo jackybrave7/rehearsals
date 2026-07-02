@@ -1,48 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Film } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Film, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../store/AuthContext';
-import { fetchAuthConfig, requestPasswordReset } from '../api/auth';
+import { fetchAuthConfig, requestPasswordReset, resendEmailVerification } from '../api/auth';
 import { Button } from '../components/Button';
-
-const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
-
-function loadGsiScript(): Promise<void> {
-  if (window.google?.accounts?.id) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GSI_SCRIPT_SRC}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('GSI_LOAD_FAILED')), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = GSI_SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('GSI_LOAD_FAILED'));
-    document.head.appendChild(script);
-  });
-}
+import { LEGAL_DOCUMENTS } from '../content/legalOperator';
 
 export function LoginPage() {
-  const { user, loading, login, register, googleLogin } = useAuth();
+  const { user, loading, login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const googleButtonRef = useRef<HTMLDivElement>(null);
-  const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
+  const [searchParams] = useSearchParams();
 
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mailConfigured, setMailConfigured] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/app';
 
@@ -51,41 +31,11 @@ export function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!clientId || !googleButtonRef.current || loading || user) return;
-
-    let cancelled = false;
-    void loadGsiScript()
-      .then(() => {
-        if (cancelled || !googleButtonRef.current || !window.google?.accounts?.id) return;
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response) => {
-            setSubmitting(true);
-            setError(null);
-            void googleLogin(response.credential)
-              .then(() => navigate(redirectTo, { replace: true }))
-              .catch((authError) => {
-                setError(authError instanceof Error ? authError.message : 'Ошибка входа через Google');
-              })
-              .finally(() => setSubmitting(false));
-          },
-        });
-        googleButtonRef.current.innerHTML = '';
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: 'outline',
-          size: 'large',
-          width: 320,
-          text: mode === 'login' ? 'signin_with' : 'signup_with',
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setError('Не удалось загрузить Google Sign-In');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId, googleLogin, loading, mode, navigate, redirectTo, user]);
+    if (searchParams.get('verified') === '1') {
+      setInfo('Email подтверждён. Теперь можно войти.');
+      setMode('login');
+    }
+  }, [searchParams]);
 
   if (!loading && user) {
     return <Navigate to={redirectTo} replace />;
@@ -96,6 +46,7 @@ export function LoginPage() {
     setSubmitting(true);
     setError(null);
     setInfo(null);
+    setShowResendVerification(false);
     try {
       if (mode === 'forgot') {
         const message = await requestPasswordReset(email);
@@ -104,12 +55,41 @@ export function LoginPage() {
       }
       if (mode === 'login') {
         await login(email, password);
-      } else {
-        await register(email, password, name);
+        navigate(redirectTo, { replace: true });
+        return;
       }
-      navigate(redirectTo, { replace: true });
+      if (!acceptTerms) {
+        setError('Примите пользовательское соглашение и политику конфиденциальности');
+        return;
+      }
+      const result = await register(email, password, name, acceptTerms);
+      setInfo(result.message);
+      setMode('login');
+      setPassword('');
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : 'Ошибка входа');
+      const message = authError instanceof Error ? authError.message : 'Ошибка входа';
+      setError(message);
+      if (message.includes('Подтвердите email')) {
+        setShowResendVerification(true);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim()) {
+      setError('Укажите email, на который регистрировались');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const message = await resendEmailVerification(email);
+      setInfo(message);
+      setShowResendVerification(false);
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Не удалось отправить письмо');
     } finally {
       setSubmitting(false);
     }
@@ -119,155 +99,207 @@ export function LoginPage() {
     setMode(next);
     setError(null);
     setInfo(null);
+    setShowResendVerification(false);
+    setShowPassword(false);
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 shadow-2xl">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/20 text-gold">
-            <Film size={24} />
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 shadow-2xl">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/20 text-gold">
+              <Film size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gold-light">Репетиции</h1>
+              <p className="text-sm text-muted">Вход в планировщик постановки</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gold-light">Репетиции</h1>
-            <p className="text-sm text-muted">Вход в планировщик постановки</p>
-          </div>
-        </div>
 
-        {mode !== 'forgot' ? (
-          <div className="mb-6 flex gap-2 rounded-xl bg-black/20 p-1">
-            <button
-              type="button"
-              onClick={() => switchMode('login')}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-                mode === 'login' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-              }`}
-            >
-              Вход
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('register')}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-                mode === 'register' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-              }`}
-            >
-              Регистрация
-            </button>
-          </div>
-        ) : (
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-white">Восстановление пароля</h2>
-            <p className="mt-1 text-sm text-muted">
-              Отправим одноразовый пароль на email. После входа смените его в Настройках.
-            </p>
-          </div>
-        )}
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          {mode === 'register' && (
-            <label className="block">
-              <span className="mb-1 block text-sm text-muted">Имя</span>
-              <input
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
-                placeholder="Как к вам обращаться"
-              />
-            </label>
+          {mode !== 'forgot' ? (
+            <div className="mb-6 flex gap-2 rounded-xl bg-black/20 p-1">
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  mode === 'login' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+                }`}
+              >
+                Вход
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('register')}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  mode === 'register' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
+                }`}
+              >
+                Регистрация
+              </button>
+            </div>
+          ) : (
+            <div className="mb-6">
+              <h2 className="text-lg font-medium text-white">Восстановление пароля</h2>
+              <p className="mt-1 text-sm text-muted">
+                Отправим одноразовый пароль на email. После входа смените его в Настройках.
+              </p>
+            </div>
           )}
 
-          <label className="block">
-            <span className="mb-1 block text-sm text-muted">Email</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
-              autoComplete="email"
-            />
-          </label>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {mode === 'register' && (
+              <label className="block">
+                <span className="mb-1 block text-sm text-muted">Имя</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
+                  placeholder="Как к вам обращаться"
+                />
+              </label>
+            )}
 
-          {mode !== 'forgot' && (
             <label className="block">
-              <span className="mb-1 block text-sm text-muted">Пароль</span>
+              <span className="mb-1 block text-sm text-muted">Email</span>
               <input
-                type="password"
+                type="email"
                 required
-                minLength={mode === 'register' ? 8 : undefined}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                autoComplete="email"
               />
-              {mode === 'register' && (
-                <span className="mt-1 block text-xs text-muted">Минимум 8 символов</span>
-              )}
             </label>
-          )}
 
-          {mode === 'login' && mailConfigured && (
-            <button
-              type="button"
-              onClick={() => switchMode('forgot')}
-              className="text-sm text-gold-light hover:underline"
-            >
-              Забыли пароль?
-            </button>
-          )}
+            {mode !== 'forgot' && (
+              <label className="block">
+                <span className="mb-1 block text-sm text-muted">Пароль</span>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={mode === 'register' ? 8 : undefined}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full rounded-xl border border-gold/15 bg-black/20 py-3 pl-4 pr-11 text-white outline-none focus:border-gold/40"
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted transition-colors hover:text-white"
+                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {mode === 'register' && (
+                  <span className="mt-1 block text-xs text-muted">Минимум 8 символов</span>
+                )}
+              </label>
+            )}
 
-          {mode === 'forgot' && (
-            <button
-              type="button"
-              onClick={() => switchMode('login')}
-              className="text-sm text-muted hover:text-white"
-            >
-              ← Назад ко входу
-            </button>
-          )}
+            {mode === 'register' && (
+              <label className="flex items-start gap-3 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  checked={acceptTerms}
+                  onChange={(event) => setAcceptTerms(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gold/30 accent-gold"
+                />
+                <span>
+                  Я принимаю{' '}
+                  <Link to={LEGAL_DOCUMENTS.terms.path} className="text-gold-light hover:underline" target="_blank">
+                    пользовательское соглашение
+                  </Link>
+                  ,{' '}
+                  <Link to={LEGAL_DOCUMENTS.privacy.path} className="text-gold-light hover:underline" target="_blank">
+                    политику конфиденциальности
+                  </Link>{' '}
+                  и{' '}
+                  <Link to={LEGAL_DOCUMENTS.offer.path} className="text-gold-light hover:underline" target="_blank">
+                    публичную оферту
+                  </Link>
+                </span>
+              </label>
+            )}
 
-          {error && (
-            <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-              {error}
-            </div>
-          )}
+            {mode === 'login' && mailConfigured && (
+              <button
+                type="button"
+                onClick={() => switchMode('forgot')}
+                className="text-sm text-gold-light hover:underline"
+              >
+                Забыли пароль?
+              </button>
+            )}
 
-          {info && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-200">
-              {info}
-            </div>
-          )}
+            {mode === 'forgot' && (
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="text-sm text-muted hover:text-white"
+              >
+                ← Назад ко входу
+              </button>
+            )}
 
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting
-              ? 'Подождите…'
-              : mode === 'login'
-                ? 'Войти'
-                : mode === 'register'
-                  ? 'Создать аккаунт'
-                  : 'Отправить пароль на почту'}
-          </Button>
-        </form>
+            {error && (
+              <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+                {error}
+                {showResendVerification && (
+                  <button
+                    type="button"
+                    onClick={() => void handleResendVerification()}
+                    className="mt-2 block text-gold-light hover:underline"
+                    disabled={submitting}
+                  >
+                    Отправить письмо повторно
+                  </button>
+                )}
+              </div>
+            )}
 
-        {mode !== 'forgot' && clientId ? (
-          <div className="mt-6 space-y-3">
-            <div className="text-center text-xs uppercase tracking-wide text-muted">или</div>
-            <div ref={googleButtonRef} className="flex justify-center" />
-          </div>
-        ) : (
-          <p className="mt-6 text-center text-xs text-muted">
-            Google Sign-In: задайте VITE_GOOGLE_CLIENT_ID в .env
+            {info && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-200">
+                {info}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting
+                ? 'Подождите…'
+                : mode === 'login'
+                  ? 'Войти'
+                  : mode === 'register'
+                    ? 'Создать аккаунт'
+                    : 'Отправить пароль на почту'}
+            </Button>
+          </form>
+
+          <p className="mt-8 text-center text-sm text-muted">
+            <Link to="/" className="text-gold-light hover:underline">
+              На главную
+            </Link>
           </p>
-        )}
-
-        <p className="mt-8 text-center text-sm text-muted">
-          <Link to="/" className="text-gold-light hover:underline">
-            На главную
-          </Link>
-        </p>
+        </div>
       </div>
+
+      <footer className="border-t border-gold/10 px-4 py-6 text-center text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <Link to={LEGAL_DOCUMENTS.terms.path} className="hover:text-gold-light">
+            {LEGAL_DOCUMENTS.terms.title}
+          </Link>
+          <Link to={LEGAL_DOCUMENTS.privacy.path} className="hover:text-gold-light">
+            {LEGAL_DOCUMENTS.privacy.title}
+          </Link>
+          <Link to={LEGAL_DOCUMENTS.offer.path} className="hover:text-gold-light">
+            {LEGAL_DOCUMENTS.offer.title}
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

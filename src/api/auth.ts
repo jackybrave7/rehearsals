@@ -68,23 +68,45 @@ export async function loginWithEmail(email: string, password: string): Promise<A
 export async function registerWithEmail(
   email: string,
   password: string,
-  name: string
-): Promise<AuthSessionPayload> {
+  name: string,
+  acceptTerms: boolean
+): Promise<{ needsEmailVerification: true; message: string }> {
   const response = await authFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, name, acceptTerms }),
   });
   if (!response.ok) throw new Error(await parseAuthError(response));
-  return response.json() as Promise<AuthSessionPayload>;
+  const data = (await response.json()) as { message?: string };
+  return {
+    needsEmailVerification: true,
+    message:
+      data.message ??
+      'На ваш email отправлена ссылка для подтверждения. Перейдите по ней, затем войдите в аккаунт.',
+  };
 }
 
-export async function loginWithGoogle(credential: string): Promise<AuthSessionPayload> {
-  const response = await authFetch('/auth/google', {
+export async function verifyEmail(token: string): Promise<void> {
+  const response = await authFetch('/auth/verify-email', {
     method: 'POST',
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify({ token }),
   });
   if (!response.ok) throw new Error(await parseAuthError(response));
-  return response.json() as Promise<AuthSessionPayload>;
+}
+
+export async function resendEmailVerification(email: string): Promise<string> {
+  const response = await authFetch('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  const data = (await response.json().catch(() => null)) as {
+    message?: string;
+    error?: string;
+  } | null;
+  if (!response.ok) throw new Error(await parseAuthError(response, data?.error, data));
+  return (
+    data?.message ??
+    'Если аккаунт с таким email зарегистрирован и не подтверждён, на почту отправлена новая ссылка.'
+  );
 }
 
 export async function logout(): Promise<void> {
@@ -131,7 +153,6 @@ async function parseAuthError(
     if (code === 'USER_NOT_FOUND') {
       return 'Пользователь не найден. Попросите его зарегистрироваться на rehears.ru/login';
     }
-    if (code === 'INVALID_GOOGLE_TOKEN') return 'Не удалось войти через Google';
     if (code === 'WRONG_PASSWORD') return 'Неверный текущий пароль';
     if (code === 'INVALID_PASSWORD') return 'Новый пароль должен быть не короче 8 символов';
     if (code === 'INVALID_NAME') return 'Укажите имя';
@@ -140,6 +161,16 @@ async function parseAuthError(
     }
     if (code === 'MAIL_FAILED') return 'Не удалось отправить письмо. Попробуйте позже.';
     if (code === 'INVALID_EMAIL') return 'Укажите email';
+    if (code === 'TERMS_NOT_ACCEPTED') {
+      return 'Примите пользовательское соглашение и политику конфиденциальности';
+    }
+    if (code === 'EMAIL_NOT_VERIFIED') {
+      return 'Подтвердите email — проверьте почту или запросите письмо повторно.';
+    }
+    if (code === 'TOO_MANY_REQUESTS') {
+      return data?.message ?? 'Подождите пару минут перед повторной отправкой.';
+    }
+    if (code === 'INVALID_TOKEN') return 'Ссылка подтверждения недействительна или устарела.';
     if (code) return code;
     if (data.message) return data.message;
   } catch {

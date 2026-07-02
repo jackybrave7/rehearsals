@@ -1,10 +1,13 @@
 export type TheaterAccessRole = 'owner' | 'editor' | 'observer';
 
+export type SubscriptionPlan = 'free' | 'pro';
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   hasPassword?: boolean;
+  subscriptionPlan?: SubscriptionPlan;
 }
 
 export interface TheaterAccessInfo {

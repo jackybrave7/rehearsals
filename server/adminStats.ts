@@ -1,5 +1,6 @@
 import type { Express } from 'express';
 import { getDb, type AppDatabase } from './db.js';
+import { normalizeSubscriptionPlan } from './subscription.js';
 import { getDbInfo, listBackupFiles } from './backup.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import type { TheaterAccessRole } from './authTypes.js';
@@ -156,6 +157,7 @@ function mapUserSummaryRow(
     email: string;
     name: string;
     created_at: string;
+    subscription_plan: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -173,6 +175,7 @@ function mapUserSummaryRow(
     email: row.email,
     name: row.name,
     createdAt: row.created_at,
+    subscriptionPlan: normalizeSubscriptionPlan(row.subscription_plan),
     authMethods: {
       password: Boolean(row.has_password),
       google: Boolean(row.has_google),
@@ -222,6 +225,7 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
          u.email,
          u.name,
          u.created_at,
+         u.subscription_plan,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
@@ -237,6 +241,7 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
     email: string;
     name: string;
     created_at: string;
+    subscription_plan: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -288,6 +293,7 @@ export function collectAdminUserDetail(
          u.email,
          u.name,
          u.created_at,
+         u.subscription_plan,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,

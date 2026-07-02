@@ -21,7 +21,12 @@ import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminUserDetailPage } from './pages/AdminUserDetailPage';
 import { MarketingPage } from './pages/MarketingPage';
+import { PricingPage } from './pages/PricingPage';
 import { LoginPage } from './pages/LoginPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { TermsPage } from './pages/legal/TermsPage';
+import { PrivacyPage } from './pages/legal/PrivacyPage';
+import { OfferPage } from './pages/legal/OfferPage';
 import { AdminRoute } from './components/AdminRoute';
 import { appPaths } from './navigation/appPaths';
 
@@ -38,7 +43,12 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route index element={<MarketingPage />} />
+              <Route path="pricing" element={<PricingPage />} />
               <Route path="login" element={<LoginPage />} />
+              <Route path="verify-email" element={<VerifyEmailPage />} />
+              <Route path="legal/terms" element={<TermsPage />} />
+              <Route path="legal/privacy" element={<PrivacyPage />} />
+              <Route path="legal/offer" element={<OfferPage />} />
               <Route path="welcome" element={<Navigate to="/" replace />} />
               <Route path="actors" element={<Navigate to="/app/actors" replace />} />
               <Route path="play" element={<Navigate to="/app/play" replace />} />

@@ -2,6 +2,7 @@ export const APP_BASE = '/app';
 
 export const appPaths = {
   home: APP_BASE,
+  pricing: '/pricing',
   overview: `${APP_BASE}/overview`,
   play: `${APP_BASE}/play`,
   scenes: `${APP_BASE}/scenes`,

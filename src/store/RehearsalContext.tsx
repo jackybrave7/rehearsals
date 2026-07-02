@@ -275,6 +275,12 @@ function formatSaveError(error: unknown): string {
   if (message.includes('FORBIDDEN')) {
     return 'Недостаточно прав для сохранения изменений в этом театре.';
   }
+  if (message === 'SUBSCRIPTION_THEATER_LIMIT') {
+    return 'На тарифе Free доступен один театр. Перейдите на Pro или удалите лишний театр.';
+  }
+  if (message === 'SUBSCRIPTION_PLAY_LIMIT') {
+    return 'На тарифе Free доступна одна активная постановка. Архивируйте лишнюю или перейдите на Pro.';
+  }
   if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
     return isLocalDevHost()
       ? 'Нет связи с базой (порт 3001). Запустите restart.bat — изменения не сохранены.'

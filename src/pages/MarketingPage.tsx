@@ -1,18 +1,47 @@
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
 import { useForceZenTheme } from '../hooks/useForceZenTheme';
+import { MarketingHeader } from '../components/MarketingHeader';
+import { MarketingFooter } from '../components/MarketingFooter';
 import {
   ArrowRight,
+  Building2,
   CalendarDays,
   Check,
+  ClipboardCopy,
   Clock,
+  FileSearch,
   FileText,
   Layers,
+  LayoutGrid,
   MessageCircle,
   Sparkles,
   Users,
   X,
 } from 'lucide-react';
+
+const painPoints = [
+  {
+    icon: LayoutGrid,
+    title: 'Всё разбросано',
+    text: 'Состав в одной таблице, сцены — в другой, план репетиции — в третьей',
+  },
+  {
+    icon: ClipboardCopy,
+    title: 'Ручная рассылка',
+    text: 'Каждый раз копируете план в Telegram и забываете @username',
+  },
+  {
+    icon: FileSearch,
+    title: '«Где мой текст?»',
+    text: 'Актёры спрашивают — и вы снова ищете ссылку в Google Docs',
+  },
+  {
+    icon: Building2,
+    title: 'Тяжёлые системы',
+    text: 'Темза и 1С — для всего театра, а вам нужна одна постановка',
+  },
+] as const;
 
 const features = [
   {
@@ -49,7 +78,7 @@ const features = [
     icon: CalendarDays,
     title: 'Шаблоны и серии',
     description:
-      'Сохраните удачный план как шаблон и разверните еженедельную серию — «каждый вторник до премьеры».',
+      'Сохраните удачный план как шаблон и разверните еженедельную серию — в тарифе Pro.',
   },
 ];
 
@@ -119,34 +148,7 @@ export function MarketingPage() {
 
   return (
     <div className="marketing-page zen-page min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-          <Link to="/" className="flex items-center gap-2.5 text-foreground no-underline">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-sm font-bold">
-              Р
-            </span>
-            <span className="text-lg font-semibold tracking-tight">Репетиции</span>
-          </Link>
-          <nav className="hidden items-center gap-8 text-sm text-muted sm:flex">
-            <a href="#features" className="transition-colors hover:text-foreground">
-              Возможности
-            </a>
-            <a href="#how" className="transition-colors hover:text-foreground">
-              Как это работает
-            </a>
-            <a href="#compare" className="transition-colors hover:text-foreground">
-              Сравнение
-            </a>
-          </nav>
-          <Link
-            to={appPaths.home}
-            className="zen-primary-btn inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-          >
-            Открыть приложение
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader current="home" />
 
       <main>
         {/* Hero */}
@@ -169,8 +171,8 @@ export function MarketingPage() {
               <span className="text-accent">до сообщения в Telegram</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted sm:text-xl">
-              Репетиции — для режиссёра, который ведёт постановку сам: сцены, состав, почасовой план
-              и рассылка труппе. Без 1С, без внедрения на месяцы.
+              Сцены, почасовой план и рассылка в Telegram. Платите, только когда ведёте больше одной
+              постановки — без 1С и внедрения на месяцы.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
@@ -180,12 +182,12 @@ export function MarketingPage() {
                 Начать бесплатно
                 <ArrowRight size={18} />
               </Link>
-              <a
-                href="#how"
+              <Link
+                to={appPaths.pricing}
                 className="inline-flex items-center gap-2 rounded-xl border border-border px-8 py-3.5 text-base font-medium text-foreground transition-colors hover:bg-black/5"
               >
-                Как это работает
-              </a>
+                Тарифы
+              </Link>
             </div>
             <p className="mt-6 text-sm text-muted/80">
               Онлайн-сервис · совместная работа · русский интерфейс
@@ -194,35 +196,76 @@ export function MarketingPage() {
         </section>
 
         {/* Problem */}
-        <section className="border-y border-gold/10 bg-surface/40 px-5 py-14 sm:px-8">
-          <div className="mx-auto max-w-5xl">
-            <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
-              <div>
-                <h2 className="text-2xl font-bold text-white sm:text-3xl">Знакомо?</h2>
-                <ul className="mt-6 space-y-4 text-muted">
-                  {[
-                    'Состав в одной таблице, сцены — в другой, план репетиции — в третьей',
-                    'Каждый раз вручную копируете план в Telegram и забываете @username',
-                    'Актёры спрашивают: «А где мой текст?» — и вы ищете ссылку в Google Docs',
-                    'Темза и 1С — для всего театра, а вам нужна одна постановка',
-                  ].map((item) => (
-                    <li key={item} className="flex gap-3">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold/60" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-2xl border border-gold/15 bg-background/60 p-8">
-                <p className="text-sm font-medium uppercase tracking-widest text-gold">Решение</p>
-                <p className="mt-4 text-xl font-semibold leading-snug text-white">
-                  Один инструмент для репетиционного цикла — от текста пьесы до готового сообщения
-                  актёрам.
-                </p>
-                <p className="mt-4 leading-relaxed text-muted">
-                  Не ERP для дирекции, а режиссёрский пульт: что репетируем, кого ждём, что забыли,
-                  что отправить в чат.
-                </p>
+        <section className="relative overflow-hidden border-y border-border bg-surface/50 px-5 py-16 sm:px-8 sm:py-20">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-60"
+            style={{
+              background:
+                'radial-gradient(ellipse 70% 50% at 20% 50%, rgba(224, 74, 18, 0.08), transparent 60%), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(201, 169, 98, 0.06), transparent 55%)',
+            }}
+          />
+          <div className="relative mx-auto max-w-5xl">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">
+                Боль режиссёра
+              </p>
+              <h2 className="mt-3 text-4xl font-extrabold leading-none tracking-tight text-foreground sm:text-5xl">
+                Знакомо<span className="text-accent">?</span>
+              </h2>
+              <p className="mt-4 text-lg leading-relaxed text-muted">
+                Перед каждой репетицией — один и тот же ритуал: собрать данные из разных мест и
+                надеяться, что никого не забыли.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              {painPoints.map(({ icon: Icon, title, text }) => (
+                <article
+                  key={title}
+                  className="group rounded-2xl border border-foreground/8 bg-background/90 p-5 shadow-[0_4px_24px_-8px_rgba(30,25,40,0.12)] transition-all hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_8px_30px_-10px_rgba(30,25,40,0.18)]"
+                >
+                  <div className="flex items-start gap-4">
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-foreground/10 bg-foreground/[0.04] text-foreground/70 transition-colors group-hover:border-accent/25 group-hover:bg-accent/10 group-hover:text-accent">
+                      <Icon size={20} strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <h3 className="font-semibold text-foreground">{title}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted">{text}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="relative mt-8 overflow-hidden rounded-[24px] border-2 border-accent/35 bg-gradient-to-br from-accent/[0.12] via-background to-background p-8 sm:p-10">
+              <div
+                className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-40"
+                style={{
+                  background: 'radial-gradient(circle, rgba(224, 74, 18, 0.25), transparent 70%)',
+                }}
+              />
+              <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-xl">
+                  <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-accent">
+                    <Sparkles size={14} />
+                    Решение
+                  </p>
+                  <p className="mt-4 text-2xl font-bold leading-snug text-foreground sm:text-[1.65rem]">
+                    Один инструмент для репетиционного цикла — от текста пьесы до готового
+                    сообщения актёрам.
+                  </p>
+                  <p className="mt-4 leading-relaxed text-muted">
+                    Не ERP для дирекции, а режиссёрский пульт: что репетируем, кого ждём, что забыли,
+                    что отправить в чат.
+                  </p>
+                </div>
+                <Link
+                  to={appPaths.home}
+                  className="zen-primary-btn inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl px-6 py-3.5 text-sm font-semibold lg:self-center"
+                >
+                  Попробовать
+                  <ArrowRight size={16} />
+                </Link>
               </div>
             </div>
           </div>
@@ -354,19 +397,7 @@ export function MarketingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-gold/10 px-5 py-8 sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-muted sm:flex-row">
-          <p>© {new Date().getFullYear()} Репетиции — планировщик постановки</p>
-          <div className="flex gap-6">
-            <Link to={appPaths.home} className="transition-colors hover:text-gold-light">
-              Приложение
-            </Link>
-            <a href="#features" className="transition-colors hover:text-gold-light">
-              Возможности
-            </a>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

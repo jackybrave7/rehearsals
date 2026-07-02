@@ -107,8 +107,7 @@ export function TheaterMembersPanel() {
 
         {emailLooksLikeTypo && (
           <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-            Похоже на опечатку: <strong>@gmai.com</strong>. Для входа через Google нужен{' '}
-            <strong>@gmail.com</strong> — это разные аккаунты в системе.
+            Похоже на опечатку: <strong>@gmai.com</strong>. Обычно нужен <strong>@gmail.com</strong>.
           </div>
         )}
 

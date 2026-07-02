@@ -27,6 +27,21 @@ export interface DeleteAdminUserResult {
   deletedFilesCount: number;
 }
 
+export async function updateAdminUserSubscription(
+  userId: string,
+  plan: 'free' | 'pro'
+): Promise<{ userId: string; plan: 'free' | 'pro'; mailSent?: boolean }> {
+  const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/subscription`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan }),
+  });
+  if (response.status === 403) throw new Error('FORBIDDEN');
+  if (response.status === 404) throw new Error('NOT_FOUND');
+  if (!response.ok) throw new Error('UPDATE_SUBSCRIPTION_FAILED');
+  return response.json() as Promise<{ userId: string; plan: 'free' | 'pro'; mailSent?: boolean }>;
+}
+
 export async function deleteAdminUser(userId: string): Promise<DeleteAdminUserResult> {
   const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',

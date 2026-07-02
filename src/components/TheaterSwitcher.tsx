@@ -5,6 +5,8 @@ import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { getActiveTheater } from '../store/selectors';
 import { generateId } from '../utils/id';
+import { canCreateTheater } from '../utils/subscription';
+import { useSubscription } from '../hooks/useSubscription';
 
 type TheaterSwitcherProps = {
   variant: 'sidebar' | 'zen';
@@ -13,8 +15,9 @@ type TheaterSwitcherProps = {
 
 export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherProps) {
   const { state, dispatch } = useRehearsalStore();
-  const { grantTheaterAccess } = useAuth();
-  const { confirmDelete, prompt } = useConfirmDialog();
+  const { grantTheaterAccess, theaters: accessTheaters } = useAuth();
+  const { isPro } = useSubscription();
+  const { confirmDelete, prompt, alert } = useConfirmDialog();
   const activeTheater = getActiveTheater(state);
 
   const setActiveTheater = (theaterId: string) => {
@@ -23,6 +26,16 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
   };
 
   const createTheater = async () => {
+    const ownedCount = accessTheaters.filter((entry) => entry.role === 'owner').length;
+    if (!canCreateTheater(ownedCount, isPro)) {
+      await alert({
+        title: 'Лимит тарифа Free',
+        message:
+          'На бесплатном тарифе доступен один театр. Перейдите на Pro, чтобы вести несколько коллективов.',
+        okLabel: 'Понятно',
+      });
+      return;
+    }
     const name = await prompt({
       title: 'Новый театр',
       message: 'Название театра или коллектива',

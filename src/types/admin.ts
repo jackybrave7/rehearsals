@@ -65,6 +65,7 @@ export interface AdminUserSummary {
   createdAt: string;
   authMethods: { password: boolean; google: boolean };
   activeSessions: number;
+  subscriptionPlan: 'free' | 'pro';
   theaterCount: number;
   ownedTheaterCount: number;
   filesCount: number;

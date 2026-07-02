@@ -4,12 +4,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
 import { enrichSessionPayload } from './platformAdmin.js';
-import { isMailConfigured, sendPasswordResetEmail } from './mail.js';
+import { getUserSubscriptionPlan } from './subscription.js';
+import { isMailConfigured, sendEmailVerificationEmail, sendPasswordResetEmail } from './mail.js';
+import {
+  createEmailVerificationToken,
+  isEmailVerified,
+  verifyEmailByToken,
+} from './emailVerification.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
 const PASSWORD_RESET_COOLDOWN_MS = 2 * 60 * 1000;
+const EMAIL_VERIFICATION_COOLDOWN_MS = 2 * 60 * 1000;
 const passwordResetCooldown = new Map<string, number>();
+const emailVerificationCooldown = new Map<string, number>();
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -46,12 +54,16 @@ type UserRow = {
   password_hash: string | null;
 };
 
-function toAuthUser(row: Pick<UserRow, 'id' | 'email' | 'name' | 'password_hash'>): AuthUser {
+function toAuthUser(
+  db: AppDatabase,
+  row: Pick<UserRow, 'id' | 'email' | 'name' | 'password_hash'>
+): AuthUser {
   return {
     id: row.id,
     email: row.email,
     name: row.name,
     hasPassword: Boolean(row.password_hash),
+    subscriptionPlan: getUserSubscriptionPlan(db, row.id, row.email),
   };
 }
 
@@ -61,7 +73,7 @@ function buildSessionPayload(db: AppDatabase, userId: string): AuthSessionPayloa
     .get(userId) as UserRow | undefined;
   if (!row) throw new Error('USER_NOT_FOUND');
   return {
-    user: toAuthUser(row),
+    user: toAuthUser(db, row),
     theaters: getUserTheaters(db, userId),
   };
 }
@@ -146,7 +158,7 @@ function createSession(db: AppDatabase, userId: string, res: Response): AuthUser
   setSessionCookie(res, token);
 
   const user = db.prepare(`SELECT id, email, name, password_hash FROM users WHERE id = ?`).get(userId) as UserRow;
-  return toAuthUser(user);
+  return toAuthUser(db, user);
 }
 
 export function getSessionPayload(req: Request, db: AppDatabase = getDb()): AuthSessionPayload | null {
@@ -168,7 +180,7 @@ export function getSessionPayload(req: Request, db: AppDatabase = getDb()): Auth
   if (new Date(row.expires_at).getTime() <= Date.now()) return null;
 
   return {
-    user: toAuthUser(row),
+    user: toAuthUser(db, row),
     theaters: getUserTheaters(db, row.user_id),
   };
 }
@@ -203,18 +215,6 @@ export function canManageTheaterMembers(session: AuthSessionPayload, theaterId: 
   return getTheaterRole(session, theaterId) === 'owner';
 }
 
-async function verifyGoogleCredential(credential: string): Promise<{ sub: string; email: string; name: string }> {
-  const clientId = process.env.GOOGLE_CLIENT_ID ?? process.env.VITE_GOOGLE_CLIENT_ID;
-  const response = await fetch(
-    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
-  );
-  if (!response.ok) throw new Error('INVALID_GOOGLE_TOKEN');
-  const data = (await response.json()) as { sub?: string; email?: string; name?: string; aud?: string };
-  if (!data.sub || !data.email) throw new Error('INVALID_GOOGLE_TOKEN');
-  if (clientId && data.aud !== clientId) throw new Error('INVALID_GOOGLE_AUDIENCE');
-  return { sub: data.sub, email: data.email.toLowerCase(), name: data.name ?? data.email };
-}
-
 export function registerAuthRoutes(app: import('express').Express) {
   app.get('/api/auth/config', (_req, res) => {
     res.json({ mailConfigured: isMailConfigured() });
@@ -238,13 +238,22 @@ export function registerAuthRoutes(app: import('express').Express) {
     res.json({ ok: true });
   });
 
-  app.post('/api/auth/register', (req, res) => {
+  app.post('/api/auth/register', async (req, res) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const acceptTerms = req.body?.acceptTerms === true;
 
     if (!email || !password || password.length < 8) {
       res.status(400).json({ error: 'INVALID_CREDENTIALS' });
+      return;
+    }
+    if (!acceptTerms) {
+      res.status(400).json({ error: 'TERMS_NOT_ACCEPTED' });
+      return;
+    }
+    if (!isMailConfigured()) {
+      res.status(503).json({ error: 'MAIL_NOT_CONFIGURED' });
       return;
     }
 
@@ -256,13 +265,87 @@ export function registerAuthRoutes(app: import('express').Express) {
     }
 
     const userId = uuidv4();
+    const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO users (id, email, name, password_hash, google_sub, created_at) VALUES (?, ?, ?, ?, NULL, ?)`
-    ).run(userId, email, name || email, hashPassword(password), new Date().toISOString());
+      `INSERT INTO users (
+         id, email, name, password_hash, google_sub, created_at, terms_accepted_at, email_verified_at
+       ) VALUES (?, ?, ?, ?, NULL, ?, ?, NULL)`
+    ).run(userId, email, name || email, hashPassword(password), now, now);
 
-    assignOrphanTheaters(db, userId);
-    const user = createSession(db, userId, res);
-    res.json(enrichSessionPayload(buildSessionPayload(db, user.id)));
+    try {
+      const token = createEmailVerificationToken(db, userId);
+      await sendEmailVerificationEmail(email, name || email, token);
+      res.json({
+        ok: true,
+        needsEmailVerification: true,
+        message:
+          'На ваш email отправлена ссылка для подтверждения. Перейдите по ней, затем войдите в аккаунт.',
+      });
+    } catch (error) {
+      console.error('[auth] verification mail failed', error);
+      db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
+      res.status(503).json({ error: 'MAIL_FAILED' });
+    }
+  });
+
+  app.post('/api/auth/verify-email', (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    if (!token) {
+      res.status(400).json({ error: 'INVALID_TOKEN' });
+      return;
+    }
+
+      const result = verifyEmailByToken(getDb(), token);
+    if (!result) {
+      res.status(400).json({ error: 'INVALID_TOKEN' });
+      return;
+    }
+
+    assignOrphanTheaters(getDb(), result.userId);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const genericMessage =
+      'Если аккаунт с таким email зарегистрирован и не подтверждён, на почту отправлена новая ссылка.';
+
+    if (!email) {
+      res.status(400).json({ error: 'INVALID_EMAIL' });
+      return;
+    }
+    if (!isMailConfigured()) {
+      res.status(503).json({ error: 'MAIL_NOT_CONFIGURED' });
+      return;
+    }
+
+    const lastSent = emailVerificationCooldown.get(email);
+    if (lastSent && Date.now() - lastSent < EMAIL_VERIFICATION_COOLDOWN_MS) {
+      res.status(429).json({ error: 'TOO_MANY_REQUESTS', message: genericMessage });
+      return;
+    }
+
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT id, email, name, email_verified_at FROM users WHERE email = ?`)
+      .get(email) as
+      | { id: string; email: string; name: string; email_verified_at: string | null }
+      | undefined;
+
+    if (!row || row.email_verified_at) {
+      res.json({ ok: true, message: genericMessage });
+      return;
+    }
+
+    try {
+      const token = createEmailVerificationToken(db, row.id);
+      await sendEmailVerificationEmail(row.email, row.name, token);
+      emailVerificationCooldown.set(email, Date.now());
+      res.json({ ok: true, message: genericMessage });
+    } catch (error) {
+      console.error('[auth] resend verification mail failed', error);
+      res.status(503).json({ error: 'MAIL_FAILED' });
+    }
   });
 
   app.post('/api/auth/login', (req, res) => {
@@ -280,6 +363,11 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     if (!row?.password_hash || !verifyPassword(password, row.password_hash)) {
       res.status(401).json({ error: 'INVALID_CREDENTIALS' });
+      return;
+    }
+
+    if (!isEmailVerified(db, row.id)) {
+      res.status(403).json({ error: 'EMAIL_NOT_VERIFIED' });
       return;
     }
 
@@ -383,49 +471,6 @@ export function registerAuthRoutes(app: import('express').Express) {
     } catch (error) {
       console.error('[auth] forgot-password mail failed', error);
       res.status(503).json({ error: 'MAIL_FAILED' });
-    }
-  });
-
-  app.post('/api/auth/google', async (req, res) => {
-    const credential = typeof req.body?.credential === 'string' ? req.body.credential : '';
-    if (!credential) {
-      res.status(400).json({ error: 'INVALID_CREDENTIALS' });
-      return;
-    }
-
-    try {
-      const googleUser = await verifyGoogleCredential(credential);
-      const db = getDb();
-      let row = db
-        .prepare(`SELECT id, email, name, password_hash FROM users WHERE google_sub = ? OR email = ?`)
-        .get(googleUser.sub, googleUser.email) as UserRow | undefined;
-
-      if (!row) {
-        const userId = uuidv4();
-        db.prepare(
-          `INSERT INTO users (id, email, name, password_hash, google_sub, created_at) VALUES (?, ?, ?, NULL, ?, ?)`
-        ).run(userId, googleUser.email, googleUser.name, googleUser.sub, new Date().toISOString());
-        row = {
-          id: userId,
-          email: googleUser.email,
-          name: googleUser.name,
-          password_hash: null,
-        };
-      } else {
-        db.prepare(`UPDATE users SET google_sub = ?, name = ? WHERE id = ?`).run(
-          googleUser.sub,
-          googleUser.name,
-          row.id
-        );
-        row = { ...row, name: googleUser.name };
-      }
-
-      assignOrphanTheaters(db, row.id);
-      createSession(db, row.id, res);
-      res.json(enrichSessionPayload(buildSessionPayload(db, row.id)));
-    } catch (error) {
-      console.error('[auth] google failed', error);
-      res.status(401).json({ error: 'INVALID_GOOGLE_TOKEN' });
     }
   });
 

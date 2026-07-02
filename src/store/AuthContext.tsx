@@ -10,7 +10,6 @@ import {
 import {
   fetchAuthSession,
   loginWithEmail,
-  loginWithGoogle,
   logout as logoutRequest,
   registerWithEmail,
   updateAuthProfile,
@@ -24,8 +23,7 @@ interface AuthContextValue {
   isPlatformAdmin: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  googleLogin: (credential: string) => Promise<void>;
+  register: (email: string, password: string, name: string, acceptTerms: boolean) => Promise<{ message: string }>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthSessionPayload | null>;
   updateProfile: (payload: {
@@ -132,14 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applySession(session, setUser, setTheaters, setIsPlatformAdmin);
   }, []);
 
-  const register = useCallback(async (email: string, password: string, name: string) => {
-    const session = await registerWithEmail(email, password, name);
-    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
-  }, []);
-
-  const googleLogin = useCallback(async (credential: string) => {
-    const session = await loginWithGoogle(credential);
-    applySession(session, setUser, setTheaters, setIsPlatformAdmin);
+  const register = useCallback(async (email: string, password: string, name: string, acceptTerms: boolean) => {
+    return registerWithEmail(email, password, name, acceptTerms);
   }, []);
 
   const logout = useCallback(async () => {
@@ -155,7 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       register,
-      googleLogin,
       logout,
       refreshSession,
       updateProfile,
@@ -171,7 +162,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       register,
-      googleLogin,
       logout,
       refreshSession,
       updateProfile,
