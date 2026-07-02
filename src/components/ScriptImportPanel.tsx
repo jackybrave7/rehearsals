@@ -12,6 +12,8 @@ import {
 } from '../utils/scriptDocument';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
+import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
+import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
 import { Button } from './Button';
 
@@ -76,7 +78,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         scriptImportSyncedAt: undefined,
       });
       dispatch({ type: 'UPDATE_PLAY', payload: updatedPlay });
-      setSyncMessage(`Файл «${file.name}» загружен. Нажмите «Сопоставить сцены», чтобы привязать заголовки.`);
+      setSyncMessage(
+        scenes.length === 0
+          ? `Файл «${file.name}» загружен. Нажмите «Импортировать сцены», чтобы создать сцены из заголовков файла.`
+          : `Файл «${file.name}» загружен. Нажмите «Сопоставить сцены», чтобы привязать заголовки.`
+      );
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : 'Не удалось загрузить файл');
     } finally {
@@ -95,14 +101,40 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
       setSyncError('Сначала загрузите файл сценария (.txt или .docx).');
       return;
     }
-    if (scenes.length === 0) {
-      setSyncError('Добавьте сцены в списке выше.');
-      return;
-    }
 
     setIsSyncing(true);
     try {
-      const { matches, anchorCount, characterCounts } = await parseScriptImport(currentFileId, scenes);
+      let targetScenes = scenes;
+      let createdCount = 0;
+
+      if (targetScenes.length === 0) {
+        const { anchors } = await parseScriptImport(currentFileId, []);
+        if (anchors.length === 0) {
+          setSyncError(
+            'В файле не найдены заголовки сцен. Оформите названия как отдельные строки: «АКТ 1, сц. 2» или стили «Заголовок» в Word.'
+          );
+          return;
+        }
+
+        const createdScenes: Scene[] = anchors.map((anchor, index) => ({
+          id: generateId(),
+          playId: play.id,
+          number: index + 1,
+          title: anchor.text,
+          status: 'not_started',
+          priority: 'medium',
+          roleIds: [],
+          estimatedMinutes: DEFAULT_SCENE_REHEARSAL_MINUTES,
+        }));
+        createdScenes.forEach((scene) => dispatch({ type: 'ADD_SCENE', payload: scene }));
+        targetScenes = createdScenes;
+        createdCount = createdScenes.length;
+      }
+
+      const { matches, anchorCount, characterCounts } = await parseScriptImport(
+        currentFileId,
+        targetScenes
+      );
 
       if (matches.length === 0) {
         setSyncError(
@@ -144,10 +176,13 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         });
       }
 
+      const matchSummary =
+        matches.length === targetScenes.length
+          ? `Сопоставлено ${matches.length} из ${targetScenes.length} сцен (в файле ${anchorCount} заголовков).`
+          : `Сопоставлено ${matches.length} из ${targetScenes.length} сцен. В файле ${anchorCount} заголовков — часть из них не сцены.`;
       setSyncMessage(
-        (matches.length === scenes.length
-          ? `Сопоставлено ${matches.length} из ${scenes.length} сцен (в файле ${anchorCount} заголовков).`
-          : `Сопоставлено ${matches.length} из ${scenes.length} сцен. В файле ${anchorCount} заголовков — часть из них не сцены.`) +
+        (createdCount > 0 ? `Создано ${createdCount} сцен из файла. ` : '') +
+          matchSummary +
           (countEntries.length > 0 ? ` Подсчитаны знаки для ${countEntries.length} сцен.` : '')
       );
     } catch (error) {
@@ -212,10 +247,10 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
               <Button
                 variant="secondary"
                 onClick={() => void handleSync()}
-                disabled={isSyncing || !fileId || scenes.length === 0}
+                disabled={isSyncing || !fileId}
               >
                 {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Сопоставить сцены
+                {scenes.length === 0 ? 'Импортировать сцены' : 'Сопоставить сцены'}
               </Button>
             </>
           )}
