@@ -24,7 +24,7 @@ interface RehearsalPlanningPanelProps {
 }
 
 export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProps) {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { isPro } = useSubscription();
   const { confirm } = useConfirmDialog();
   const templates = useMemo(
@@ -45,6 +45,7 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
   });
 
   const saveTemplate = () => {
+    if (readOnly) return;
     const name = templateName.trim() || `Шаблон ${rehearsal.date}`;
     dispatch({
       type: 'ADD_REHEARSAL_TEMPLATE',
@@ -55,6 +56,7 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
   };
 
   const applyTemplate = () => {
+    if (readOnly) return;
     const template = templates.find((item) => item.id === selectedTemplateId);
     if (!template) return;
     const applied = applyTemplateToRehearsal(template, rehearsal.startTime);
@@ -83,6 +85,7 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
   };
 
   const createSeries = () => {
+    if (readOnly) return;
     const template = seriesForm.useCurrentPlan
       ? createTemplateFromRehearsal(rehearsal, seriesForm.name, state.activeTheaterId ?? undefined)
       : undefined;
@@ -126,6 +129,8 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
             title="Шаблоны и серии — в Pro"
             description="Сохраняйте план репетиции и разворачивайте повторяющееся расписание."
           />
+        ) : readOnly ? (
+          <p className="text-sm text-muted">Шаблоны и серии доступны редакторам и владельцу театра.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => setTemplateModalOpen(true)}>

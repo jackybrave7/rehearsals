@@ -403,6 +403,12 @@ export function SettingsPage() {
             точнее описания. По умолчанию: 1 авторский лист ={' '}
             {DEFAULT_SCENE_TIMING_SETTINGS.charsPerAuthorPage.toLocaleString('ru-RU')} зн.
           </p>
+          {readOnly ? (
+            <p className="text-xs text-muted/80">
+              Это личные настройки вашего аккаунта: как вы видите хронометраж. На расписание театра
+              они не влияют.
+            </p>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Знаков в авторском листе"

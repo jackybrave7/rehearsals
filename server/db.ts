@@ -92,6 +92,7 @@ export function getDb(): AppDatabase {
     `ALTER TABLE actors ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE users ADD COLUMN subscription_plan TEXT NOT NULL DEFAULT 'free'`,
     `ALTER TABLE plays ADD COLUMN archived_at TEXT`,
+    `ALTER TABLE plays ADD COLUMN script_import_synced_at TEXT`,
     `ALTER TABLE users ADD COLUMN email_verified_at TEXT`,
     `ALTER TABLE users ADD COLUMN email_verification_token_hash TEXT`,
     `ALTER TABLE users ADD COLUMN email_verification_expires_at TEXT`,

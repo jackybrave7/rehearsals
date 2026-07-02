@@ -54,7 +54,7 @@ const emptyRehearsal = (
 });
 
 export function RehearsalsPage() {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -80,6 +80,7 @@ export function RehearsalsPage() {
   const pickerCharacterRoles = getPlayRoles(state, form.playId ?? state.activePlayId ?? '', 'character');
 
   const openCreate = () => {
+    if (readOnly) return;
     const playId = state.activePlayId ?? undefined;
     const performanceId = playId ? resolveRehearsalPerformanceId(state, { playId }) : undefined;
     setForm(
@@ -94,6 +95,7 @@ export function RehearsalsPage() {
   };
 
   const handleSave = () => {
+    if (readOnly) return;
     const rehearsal: Rehearsal = {
       ...form,
       id: generateId(),
@@ -137,12 +139,12 @@ export function RehearsalsPage() {
           <h1 className={pageTitleClass}>Репетиции</h1>
           <p className="mt-1 text-muted">Календарь и расписание</p>
         </div>
-        <div className="flex gap-3">
+        {!readOnly && (
           <Button onClick={openCreate}>
             <Plus size={18} />
             Новая репетиция
           </Button>
-        </div>
+        )}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -222,9 +224,11 @@ export function RehearsalsPage() {
             {dayRehearsals.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gold/20 p-8 text-center text-muted">
                 Нет репетиций на этот день.
-                <Button className="mt-4" variant="secondary" onClick={openCreate}>
-                  Запланировать
-                </Button>
+                {!readOnly && (
+                  <Button className="mt-4" variant="secondary" onClick={openCreate}>
+                    Запланировать
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">

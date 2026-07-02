@@ -161,6 +161,7 @@ export function RehearsalDetailPage() {
   }
 
   const dismissRehearsalWarningItem = (warningId: string) => {
+    if (readOnly) return;
     dispatch({
       type: 'UPDATE_REHEARSAL',
       payload: dismissRehearsalWarning(rehearsal, warningId),
@@ -176,6 +177,7 @@ export function RehearsalDetailPage() {
   );
 
   const openAddBlock = () => {
+    if (readOnly) return;
     const lastBlock = sortedSchedule[sortedSchedule.length - 1];
     const startTime = lastBlock
       ? addMinutes(lastBlock.startTime, lastBlock.durationMinutes)
@@ -192,12 +194,14 @@ export function RehearsalDetailPage() {
   };
 
   const openEditBlock = (block: ScheduleBlock) => {
+    if (readOnly) return;
     setEditingBlock(block);
     setBlockForm({ ...block });
     setBlockModalOpen(true);
   };
 
   const saveBlock = () => {
+    if (readOnly) return;
     if (!blockForm.title.trim()) return;
     let schedule: ScheduleBlock[];
     if (editingBlock) {
@@ -218,10 +222,12 @@ export function RehearsalDetailPage() {
   };
 
   const updateSchedule = (schedule: ScheduleBlock[]) => {
+    if (readOnly) return;
     dispatch({ type: 'UPDATE_SCHEDULE', payload: { rehearsalId: rehearsal.id, schedule } });
   };
 
   const deleteBlock = (blockId: string) => {
+    if (readOnly) return;
     const schedule = recalculateScheduleStartTimes(
       rehearsal.schedule.filter((b) => b.id !== blockId),
       rehearsal.startTime
@@ -230,6 +236,7 @@ export function RehearsalDetailPage() {
   };
 
   const deleteRehearsal = async () => {
+    if (readOnly) return;
     const confirmed = await confirm({
       title: 'Удалить репетицию?',
       message: 'Репетиция и её план будут удалены без возможности восстановления.',
@@ -242,6 +249,7 @@ export function RehearsalDetailPage() {
   };
 
   const openEditRehearsal = () => {
+    if (readOnly) return;
     const { id: _id, ...rest } = rehearsal;
     setEditForm({
       ...rest,
@@ -254,12 +262,13 @@ export function RehearsalDetailPage() {
   };
 
   const saveRehearsal = () => {
-    if (!editForm) return;
+    if (readOnly || !editForm) return;
     dispatch({ type: 'UPDATE_REHEARSAL', payload: { ...editForm, id: rehearsal.id } });
     setEditModalOpen(false);
   };
 
   const toggleParticipant = (actorId: string) => {
+    if (readOnly) return;
     const actorIds = rehearsal.actorIds.includes(actorId)
       ? rehearsal.actorIds.filter((id) => id !== actorId)
       : [...rehearsal.actorIds, actorId];
@@ -274,6 +283,7 @@ export function RehearsalDetailPage() {
   };
 
   const updateAttendance = (actorId: string, status: AttendanceStatus) => {
+    if (readOnly) return;
     const actorIds = rehearsal.actorIds.includes(actorId)
       ? rehearsal.actorIds
       : [...rehearsal.actorIds, actorId];
@@ -376,7 +386,7 @@ export function RehearsalDetailPage() {
   );
 
   const addManualParticipant = () => {
-    if (!manualParticipantId || participantActorIds.includes(manualParticipantId)) return;
+    if (readOnly || !manualParticipantId || participantActorIds.includes(manualParticipantId)) return;
     dispatch({
       type: 'UPDATE_REHEARSAL',
       payload: {
@@ -389,6 +399,7 @@ export function RehearsalDetailPage() {
   };
 
   const reorderParticipants = (fromIndex: number, toIndex: number) => {
+    if (readOnly) return;
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
     const order = [...participantActorIds];
     const [moved] = order.splice(fromIndex, 1);
@@ -400,6 +411,7 @@ export function RehearsalDetailPage() {
   };
 
   const handleParticipantDrop = (toIndex: number) => {
+    if (readOnly) return;
     if (!draggingParticipantId) return;
     const fromIndex = participantActorIds.indexOf(draggingParticipantId);
     if (fromIndex !== -1) reorderParticipants(fromIndex, toIndex);
@@ -586,7 +598,7 @@ export function RehearsalDetailPage() {
                 scenes={linkedScenes}
                 play={rehearsalPlay}
                 compact
-                draggable
+                draggable={!readOnly}
               />
             </section>
           )}
@@ -761,13 +773,16 @@ export function RehearsalDetailPage() {
                     className="flex items-center gap-2 rounded-lg px-1 py-1.5 text-sm text-white hover:bg-white/[0.03]"
                   >
                     <div
-                      draggable
-                      onDragStart={(event) =>
-                        setPlanPoolDragData(event, {
-                          source: 'pool',
-                          kind: 'task',
-                          id: task!.id,
-                        })
+                      draggable={!readOnly}
+                      onDragStart={
+                        readOnly
+                          ? undefined
+                          : (event) =>
+                              setPlanPoolDragData(event, {
+                                source: 'pool',
+                                kind: 'task',
+                                id: task!.id,
+                              })
                       }
                       aria-label={`Перетащить задачу ${task!.title}`}
                       className="flex shrink-0 cursor-grab text-muted opacity-60 active:cursor-grabbing hover:opacity-100"

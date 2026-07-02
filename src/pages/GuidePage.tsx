@@ -12,7 +12,7 @@ export function GuidePage() {
           Справка
         </div>
         <h1 className={pageTitleClass}>Руководство</h1>
-        <p className="mt-1 text-muted">Как пользоваться приложением «Репетиции»</p>
+        <p className="mt-1 text-muted">Пошаговая инструкция: от регистрации до первой репетиции</p>
       </header>
 
       <article className="rounded-2xl border border-gold/10 bg-surface/40 p-4 sm:p-6 lg:p-8">

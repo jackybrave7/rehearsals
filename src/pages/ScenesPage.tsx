@@ -21,6 +21,7 @@ import { Input, Textarea, Select } from '../components/FormFields';
 import { SceneRoleChip } from '../components/SceneRoleChip';
 import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
+import { ScriptImportPanel } from '../components/ScriptImportPanel';
 import { SceneScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { PremiereBanner } from '../components/PremiereBanner';
@@ -68,11 +69,12 @@ const priorityColors: Record<ScenePriority, string> = {
 };
 
 export function ScenesPage() {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { isPro } = useSubscription();
   const { confirm } = useConfirmDialog();
   const activePlay = getActivePlay(state);
   const playReadOnly = activePlay ? isPlayReadOnly(activePlay, isPro) : false;
+  const scenesReadOnly = playReadOnly || readOnly;
   const playScenes = getPlayScenes(state, state.activePlayId);
   const selectedPerformance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
   const characterRoles = getPlayRoles(state, activePlay?.id ?? '', 'character');
@@ -327,6 +329,8 @@ export function ScenesPage() {
       <PremiereBanner state={state} playId={activePlay.id} />
 
       <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
+
+      <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
 
       {sorted.length > 0 && (
         <div className="space-y-3">

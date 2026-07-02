@@ -91,6 +91,8 @@ export interface Play {
   googleDocumentId?: string;
   /** Когда последний раз сопоставляли якоря сцен через Google Docs API */
   googleDocsLinksSyncedAt?: string;
+  /** Когда последний раз сопоставляли сцены с загруженным файлом сценария */
+  scriptImportSyncedAt?: string;
   scriptFileName?: string;
   /** Ссылка на файл сценария на сервере, напр. /api/files/{id} */
   scriptFileUrl?: string;

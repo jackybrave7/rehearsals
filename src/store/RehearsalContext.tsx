@@ -301,18 +301,28 @@ function persistToStorage(
   readOnly: boolean,
   refreshSession?: () => Promise<unknown>
 ): void {
-  mirrorLocalStorage(state);
   if (readOnly) {
-    setSaveError(null);
-    setSaveStatus('saved');
+    setSaveStatus('saving');
+    persistChain = persistChain
+      .then(async () => {
+        await saveAppStateWithRetry(state);
+        setSaveError(null);
+        setSaveStatus('saved');
+      })
+      .catch((error) => {
+        console.error('[rehearsals] Ошибка сохранения личных настроек', error);
+        setSaveStatus('error');
+        setSaveError(formatSaveError(error));
+      });
     return;
   }
 
+  mirrorLocalStorage(state);
   setSaveStatus('saving');
   persistChain = persistChain
     .then(async () => {
       await saveAppStateWithRetry(state);
-      if (refreshSession) {
+      if (refreshSession && !readOnly) {
         await refreshSession();
       }
       mirrorLocalStorage(state);
@@ -677,6 +687,7 @@ type Action =
       payload: {
         playId: string;
         syncedAt: string;
+        importSource?: 'google' | 'file';
         updates: { sceneId: string; scriptAnchor?: Scene['scriptAnchor'] }[];
       };
     }
@@ -917,7 +928,12 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         plays: state.plays.map((play) =>
           play.id === action.payload.playId
-            ? { ...play, googleDocsLinksSyncedAt: action.payload.syncedAt }
+            ? {
+                ...play,
+                ...(action.payload.importSource === 'file'
+                  ? { scriptImportSyncedAt: action.payload.syncedAt }
+                  : { googleDocsLinksSyncedAt: action.payload.syncedAt }),
+              }
             : play
         ),
         scenes: state.scenes.map((scene) => {
@@ -1197,7 +1213,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
   }, [ready, loadError, readOnly, refreshSession]);
 
   useLayoutEffect(() => {
-    if (!ready || loadError || readOnly) return;
+    if (!ready || loadError) return;
 
     const saveOnClose = () => {
       void saveAppStateWithRetry(stateRef.current, { keepalive: true, attempts: 1 })
@@ -1214,7 +1230,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('beforeunload', saveOnClose);
       window.removeEventListener('pagehide', saveOnClose);
     };
-  }, [ready, loadError, readOnly]);
+  }, [ready, loadError]);
 
   if (!ready) {
     return (

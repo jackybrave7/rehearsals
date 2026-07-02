@@ -1,4 +1,5 @@
 import type { Play, Scene, SceneScriptAnchor, SceneScriptAnchorType } from '../types';
+import { resolvePlayScriptUrl } from './fileUrls';
 
 const GOOGLE_DOC_ID_RE = /\/document\/d\/([a-zA-Z0-9_-]+)/;
 
@@ -68,15 +69,22 @@ export function buildGoogleDocsAnchorUrl(
 export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): string | null {
   if (!play) return null;
 
+  const scriptUrl = resolvePlayScriptUrl(play);
   const documentId =
     play.googleDocumentId ??
     (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
 
-  if (!documentId) return null;
-
-  if (scene.scriptAnchor) {
+  if (
+    scene.scriptAnchor &&
+    documentId &&
+    !scene.scriptAnchor.id.startsWith('file-')
+  ) {
     return buildGoogleDocsAnchorUrl(documentId, scene.scriptAnchor);
   }
+
+  if (scriptUrl) return scriptUrl;
+
+  if (!documentId) return null;
 
   return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
 }
@@ -120,7 +128,7 @@ function characterHintScore(sceneHint: string | null, anchorHint: string | null)
   return matched.length >= threshold ? 80 : 0;
 }
 
-function isSceneLikeHeading(text: string): boolean {
+export function isSceneLikeHeading(text: string): boolean {
   const trimmed = text.trim();
   return (
     /^(?:акт\s+\d+|сцена\s+\d+|акт\s+\d+(?:,\s*\d+\s*часть)?,\s*сц\.?\s*\d+)/i.test(trimmed) ||

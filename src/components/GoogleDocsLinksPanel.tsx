@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { useGoogleDocsAuth } from '../hooks/useGoogleDocsAuth';
+import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import { syncSceneAnchorsFromGoogleDoc, syncSceneCharacterCountsFromGoogleDoc, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
 import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
@@ -31,6 +31,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const autoSyncAttemptedRef = useRef<string | null>(null);
 
   const linkedCount = useMemo(
     () => scenes.filter((scene) => scene.scriptAnchor).length,
@@ -76,19 +77,24 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
     return counts.size;
   };
 
-  const handleSync = async () => {
-    setSyncMessage(null);
-    setSyncError(null);
+  const handleSync = async (options?: { silent?: boolean }) => {
+    if (options?.silent) {
+      setSyncMessage(null);
+      setSyncError(null);
+    } else {
+      setSyncMessage(null);
+      setSyncError(null);
+    }
     setIsSyncing(true);
 
     try {
       if (!play.documentUrl) {
-        setSyncError('У постановки не указан Google Docs URL.');
+        if (!options?.silent) setSyncError('У постановки не указан Google Docs URL.');
         return;
       }
-      const token = await auth.getAccessToken();
+      const token = await auth.getAccessToken({ interactive: !options?.silent });
       if (!token) {
-        setSyncError('Не удалось получить доступ Google.');
+        if (!options?.silent) setSyncError('Не удалось получить доступ Google.');
         return;
       }
 
@@ -99,11 +105,13 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
       );
 
       if (matches.length === 0) {
-        setSyncError(
-          anchorCount === 0
-            ? 'В документе не найдены заголовки. Оформите названия сцен как заголовки (H1–H6) в Google Docs.'
-            : 'Не удалось сопоставить заголовки документа со сценами. Проверьте названия.'
-        );
+        if (!options?.silent) {
+          setSyncError(
+            anchorCount === 0
+              ? 'В документе не найдены заголовки. Оформите названия сцен как заголовки (H1–H6) в Google Docs.'
+              : 'Не удалось сопоставить заголовки документа со сценами. Проверьте названия.'
+          );
+        }
         return;
       }
 
@@ -113,6 +121,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         payload: {
           playId: play.id,
           syncedAt,
+          importSource: 'google',
           updates: matches.map((match) => ({
             sceneId: match.sceneId,
             scriptAnchor: match.anchor,
@@ -141,6 +150,32 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
       setIsSyncing(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      auth.isRestoring ||
+      !auth.isConfigured ||
+      likelyOfficeUpload ||
+      scenes.length === 0 ||
+      linkedCount > 0 ||
+      play.googleDocsLinksSyncedAt ||
+      autoSyncAttemptedRef.current === play.id
+    ) {
+      return;
+    }
+
+    autoSyncAttemptedRef.current = play.id;
+    void handleSync({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-sync once per play when scenes appear
+  }, [
+    auth.isConfigured,
+    auth.isRestoring,
+    likelyOfficeUpload,
+    linkedCount,
+    play.googleDocsLinksSyncedAt,
+    play.id,
+    scenes.length,
+  ]);
 
   const handleCountCharacters = async () => {
     setSyncMessage(null);
@@ -203,6 +238,11 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Добавьте VITE_GOOGLE_CLIENT_ID в .env
             </span>
+          ) : !auth.accessToken && auth.isRestoring ? (
+            <span className="inline-flex items-center gap-2 rounded-lg border border-gold/15 bg-surface/60 px-3 py-2 text-xs text-muted">
+              <Loader2 size={14} className="animate-spin" />
+              Подключаем Google…
+            </span>
           ) : !auth.accessToken ? (
             <Button variant="secondary" onClick={() => auth.signIn()} disabled={auth.isRequesting}>
               {auth.isRequesting ? <Loader2 size={16} className="animate-spin" /> : null}
@@ -210,7 +250,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={handleSync} disabled={isSyncing || scenes.length === 0}>
+              <Button variant="secondary" onClick={() => void handleSync()} disabled={isSyncing || scenes.length === 0}>
                 {isSyncing ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (

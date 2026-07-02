@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS plays (
   document_url TEXT,
   google_document_id TEXT,
   google_docs_links_synced_at TEXT,
+  script_import_synced_at TEXT,
   script_file_name TEXT,
   script_file_data_url TEXT,
   script_file_url TEXT,

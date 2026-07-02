@@ -238,9 +238,9 @@ export function insertStateEntities(
   const insertPlay = db.prepare(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
-      google_docs_links_synced_at, script_file_name, script_file_data_url, script_file_url,
+      google_docs_links_synced_at, script_import_synced_at, script_file_name, script_file_data_url, script_file_url,
       script_file_mime_type, script_file_size, archived_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
     const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
@@ -254,6 +254,7 @@ export function insertStateEntities(
       play.documentUrl ?? null,
       play.googleDocumentId ?? null,
       play.googleDocsLinksSyncedAt ?? null,
+      play.scriptImportSyncedAt ?? null,
       play.scriptFileName ?? null,
       legacyDataUrl,
       play.scriptFileUrl ?? null,
@@ -593,6 +594,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       documentUrl: (row.document_url as string | null) ?? undefined,
       googleDocumentId: (row.google_document_id as string | null) ?? undefined,
       googleDocsLinksSyncedAt: (row.google_docs_links_synced_at as string | null) ?? undefined,
+      scriptImportSyncedAt: (row.script_import_synced_at as string | null) ?? undefined,
       scriptFileName: (row.script_file_name as string | null) ?? undefined,
       scriptFileUrl: (row.script_file_url as string | null) ?? undefined,
       scriptFileDataUrl: (row.script_file_data_url as string | null) ?? undefined,

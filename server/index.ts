@@ -19,6 +19,7 @@ import {
   loadLatestBackupState,
 } from './backup.js';
 import { handleFetchGoogleDocument } from './googleDocs.js';
+import { handleParseScriptImport } from './scriptImport.js';
 import { startReminderScheduler } from './reminderScheduler.js';
 import { startTelegramLinkPoller } from './telegramLinkPoller.js';
 
@@ -97,6 +98,10 @@ app.get('/api/state', (req, res) => {
 
 app.get('/api/google-docs/documents/:documentId', (req, res) => {
   void handleFetchGoogleDocument(req, res);
+});
+
+app.post('/api/script-import/parse', (req, res) => {
+  void handleParseScriptImport(req, res);
 });
 
 app.put('/api/state', (req, res) => {

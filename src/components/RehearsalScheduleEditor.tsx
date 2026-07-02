@@ -165,6 +165,7 @@ export function RehearsalScheduleEditor({
   };
 
   const handleDropAt = (event: React.DragEvent, targetIndex: number) => {
+    if (readOnly) return;
     event.preventDefault();
     event.stopPropagation();
     setDragOverIndex(null);
@@ -210,6 +211,7 @@ export function RehearsalScheduleEditor({
   };
 
   const setBlockCompletion = (blockId: string, completed: boolean) => {
+    if (readOnly) return;
     applySchedule(
       sortedSchedule.map((block) => {
         if (block.id !== blockId) return block;
@@ -305,7 +307,7 @@ export function RehearsalScheduleEditor({
               Сформировать план
             </Button>
           )}
-          <Button onClick={onAddBlock}>
+          <Button onClick={onAddBlock} disabled={readOnly}>
             <Plus size={18} /> Добавить блок
           </Button>
         </div>
@@ -320,19 +322,23 @@ export function RehearsalScheduleEditor({
       {sortedSchedule.length === 0 ? (
         <div
           className={`rounded-2xl border border-dashed p-12 text-center transition-colors ${
-            dragOverIndex === 0
+            !readOnly && dragOverIndex === 0
               ? 'border-gold/50 bg-gold/5 text-gold-light'
               : 'border-gold/20 text-muted'
           }`}
-          onDragEnter={(event) => handleDragOver(event, 0)}
-          onDragOver={(event) => handleDragOver(event, 0)}
-          onDragLeave={() => setDragOverIndex(null)}
-          onDrop={(event) => handleDropAt(event, 0)}
+          onDragEnter={readOnly ? undefined : (event) => handleDragOver(event, 0)}
+          onDragOver={readOnly ? undefined : (event) => handleDragOver(event, 0)}
+          onDragLeave={readOnly ? undefined : () => setDragOverIndex(null)}
+          onDrop={readOnly ? undefined : (event) => handleDropAt(event, 0)}
         >
           {dragOverIndex === 0 ? 'Отпустите, чтобы добавить в план' : 'План пока пуст'}
-          <Button className="mt-4" variant="secondary" onClick={onAddBlock}>
-            Добавить первый блок
-          </Button>
+          {!readOnly ? (
+            <Button className="mt-4" variant="secondary" onClick={onAddBlock}>
+              Добавить первый блок
+            </Button>
+          ) : (
+            <p className="mt-4 text-xs text-muted">Редактирование плана недоступно в режиме просмотра</p>
+          )}
         </div>
       ) : (
         <div

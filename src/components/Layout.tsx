@@ -19,7 +19,11 @@ function StatusBar({ compact = false }: { compact?: boolean }) {
   const message = readOnly
     ? compact
       ? 'Только просмотр'
-      : 'Режим наблюдателя · изменения не сохраняются'
+      : saveStatus === 'saving'
+        ? 'Сохранение…'
+        : saveStatus === 'error'
+          ? (saveError ?? 'Ошибка сохранения')
+          : 'Режим наблюдателя · данные театра только для просмотра'
     : saveStatus === 'saving'
       ? 'Сохранение…'
       : saveStatus === 'saved' && !saveError
