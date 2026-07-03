@@ -22,13 +22,17 @@ export function LoginPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mailConfigured, setMailConfigured] = useState(false);
+  const [registrationMode, setRegistrationMode] = useState<'normal' | 'beta'>('normal');
   const [showResendVerification, setShowResendVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/app';
 
   useEffect(() => {
-    void fetchAuthConfig().then((config) => setMailConfigured(config.mailConfigured));
+    void fetchAuthConfig().then((config) => {
+      setMailConfigured(config.mailConfigured);
+      setRegistrationMode(config.registrationMode);
+    });
   }, []);
 
   useEffect(() => {
@@ -145,6 +149,13 @@ export function LoginPage() {
               </p>
             </div>
           )}
+
+          {mode === 'register' && registrationMode === 'beta' ? (
+            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              Сервис работает в режиме бета-тестирования. После регистрации и подтверждения email
+              заявка будет рассмотрена администратором — мы сообщим на почту, когда доступ откроется.
+            </div>
+          ) : null}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === 'register' && (

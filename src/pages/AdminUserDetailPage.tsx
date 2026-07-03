@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
-import { deleteAdminUser, fetchAdminUserDetail, updateAdminUserSubscription } from '../api/adminUsers';
+import { deleteAdminUser, fetchAdminUserDetail, updateAdminUserSubscription, approveAdminUserRegistration } from '../api/adminUsers';
 import type { AdminUserDetail } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
@@ -41,6 +41,8 @@ export function AdminUserDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
   const [planNotice, setPlanNotice] = useState<string | null>(null);
+  const [approvalSaving, setApprovalSaving] = useState(false);
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const isSelf = Boolean(userId && currentUser?.id === userId);
 
   const load = useCallback(async () => {
@@ -81,6 +83,33 @@ export function AdminUserDetailPage() {
       setError('Не удалось обновить тариф');
     } finally {
       setPlanSaving(false);
+    }
+  };
+
+  const handleApproveRegistration = async () => {
+    if (!detail || !userId || approvalSaving) return;
+    setApprovalSaving(true);
+    setApprovalNotice(null);
+    setError(null);
+    try {
+      const result = await approveAdminUserRegistration(userId);
+      await load();
+      if (result.alreadyApproved) {
+        setApprovalNotice('Регистрация уже была одобрена ранее.');
+      } else if (result.mailSent) {
+        setApprovalNotice('Доступ открыт, пользователю отправлено письмо.');
+      } else {
+        setApprovalNotice('Доступ открыт, но письмо не отправлено — проверьте SMTP в .env.');
+      }
+    } catch (approveError) {
+      const code = approveError instanceof Error ? approveError.message : '';
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        setError('Сначала пользователь должен подтвердить email.');
+      } else {
+        setError('Не удалось одобрить регистрацию');
+      }
+    } finally {
+      setApprovalSaving(false);
     }
   };
 
@@ -197,6 +226,27 @@ export function AdminUserDetailPage() {
               icon={HardDrive}
             />
           </section>
+
+          {detail.registrationStatus !== 'approved' ? (
+            <section className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+              <h2 className="mb-2 text-lg font-semibold text-white">Регистрация</h2>
+              <p className="mb-4 text-sm text-muted">
+                {detail.registrationStatus === 'pending_email'
+                  ? 'Пользователь ещё не подтвердил email. Одобрение станет доступно после подтверждения.'
+                  : 'Email подтверждён. Можно открыть доступ к сервису.'}
+              </p>
+              <Button
+                disabled={
+                  approvalSaving ||
+                  detail.registrationStatus !== 'pending_approval'
+                }
+                onClick={() => void handleApproveRegistration()}
+              >
+                {approvalSaving ? 'Сохранение…' : 'Одобрить регистрацию'}
+              </Button>
+              {approvalNotice ? <p className="mt-3 text-sm text-emerald-300">{approvalNotice}</p> : null}
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
             <h2 className="mb-2 text-lg font-semibold text-white">Тариф</h2>

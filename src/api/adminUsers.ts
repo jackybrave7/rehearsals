@@ -56,3 +56,16 @@ export async function deleteAdminUser(userId: string): Promise<DeleteAdminUserRe
   if (!response.ok) throw new Error('DELETE_USER_FAILED');
   return response.json() as Promise<DeleteAdminUserResult>;
 }
+
+export async function approveAdminUserRegistration(
+  userId: string
+): Promise<{ mailSent?: boolean; alreadyApproved?: boolean }> {
+  const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/approve-registration`, {
+    method: 'POST',
+  });
+  if (response.status === 403) throw new Error('FORBIDDEN');
+  if (response.status === 404) throw new Error('NOT_FOUND');
+  if (response.status === 400) throw new Error('EMAIL_NOT_VERIFIED');
+  if (!response.ok) throw new Error('APPROVE_REGISTRATION_FAILED');
+  return response.json() as Promise<{ mailSent?: boolean; alreadyApproved?: boolean }>;
+}

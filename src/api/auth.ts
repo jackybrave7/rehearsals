@@ -20,13 +20,19 @@ export async function fetchAuthSession(): Promise<AuthSessionPayload | null> {
   return response.json() as Promise<AuthSessionPayload>;
 }
 
-export async function fetchAuthConfig(): Promise<{ mailConfigured: boolean }> {
+export async function fetchAuthConfig(): Promise<{
+  mailConfigured: boolean;
+  registrationMode: 'normal' | 'beta';
+}> {
   try {
     const response = await authFetch('/auth/config');
-    if (!response.ok) return { mailConfigured: false };
-    return response.json() as Promise<{ mailConfigured: boolean }>;
+    if (!response.ok) return { mailConfigured: false, registrationMode: 'normal' };
+    return response.json() as Promise<{
+      mailConfigured: boolean;
+      registrationMode: 'normal' | 'beta';
+    }>;
   } catch {
-    return { mailConfigured: false };
+    return { mailConfigured: false, registrationMode: 'normal' };
   }
 }
 
@@ -70,27 +76,31 @@ export async function registerWithEmail(
   password: string,
   name: string,
   acceptTerms: boolean
-): Promise<{ needsEmailVerification: true; message: string }> {
+): Promise<{ needsEmailVerification: true; message: string; registrationMode?: 'normal' | 'beta' }> {
   const response = await authFetch('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, name, acceptTerms }),
   });
   if (!response.ok) throw new Error(await parseAuthError(response));
-  const data = (await response.json()) as { message?: string };
+  const data = (await response.json()) as { message?: string; registrationMode?: 'normal' | 'beta' };
   return {
     needsEmailVerification: true,
+    registrationMode: data.registrationMode,
     message:
       data.message ??
       'На ваш email отправлена ссылка для подтверждения. Перейдите по ней, затем войдите в аккаунт.',
   };
 }
 
-export async function verifyEmail(token: string): Promise<void> {
+export async function verifyEmail(
+  token: string
+): Promise<{ betaPendingApproval?: boolean }> {
   const response = await authFetch('/auth/verify-email', {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
   if (!response.ok) throw new Error(await parseAuthError(response));
+  return (await response.json()) as { betaPendingApproval?: boolean };
 }
 
 export async function resendEmailVerification(email: string): Promise<string> {
@@ -166,6 +176,9 @@ async function parseAuthError(
     }
     if (code === 'EMAIL_NOT_VERIFIED') {
       return 'Подтвердите email — проверьте почту или запросите письмо повторно.';
+    }
+    if (code === 'REGISTRATION_PENDING') {
+      return 'Доступ ожидает одобрения администратора. Мы отправим письмо, когда аккаунт будет активирован.';
     }
     if (code === 'TOO_MANY_REQUESTS') {
       return data?.message ?? 'Подождите пару минут перед повторной отправкой.';

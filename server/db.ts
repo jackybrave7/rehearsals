@@ -99,6 +99,11 @@ export function getDb(): AppDatabase {
     `ALTER TABLE users ADD COLUMN terms_accepted_at TEXT`,
     `ALTER TABLE scenes ADD COLUMN act_group TEXT`,
     `ALTER TABLE plays ADD COLUMN act_script_anchors TEXT`,
+    `ALTER TABLE users ADD COLUMN registration_approved_at TEXT`,
+    `CREATE TABLE IF NOT EXISTS platform_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
+    )`,
   ]) {
     try {
       db.exec(migration);
@@ -127,6 +132,14 @@ export function getDb(): AppDatabase {
 
   db.prepare(
     `UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL`
+  ).run();
+
+  db.prepare(
+    `INSERT OR IGNORE INTO platform_settings (id, registration_mode) VALUES (1, 'beta')`
+  ).run();
+
+  db.prepare(
+    `UPDATE users SET registration_approved_at = created_at WHERE registration_approved_at IS NULL`
   ).run();
 
   dbInstance = wrapDatabase(db);

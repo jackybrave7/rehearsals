@@ -5,12 +5,13 @@ import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
 import { enrichSessionPayload } from './platformAdmin.js';
 import { getUserSubscriptionPlan } from './subscription.js';
-import { isMailConfigured, sendEmailVerificationEmail, sendPasswordResetEmail } from './mail.js';
+import { isMailConfigured, sendEmailVerificationEmail, sendEmailConfirmedEmail, sendPasswordResetEmail } from './mail.js';
 import {
   createEmailVerificationToken,
   isEmailVerified,
   verifyEmailByToken,
 } from './emailVerification.js';
+import { getRegistrationMode, isRegistrationApproved } from './platformSettings.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
@@ -130,7 +131,7 @@ function getUserTheaters(db: AppDatabase, userId: string): TheaterAccessInfo[] {
   return rows.map((row) => ({ theaterId: row.theater_id, role: row.role }));
 }
 
-function assignOrphanTheaters(db: AppDatabase, userId: string) {
+export function assignOrphanTheaters(db: AppDatabase, userId: string) {
   syncOwnerMemberships(db);
 
   const orphans = db
@@ -217,7 +218,10 @@ export function canManageTheaterMembers(session: AuthSessionPayload, theaterId: 
 
 export function registerAuthRoutes(app: import('express').Express) {
   app.get('/api/auth/config', (_req, res) => {
-    res.json({ mailConfigured: isMailConfigured() });
+    res.json({
+      mailConfigured: isMailConfigured(),
+      registrationMode: getRegistrationMode(),
+    });
   });
 
   app.get('/api/auth/me', (req, res) => {
@@ -266,20 +270,25 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     const userId = uuidv4();
     const now = new Date().toISOString();
+    const registrationApprovedAt = getRegistrationMode(db) === 'normal' ? now : null;
     db.prepare(
       `INSERT INTO users (
-         id, email, name, password_hash, google_sub, created_at, terms_accepted_at, email_verified_at
-       ) VALUES (?, ?, ?, ?, NULL, ?, ?, NULL)`
-    ).run(userId, email, name || email, hashPassword(password), now, now);
+         id, email, name, password_hash, google_sub, created_at, terms_accepted_at,
+         email_verified_at, registration_approved_at
+       ) VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, ?)`
+    ).run(userId, email, name || email, hashPassword(password), now, now, registrationApprovedAt);
 
     try {
       const token = createEmailVerificationToken(db, userId);
-      await sendEmailVerificationEmail(email, name || email, token);
+      const betaMode = getRegistrationMode(db) === 'beta';
+      await sendEmailVerificationEmail(email, name || email, token, { betaMode });
       res.json({
         ok: true,
         needsEmailVerification: true,
-        message:
-          'На ваш email отправлена ссылка для подтверждения. Перейдите по ней, затем войдите в аккаунт.',
+        registrationMode: betaMode ? 'beta' : 'normal',
+        message: betaMode
+          ? 'Регистрация принята. Подтвердите email по ссылке из письма. Если письма нет во входящих — проверьте «Спам». После подтверждения заявка будет рассмотрена администратором — мы сообщим на почту, когда доступ откроется.'
+          : 'На ваш email отправлена ссылка для подтверждения. Перейдите по ней, затем войдите в аккаунт. Если письма нет — проверьте папку «Спам».',
       });
     } catch (error) {
       console.error('[auth] verification mail failed', error);
@@ -288,21 +297,37 @@ export function registerAuthRoutes(app: import('express').Express) {
     }
   });
 
-  app.post('/api/auth/verify-email', (req, res) => {
+  app.post('/api/auth/verify-email', async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
     if (!token) {
       res.status(400).json({ error: 'INVALID_TOKEN' });
       return;
     }
 
-      const result = verifyEmailByToken(getDb(), token);
+    const result = verifyEmailByToken(getDb(), token);
     if (!result) {
       res.status(400).json({ error: 'INVALID_TOKEN' });
       return;
     }
 
-    assignOrphanTheaters(getDb(), result.userId);
-    res.json({ ok: true });
+    const db = getDb();
+    assignOrphanTheaters(db, result.userId);
+    const betaMode = getRegistrationMode(db) === 'beta';
+    const betaPendingApproval = betaMode && !isRegistrationApproved(db, result.userId);
+
+    const userRow = db
+      .prepare(`SELECT email, name FROM users WHERE id = ?`)
+      .get(result.userId) as { email: string; name: string } | undefined;
+
+    if (userRow && isMailConfigured()) {
+      try {
+        await sendEmailConfirmedEmail(userRow.email, userRow.name, { betaMode });
+      } catch (error) {
+        console.error('[auth] confirmation notice mail failed', error);
+      }
+    }
+
+    res.json({ ok: true, betaPendingApproval });
   });
 
   app.post('/api/auth/resend-verification', async (req, res) => {
@@ -339,7 +364,8 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     try {
       const token = createEmailVerificationToken(db, row.id);
-      await sendEmailVerificationEmail(row.email, row.name, token);
+      const betaMode = getRegistrationMode(db) === 'beta';
+      await sendEmailVerificationEmail(row.email, row.name, token, { betaMode });
       emailVerificationCooldown.set(email, Date.now());
       res.json({ ok: true, message: genericMessage });
     } catch (error) {
@@ -368,6 +394,11 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     if (!isEmailVerified(db, row.id)) {
       res.status(403).json({ error: 'EMAIL_NOT_VERIFIED' });
+      return;
+    }
+
+    if (!isRegistrationApproved(db, row.id)) {
+      res.status(403).json({ error: 'REGISTRATION_PENDING' });
       return;
     }
 

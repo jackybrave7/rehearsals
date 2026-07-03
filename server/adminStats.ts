@@ -3,6 +3,7 @@ import { getDb, type AppDatabase } from './db.js';
 import { normalizeSubscriptionPlan } from './subscription.js';
 import { getDbInfo, listBackupFiles } from './backup.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
+import { getRegistrationMode } from './platformSettings.js';
 import type { TheaterAccessRole } from './authTypes.js';
 
 export interface AdminUserSummary {
@@ -12,6 +13,10 @@ export interface AdminUserSummary {
   createdAt: string;
   authMethods: { password: boolean; google: boolean };
   activeSessions: number;
+  subscriptionPlan: 'free' | 'pro';
+  emailVerified: boolean;
+  registrationApproved: boolean;
+  registrationStatus: 'approved' | 'pending_approval' | 'pending_email';
   theaterCount: number;
   ownedTheaterCount: number;
   filesCount: number;
@@ -53,6 +58,8 @@ export interface AdminUserDetail extends AdminUserSummary {
 
 export interface PlatformStats {
   generatedAt: string;
+  registrationMode: 'normal' | 'beta';
+  pendingRegistrations: number;
   users: {
     total: number;
     newLast30Days: number;
@@ -158,6 +165,8 @@ function mapUserSummaryRow(
     name: string;
     created_at: string;
     subscription_plan: string | null;
+    email_verified_at: string | null;
+    registration_approved_at: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -170,12 +179,22 @@ function mapUserSummaryRow(
   since30Days: string
 ): AdminUserSummary {
   const userId = row.id;
+  const emailVerified = Boolean(row.email_verified_at);
+  const registrationApproved = Boolean(row.registration_approved_at);
+  const registrationStatus: AdminUserSummary['registrationStatus'] = !emailVerified
+    ? 'pending_email'
+    : !registrationApproved
+      ? 'pending_approval'
+      : 'approved';
   return {
     id: userId,
     email: row.email,
     name: row.name,
     createdAt: row.created_at,
     subscriptionPlan: normalizeSubscriptionPlan(row.subscription_plan),
+    emailVerified,
+    registrationApproved,
+    registrationStatus,
     authMethods: {
       password: Boolean(row.has_password),
       google: Boolean(row.has_google),
@@ -226,6 +245,8 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
          u.name,
          u.created_at,
          u.subscription_plan,
+         u.email_verified_at,
+         u.registration_approved_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
@@ -242,6 +263,8 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
     name: string;
     created_at: string;
     subscription_plan: string | null;
+    email_verified_at: string | null;
+    registration_approved_at: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -294,6 +317,8 @@ export function collectAdminUserDetail(
          u.name,
          u.created_at,
          u.subscription_plan,
+         u.email_verified_at,
+         u.registration_approved_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
@@ -310,6 +335,9 @@ export function collectAdminUserDetail(
         email: string;
         name: string;
         created_at: string;
+        subscription_plan: string | null;
+        email_verified_at: string | null;
+        registration_approved_at: string | null;
         has_password: number;
         has_google: number;
         active_sessions: number;
@@ -470,6 +498,12 @@ export function collectPlatformStats(db: AppDatabase = getDb()): PlatformStats {
 
   return {
     generatedAt: nowIso,
+    registrationMode: getRegistrationMode(db),
+    pendingRegistrations: countRow(
+      db,
+      `SELECT COUNT(*) AS count FROM users
+       WHERE email_verified_at IS NOT NULL AND registration_approved_at IS NULL`
+    ),
     users: {
       total: countRow(db, `SELECT COUNT(*) AS count FROM users`),
       newLast30Days: countRow(

@@ -9,6 +9,7 @@ export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [betaPendingApproval, setBetaPendingApproval] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -16,7 +17,10 @@ export function VerifyEmailPage() {
       return;
     }
     void verifyEmail(token)
-      .then(() => setStatus('success'))
+      .then((result) => {
+        setBetaPendingApproval(Boolean(result.betaPendingApproval));
+        setStatus('success');
+      })
       .catch(() => setStatus('error'));
   }, [token]);
 
@@ -38,10 +42,20 @@ export function VerifyEmailPage() {
           <>
             <CheckCircle2 size={40} className="mx-auto text-emerald-400" />
             <h1 className="mt-4 text-xl font-bold text-white">Email подтверждён</h1>
-            <p className="mt-2 text-sm text-muted">Теперь можно войти в аккаунт.</p>
-            <Link to="/login" className="mt-6 inline-block">
-              <Button>Войти</Button>
-            </Link>
+            <p className="mt-2 text-sm text-muted">
+              {betaPendingApproval
+                ? 'Заявка отправлена администратору. Мы сообщим на почту, когда доступ к сервису откроется.'
+                : 'Теперь можно войти в аккаунт.'}
+            </p>
+            {!betaPendingApproval ? (
+              <Link to="/login" className="mt-6 inline-block">
+                <Button>Войти</Button>
+              </Link>
+            ) : (
+              <Link to="/login" className="mt-6 inline-block">
+                <Button variant="secondary">Ко входу</Button>
+              </Link>
+            )}
           </>
         )}
 

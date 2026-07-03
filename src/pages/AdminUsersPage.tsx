@@ -17,6 +17,18 @@ function authLabel(user: AdminUserSummary): string {
   return methods.length > 0 ? methods.join(' · ') : '—';
 }
 
+function registrationStatusLabel(status: AdminUserSummary['registrationStatus']): string {
+  if (status === 'pending_email') return 'Email не подтверждён';
+  if (status === 'pending_approval') return 'Ждёт одобрения';
+  return 'Доступ открыт';
+}
+
+function registrationStatusClass(status: AdminUserSummary['registrationStatus']): string {
+  if (status === 'pending_email') return 'bg-amber-500/15 text-amber-200';
+  if (status === 'pending_approval') return 'bg-orange-500/15 text-orange-200';
+  return 'bg-emerald-500/15 text-emerald-200';
+}
+
 export function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +52,11 @@ export function AdminUsersPage() {
     void load();
   }, [load]);
 
+  const pendingCount = useMemo(
+    () => users.filter((user) => user.registrationStatus === 'pending_approval').length,
+    [users]
+  );
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return users;
@@ -61,6 +78,9 @@ export function AdminUsersPage() {
             <h1 className="text-3xl font-bold text-white">Пользователи</h1>
             <p className="mt-1 text-muted">
               {users.length} аккаунтов · статистика по доступным театрам
+              {pendingCount > 0 ? (
+                <span className="text-amber-200"> · {pendingCount} ждут одобрения</span>
+              ) : null}
             </p>
           </div>
           <button
@@ -104,6 +124,7 @@ export function AdminUsersPage() {
               <tr className="border-b border-gold/10 text-muted">
                 <th className="px-4 py-3 font-medium">Пользователь</th>
                 <th className="px-4 py-3 font-medium">Регистрация</th>
+                <th className="px-4 py-3 font-medium">Статус</th>
                 <th className="px-4 py-3 font-medium">Вход</th>
                 <th className="px-4 py-3 font-medium">Тариф</th>
                 <th className="px-4 py-3 font-medium">Театры</th>
@@ -126,6 +147,13 @@ export function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted">
                     {format(parseISO(user.createdAt), 'd MMM yyyy', { locale: ru })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${registrationStatusClass(user.registrationStatus)}`}
+                    >
+                      {registrationStatusLabel(user.registrationStatus)}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-muted">{authLabel(user)}</td>
                   <td className="px-4 py-3">

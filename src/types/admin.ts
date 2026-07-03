@@ -1,5 +1,9 @@
+export type RegistrationMode = 'normal' | 'beta';
+
 export interface PlatformStats {
   generatedAt: string;
+  registrationMode: 'normal' | 'beta';
+  pendingRegistrations: number;
   users: {
     total: number;
     newLast30Days: number;
@@ -66,6 +70,9 @@ export interface AdminUserSummary {
   authMethods: { password: boolean; google: boolean };
   activeSessions: number;
   subscriptionPlan: 'free' | 'pro';
+  emailVerified: boolean;
+  registrationApproved: boolean;
+  registrationStatus: 'approved' | 'pending_approval' | 'pending_email';
   theaterCount: number;
   ownedTheaterCount: number;
   filesCount: number;

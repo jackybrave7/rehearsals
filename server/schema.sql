@@ -20,8 +20,16 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified_at TEXT,
   email_verification_token_hash TEXT,
   email_verification_expires_at TEXT,
-  terms_accepted_at TEXT
+  terms_accepted_at TEXT,
+  registration_approved_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
+);
+
+INSERT OR IGNORE INTO platform_settings (id, registration_mode) VALUES (1, 'beta');
 
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,

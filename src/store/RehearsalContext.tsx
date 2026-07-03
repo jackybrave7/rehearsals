@@ -819,7 +819,6 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'ADD_PLAY': {
       const play = { ...action.payload, theaterId: action.payload.theaterId ?? state.activeTheaterId ?? undefined };
-      const isFirstInTheater = state.plays.every((item) => item.theaterId !== play.theaterId);
       const defaultPerformance: Performance = {
         id: generateId(),
         playId: play.id,
@@ -829,8 +828,12 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         plays: [...state.plays, play],
-        activePlayId: isFirstInTheater ? play.id : state.activePlayId,
+        activePlayId: play.id,
         performances: [...state.performances, defaultPerformance],
+        selectedPerformanceByPlayId: {
+          ...state.selectedPerformanceByPlayId,
+          [play.id]: defaultPerformance.id,
+        },
       };
     }
     case 'UPDATE_PLAY':
@@ -891,7 +894,14 @@ function reducer(state: AppState, action: Action): AppState {
         castAssignments: state.castAssignments.filter((a) => a.id !== action.payload),
       };
     case 'ADD_PERFORMANCE':
-      return { ...state, performances: [...state.performances, action.payload] };
+      return {
+        ...state,
+        performances: [...state.performances, action.payload],
+        selectedPerformanceByPlayId: {
+          ...state.selectedPerformanceByPlayId,
+          [action.payload.playId]: action.payload.id,
+        },
+      };
     case 'UPDATE_PERFORMANCE':
       return {
         ...state,

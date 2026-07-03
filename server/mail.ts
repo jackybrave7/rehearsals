@@ -29,10 +29,71 @@ export function isMailConfigured(): boolean {
   return readMailConfig() !== null;
 }
 
+function formatFromAddress(from: string): string {
+  if (from.includes('<')) return from;
+  return `"Репетиции" <${from}>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function textToHtml(text: string): string {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const withLinks = block.replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" style="color:#b8860b;">$1</a>'
+      );
+      return `<p style="margin:0 0 12px;line-height:1.5;">${withLinks.replace(/\n/g, '<br>')}</p>`;
+    });
+  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#222;">${paragraphs.join('')}</body></html>`;
+}
+
+function buildActionEmailHtml(options: {
+  greeting: string;
+  paragraphs: string[];
+  actionLabel: string;
+  actionUrl: string;
+  footer?: string;
+}): string {
+  const body = options.paragraphs
+    .map((paragraph) => `<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(paragraph)}</p>`)
+    .join('');
+  const footer = options.footer
+    ? `<p style="margin:16px 0 0;font-size:13px;color:#666;line-height:1.5;">${escapeHtml(options.footer)}</p>`
+    : '';
+  return `<!DOCTYPE html>
+<html>
+  <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
+    <p style="margin:0 0 12px;line-height:1.5;">Здравствуйте, ${escapeHtml(options.greeting)}!</p>
+    ${body}
+    <p style="margin:20px 0;">
+      <a href="${escapeHtml(options.actionUrl)}" style="display:inline-block;padding:12px 20px;background:#b8860b;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">
+        ${escapeHtml(options.actionLabel)}
+      </a>
+    </p>
+    <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.5;word-break:break-all;">
+      Если кнопка не открывается, скопируйте ссылку:<br>
+      <a href="${escapeHtml(options.actionUrl)}" style="color:#b8860b;">${escapeHtml(options.actionUrl)}</a>
+    </p>
+    ${footer}
+  </body>
+</html>`;
+}
+
 export async function sendMail(options: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }): Promise<void> {
   const config = readMailConfig();
   if (!config) throw new Error('MAIL_NOT_CONFIGURED');
@@ -47,11 +108,25 @@ export async function sendMail(options: {
     },
   });
 
-  await transporter.sendMail({
-    from: config.from,
+  const info = await transporter.sendMail({
+    from: formatFromAddress(config.from),
+    replyTo: config.from,
     to: options.to,
     subject: options.subject,
     text: options.text,
+    html: options.html ?? textToHtml(options.text),
+    headers: {
+      'X-Mailer': 'Rehearsals',
+      'Auto-Submitted': 'auto-generated',
+    },
+  });
+
+  const domain = options.to.split('@')[1] ?? 'unknown';
+  console.log('[mail] sent', {
+    domain,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
   });
 }
 
@@ -82,14 +157,45 @@ export async function sendProActivatedEmail(to: string, name: string): Promise<v
   });
 }
 
+export async function sendRegistrationApprovedEmail(to: string, name: string): Promise<void> {
+  const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
+  const loginUrl = `${appUrl.replace(/\/$/, '')}/login`;
+  const greeting = name.trim() || to;
+
+  await sendMail({
+    to,
+    subject: 'Доступ к Репетициям открыт',
+    text: [
+      `Здравствуйте, ${greeting}!`,
+      '',
+      'Администратор одобрил вашу заявку на регистрацию в сервисе «Репетиции».',
+      'Теперь можно войти в аккаунт:',
+      loginUrl,
+      '',
+      'Добро пожаловать в планировщик постановки!',
+    ].join('\n'),
+  });
+}
+
 export async function sendEmailVerificationEmail(
   to: string,
   name: string,
-  token: string
+  token: string,
+  options?: { betaMode?: boolean }
 ): Promise<void> {
   const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
   const verifyUrl = `${appUrl.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(token)}`;
   const greeting = name.trim() || to;
+  const betaMode = options?.betaMode ?? false;
+
+  const intro = betaMode
+    ? 'Вы зарегистрировались в сервисе «Репетиции» (режим бета-тестирования). Подтвердите адрес электронной почты.'
+    : 'Вы зарегистрировались в сервисе «Репетиции». Подтвердите адрес электронной почты, чтобы войти в аккаунт.';
+  const afterConfirm = betaMode
+    ? 'После подтверждения заявка будет рассмотрена администратором. Мы сообщим на почту, когда доступ откроется.'
+    : 'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.';
+  const spamHint =
+    'Если письма нет во входящих, проверьте папку «Спам» и отметьте его как «Не спам».';
 
   await sendMail({
     to,
@@ -97,10 +203,64 @@ export async function sendEmailVerificationEmail(
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
-      'Вы зарегистрировались в сервисе «Репетиции». Подтвердите адрес электронной почты, чтобы войти в аккаунт:',
+      intro,
       verifyUrl,
       '',
-      'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.',
+      afterConfirm,
+      '',
+      spamHint,
+      ...(betaMode
+        ? ['', 'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.']
+        : []),
+    ].join('\n'),
+    html: buildActionEmailHtml({
+      greeting,
+      paragraphs: [intro, afterConfirm, spamHint],
+      actionLabel: 'Подтвердить email',
+      actionUrl: verifyUrl,
+      footer: betaMode
+        ? 'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.'
+        : undefined,
+    }),
+  });
+}
+
+export async function sendEmailConfirmedEmail(
+  to: string,
+  name: string,
+  options: { betaMode: boolean }
+): Promise<void> {
+  const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
+  const loginUrl = `${appUrl.replace(/\/$/, '')}/login`;
+  const greeting = name.trim() || to;
+
+  if (options.betaMode) {
+    await sendMail({
+      to,
+      subject: 'Email подтверждён — Репетиции',
+      text: [
+        `Здравствуйте, ${greeting}!`,
+        '',
+        'Ваш email подтверждён. Заявка на регистрацию отправлена администратору.',
+        'Мы сообщим на почту, когда доступ к сервису откроется.',
+        '',
+        'Пока можно вернуться на страницу входа:',
+        loginUrl,
+      ].join('\n'),
+    });
+    return;
+  }
+
+  await sendMail({
+    to,
+    subject: 'Email подтверждён — можно войти',
+    text: [
+      `Здравствуйте, ${greeting}!`,
+      '',
+      'Ваш email подтверждён. Теперь можно войти в «Репетиции» и пользоваться сервисом:',
+      loginUrl,
+      '',
+      'Добро пожаловать в планировщик постановки!',
     ].join('\n'),
   });
 }

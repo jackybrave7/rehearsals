@@ -61,6 +61,13 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   );
 
   useEffect(() => {
+    const saved = state.selectedPerformanceByPlayId?.[playId];
+    if (saved && performances.some((p) => p.id === saved) && saved !== selectedPerformanceId) {
+      setSelectedPerformanceId(saved);
+    }
+  }, [state.selectedPerformanceByPlayId, playId, performances, selectedPerformanceId]);
+
+  useEffect(() => {
     if (performances.length === 0) return;
     const stillValid = performances.some((p) => p.id === selectedPerformanceId);
     if (!stillValid) {

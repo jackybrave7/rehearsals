@@ -16,6 +16,7 @@ import {
 import { fetchPlatformStats } from '../api/admin';
 import type { PlatformStats } from '../types/admin';
 import { AdminNav } from '../components/admin/AdminNav';
+import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
 import { appPaths } from '../navigation/appPaths';
 
@@ -78,6 +79,13 @@ export function AdminStatsPage() {
       </header>
 
       <AdminErrorBanner error={error} />
+
+      {stats ? (
+        <AdminPlatformSettingsPanel
+          initialMode={stats.registrationMode}
+          pendingRegistrations={stats.pendingRegistrations}
+        />
+      ) : null}
 
       {loading && !stats ? (
         <div className="rounded-2xl border border-dashed border-gold/20 p-10 text-center text-muted">
