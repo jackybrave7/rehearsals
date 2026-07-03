@@ -836,13 +836,24 @@ function reducer(state: AppState, action: Action): AppState {
         },
       };
     }
-    case 'UPDATE_PLAY':
+    case 'UPDATE_PLAY': {
+      const updatedPlay = action.payload;
+      let activePlayId = state.activePlayId;
+      if (updatedPlay.archivedAt && updatedPlay.id === activePlayId) {
+        const replacement = state.plays.find(
+          (play) =>
+            play.id !== updatedPlay.id &&
+            play.theaterId === updatedPlay.theaterId &&
+            !play.archivedAt
+        );
+        activePlayId = replacement?.id ?? null;
+      }
       return {
         ...state,
-        plays: state.plays.map((p) =>
-          p.id === action.payload.id ? action.payload : p
-        ),
+        plays: state.plays.map((p) => (p.id === updatedPlay.id ? updatedPlay : p)),
+        activePlayId,
       };
+    }
     case 'DELETE_PLAY': {
       const remaining = state.plays.filter((p) => p.id !== action.payload);
       let activePlayId = state.activePlayId;

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   google_sub TEXT UNIQUE,
   created_at TEXT NOT NULL,
   subscription_plan TEXT NOT NULL DEFAULT 'free' CHECK (subscription_plan IN ('free', 'pro')),
+  subscription_pro_expires_at TEXT,
   email_verified_at TEXT,
   email_verification_token_hash TEXT,
   email_verification_expires_at TEXT,

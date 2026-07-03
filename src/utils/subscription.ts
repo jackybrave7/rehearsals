@@ -10,8 +10,8 @@ export function isPlayActive(play: Pick<Play, 'archivedAt'>): boolean {
   return !play.archivedAt;
 }
 
-export function isPlayReadOnly(play: Pick<Play, 'archivedAt'>, isPro: boolean): boolean {
-  return !isPro && Boolean(play.archivedAt);
+export function isPlayReadOnly(play: Pick<Play, 'archivedAt'>): boolean {
+  return Boolean(play.archivedAt);
 }
 
 export function countOwnedActivePlays(state: AppState, ownedTheaterIds: Set<string>): number {
@@ -36,6 +36,28 @@ export function canCreateActivePlay(activePlayCount: number, isPro: boolean): bo
 
 export function formatYearlyMonthlyPrice(): string {
   return `${Math.round(PRO_PRICING.yearlyRub / 12)} ₽`;
+}
+
+export function formatAdminSubscriptionLabel(
+  plan: 'free' | 'pro',
+  options?: {
+    storedPlan?: 'free' | 'pro';
+    expiresAt?: string | null;
+  }
+): string {
+  const stored = options?.storedPlan ?? plan;
+  const expiresAt = options?.expiresAt ?? null;
+  if (plan === 'free' && stored === 'pro') return 'Pro (истёк)';
+  if (plan === 'pro' && !expiresAt) return 'Pro · без срока';
+  if (plan === 'pro' && expiresAt) {
+    try {
+      const date = new Date(expiresAt);
+      return `Pro до ${date.toLocaleDateString('ru-RU')}`;
+    } catch {
+      return 'Pro';
+    }
+  }
+  return SUBSCRIPTION_PLAN_LABELS[plan];
 }
 
 export {

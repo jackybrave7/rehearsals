@@ -295,6 +295,27 @@ html[data-design='zen'] .text-red-200 {
   color: #b91c1c;
 }
 
+html[data-design='zen'] .bg-red-500\/15 {
+  background: #fef2f2;
+}
+
+html[data-design='zen'] .border-emerald-500\/30 {
+  border-color: rgba(5, 150, 105, 0.35);
+}
+
+html[data-design='zen'] .bg-emerald-950\/20,
+html[data-design='zen'] .bg-emerald-950\/30 {
+  background: #ecfdf5;
+}
+
+html[data-design='zen'] .text-emerald-200 {
+  color: #047857;
+}
+
+html[data-design='zen'] .text-emerald-200\/90 {
+  color: #065f46;
+}
+
 html[data-design='zen'] .text-emerald-300\/90 {
   color: #047857;
 }

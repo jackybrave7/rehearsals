@@ -4,7 +4,6 @@ import { DeleteButton } from '../components/DeleteButton';
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { useSubscription } from '../hooks/useSubscription';
 import { isPlayReadOnly } from '../utils/subscription';
 import { UpgradePrompt } from '../components/UpgradePrompt';
 import { getActivePlay, getPlayRoles, getPlayScenes, getSceneRoles, getSelectedPerformance, getActorNamesForRoleInPerformance, formatPerformanceLabel } from '../store/selectors';
@@ -70,10 +69,9 @@ const priorityColors: Record<ScenePriority, string> = {
 
 export function ScenesPage() {
   const { state, dispatch, readOnly } = useRehearsalStore();
-  const { isPro } = useSubscription();
   const { confirm } = useConfirmDialog();
   const activePlay = getActivePlay(state);
-  const playReadOnly = activePlay ? isPlayReadOnly(activePlay, isPro) : false;
+  const playReadOnly = activePlay ? isPlayReadOnly(activePlay) : false;
   const scenesReadOnly = playReadOnly || readOnly;
   const playScenes = getPlayScenes(state, state.activePlayId);
   const selectedPerformance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
@@ -322,7 +320,7 @@ export function ScenesPage() {
       {playReadOnly && (
         <UpgradePrompt
           title="Архивная постановка — только просмотр"
-          description="На тарифе Free архивные постановки нельзя редактировать. Восстановите постановку или перейдите на Pro."
+          description="Архивная постановка доступна только для просмотра. Восстановите постановку из архива, чтобы редактировать сцены и состав."
         />
       )}
 

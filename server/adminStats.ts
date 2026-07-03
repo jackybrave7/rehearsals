@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { getDb, type AppDatabase } from './db.js';
-import { normalizeSubscriptionPlan } from './subscription.js';
+import { getUserSubscriptionPlan, normalizeSubscriptionPlan } from './subscription.js';
 import { getDbInfo, listBackupFiles } from './backup.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import { getRegistrationMode } from './platformSettings.js';
@@ -14,7 +14,10 @@ export interface AdminUserSummary {
   authMethods: { password: boolean; google: boolean };
   activeSessions: number;
   subscriptionPlan: 'free' | 'pro';
+  subscriptionPlanStored: 'free' | 'pro';
+  subscriptionProExpiresAt: string | null;
   emailVerified: boolean;
+  emailVerifiedAt: string | null;
   registrationApproved: boolean;
   registrationStatus: 'approved' | 'pending_approval' | 'pending_email';
   theaterCount: number;
@@ -165,6 +168,7 @@ function mapUserSummaryRow(
     name: string;
     created_at: string;
     subscription_plan: string | null;
+    subscription_pro_expires_at: string | null;
     email_verified_at: string | null;
     registration_approved_at: string | null;
     has_password: number;
@@ -186,13 +190,19 @@ function mapUserSummaryRow(
     : !registrationApproved
       ? 'pending_approval'
       : 'approved';
+  const subscriptionPlanStored = normalizeSubscriptionPlan(row.subscription_plan);
+  const subscriptionProExpiresAt = row.subscription_pro_expires_at ?? null;
+  const subscriptionPlan = getUserSubscriptionPlan(db, userId, row.email);
   return {
     id: userId,
     email: row.email,
     name: row.name,
     createdAt: row.created_at,
-    subscriptionPlan: normalizeSubscriptionPlan(row.subscription_plan),
+    subscriptionPlan,
+    subscriptionPlanStored,
+    subscriptionProExpiresAt,
     emailVerified,
+    emailVerifiedAt: row.email_verified_at,
     registrationApproved,
     registrationStatus,
     authMethods: {
@@ -245,6 +255,7 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
          u.name,
          u.created_at,
          u.subscription_plan,
+         u.subscription_pro_expires_at,
          u.email_verified_at,
          u.registration_approved_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
@@ -263,6 +274,7 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
     name: string;
     created_at: string;
     subscription_plan: string | null;
+    subscription_pro_expires_at: string | null;
     email_verified_at: string | null;
     registration_approved_at: string | null;
     has_password: number;
@@ -317,6 +329,7 @@ export function collectAdminUserDetail(
          u.name,
          u.created_at,
          u.subscription_plan,
+         u.subscription_pro_expires_at,
          u.email_verified_at,
          u.registration_approved_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
@@ -336,6 +349,7 @@ export function collectAdminUserDetail(
         name: string;
         created_at: string;
         subscription_plan: string | null;
+        subscription_pro_expires_at: string | null;
         email_verified_at: string | null;
         registration_approved_at: string | null;
         has_password: number;

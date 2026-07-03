@@ -14,6 +14,7 @@ import { ActorAvatar } from './ActorAvatar';
 
 interface CastDistributionPanelProps {
   playId: string;
+  readOnly?: boolean;
 }
 
 const emptyRole = (playId: string, kind: PlayRoleKind, order: number): Omit<PlayRole, 'id'> => ({
@@ -24,7 +25,7 @@ const emptyRole = (playId: string, kind: PlayRoleKind, order: number): Omit<Play
   description: '',
 });
 
-export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
+export function CastDistributionPanel({ playId, readOnly = false }: CastDistributionPanelProps) {
   const { state, dispatch } = useRehearsalStore();
   const { confirm, confirmDelete } = useConfirmDialog();
   const performances = getPlayPerformances(state, playId);
@@ -89,6 +90,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const openCreateRole = (kind: PlayRoleKind) => {
+    if (readOnly) return;
     const rolesByKind = {
       character: characterRoles,
       crew: crewRoles,
@@ -101,12 +103,14 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const openEditRole = (role: PlayRole) => {
+    if (readOnly) return;
     setEditingRole(role);
     setRoleForm({ ...role });
     setRoleModalOpen(true);
   };
 
   const saveRole = () => {
+    if (readOnly) return;
     if (!roleForm.name.trim()) return;
     dispatch({
       type: editingRole ? 'UPDATE_PLAY_ROLE' : 'ADD_PLAY_ROLE',
@@ -123,6 +127,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const deleteRole = async (role: PlayRole) => {
+    if (readOnly) return;
     const confirmed = await confirm({
       title: `Удалить роль «${role.name}»?`,
       message: 'Роль будет снята со всех сцен и назначений в этой постановке.',
@@ -134,6 +139,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const assignActor = (roleId: string, actorId: string) => {
+    if (readOnly) return;
     if (!activePerformance) return;
     if (isActorAssignedToRole(state, activePerformance.id, roleId, actorId)) return;
     dispatch({
@@ -149,10 +155,12 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const unassign = (assignmentId: string) => {
+    if (readOnly) return;
     dispatch({ type: 'DELETE_CAST_ASSIGNMENT', payload: assignmentId });
   };
 
   const openAssignModal = (role: PlayRole) => {
+    if (readOnly) return;
     setAssignRole(role);
     setAssignSearch('');
   };
@@ -188,12 +196,14 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const openCreatePerformance = () => {
+    if (readOnly) return;
     setEditingPerformance(null);
     setPerformanceForm({ playId, name: '', description: '', date: '', startTime: '' });
     setPerformanceModalOpen(true);
   };
 
   const openEditPerformance = (performance: Performance) => {
+    if (readOnly) return;
     setEditingPerformance(performance);
     setPerformanceForm({
       playId,
@@ -207,6 +217,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const savePerformance = () => {
+    if (readOnly) return;
     if (!performanceForm.name.trim()) return;
     const payload: Performance = {
       id: editingPerformance?.id ?? generateId(),
@@ -226,6 +237,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const deletePerformance = async (performance: Performance) => {
+    if (readOnly) return;
     if (performance.isDefault) return;
     const confirmed = await confirmDelete({
       title: `Удалить показ «${performance.name}»?`,
@@ -237,6 +249,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
   };
 
   const copyCastFromDefault = () => {
+    if (readOnly) return;
     if (!activePerformance || !sourcePerformanceId || activePerformance.isDefault) return;
     if (sourcePerformanceId === activePerformance.id) return;
 
@@ -274,9 +287,11 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-gold-light">{title}</h4>
-          <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => openCreateRole(kind)}>
-            <Plus size={14} /> Роль
-          </Button>
+          {!readOnly && (
+            <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => openCreateRole(kind)}>
+              <Plus size={14} /> Роль
+            </Button>
+          )}
         </div>
 
         {roles.length === 0 ? (
@@ -290,7 +305,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                 <tr>
                   <th className="px-4 py-3 font-medium">Роль</th>
                   <th className="px-4 py-3 font-medium">Участники</th>
-                  <th className="px-4 py-3 font-medium w-20" />
+                  {!readOnly && <th className="px-4 py-3 font-medium w-20" />}
                 </tr>
               </thead>
               <tbody>
@@ -325,21 +340,24 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                                   size="sm"
                                 />
                                 {actor.name}
-                                <button
-                                  type="button"
-                                  onClick={() => unassign(assignment.id)}
-                                  className="rounded-full p-0.5 hover:bg-white/10"
-                                  aria-label={`Снять ${actor.name} с роли`}
-                                >
-                                  <X size={12} />
-                                </button>
+                                {!readOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => unassign(assignment.id)}
+                                    className="rounded-full p-0.5 hover:bg-white/10"
+                                    aria-label={`Снять ${actor.name} с роли`}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                )}
                               </span>
                             );
                           })}
                           {assignments.length === 0 && (
                             <span className="text-xs text-muted">Не назначены</span>
                           )}
-                          {activeActors.some(
+                          {!readOnly &&
+                          activeActors.some(
                             (actor) =>
                               !isActorAssignedToRole(
                                 state,
@@ -347,7 +365,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                                 role.id,
                                 actor.id
                               )
-                          ) && (
+                          ) ? (
                             <Button
                               variant="ghost"
                               className="!px-2 !py-1 text-xs"
@@ -356,9 +374,10 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                               <UserPlus size={14} />
                               Добавить
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </td>
+                      {!readOnly && (
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <Button
@@ -374,6 +393,7 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                           />
                         </div>
                       </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -398,16 +418,18 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {!activePerformance?.isDefault && sourcePerformanceId && (
+          {!readOnly && !activePerformance?.isDefault && sourcePerformanceId && (
             <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={copyCastFromDefault}>
               <Copy size={14} />
               Скопировать из основного
             </Button>
           )}
-          <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={openCreatePerformance}>
-            <Plus size={14} />
-            Показ
-          </Button>
+          {!readOnly && (
+            <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={openCreatePerformance}>
+              <Plus size={14} />
+              Показ
+            </Button>
+          )}
         </div>
       </div>
 
@@ -428,19 +450,23 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                 <span className="ml-2 text-xs text-muted">· базовый</span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => openEditPerformance(performance)}
-              className="rounded-lg p-2 text-muted transition-colors hover:bg-white/10 hover:text-gold-light"
-              title="Редактировать показ"
-            >
-              <Pencil size={14} />
-            </button>
-            {!performance.isDefault && (
-              <DeleteButton
-                label={`Удалить показ «${performance.name}»`}
-                onClick={() => deletePerformance(performance)}
-              />
+            {!readOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openEditPerformance(performance)}
+                  className="rounded-lg p-2 text-muted transition-colors hover:bg-white/10 hover:text-gold-light"
+                  title="Редактировать показ"
+                >
+                  <Pencil size={14} />
+                </button>
+                {!performance.isDefault && (
+                  <DeleteButton
+                    label={`Удалить показ «${performance.name}»`}
+                    onClick={() => deletePerformance(performance)}
+                  />
+                )}
+              </>
             )}
           </div>
         ))}
@@ -479,14 +505,16 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
                 </p>
               )}
             </div>
-            <Button
-              variant="secondary"
-              className="!px-3 !py-1.5 text-sm shrink-0"
-              onClick={() => openEditPerformance(activePerformance)}
-            >
-              <Pencil size={14} />
-              Редактировать
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="secondary"
+                className="!px-3 !py-1.5 text-sm shrink-0"
+                onClick={() => openEditPerformance(activePerformance)}
+              >
+                <Pencil size={14} />
+                Редактировать
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -495,6 +523,8 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
       {renderRoleTable(crewRoles, 'Постановочная группа', 'crew')}
       {renderRoleTable(technicalRoles, 'Техническая группа', 'technical')}
 
+      {!readOnly && (
+        <>
       <Modal
         open={roleModalOpen}
         onClose={() => setRoleModalOpen(false)}
@@ -632,6 +662,8 @@ export function CastDistributionPanel({ playId }: CastDistributionPanelProps) {
           )}
         </div>
       </Modal>
+        </>
+      )}
     </div>
   );
 }

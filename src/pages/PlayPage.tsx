@@ -247,7 +247,7 @@ export function PlayPage() {
 
           {selectedPlay && (() => {
             const play = selectedPlay;
-            const playReadOnly = isPlayReadOnly(play, isPro);
+            const playReadOnly = isPlayReadOnly(play);
             const sceneCount = state.scenes.filter((s) => s.playId === play.id).length;
             const roleCount = state.playRoles.filter(
               (r) => r.playId === play.id && r.kind === 'character'
@@ -258,7 +258,8 @@ export function PlayPage() {
               <div className="rounded-2xl border border-gold/30 bg-surface/80 p-6">
                 {playReadOnly && (
                   <p className="mb-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted">
-                    Архивная постановка на тарифе Free — только просмотр. Восстановите или перейдите на Pro.
+                    Архивная постановка — только просмотр. Нажмите «Восстановить», чтобы снова редактировать
+                    состав и сцены.
                   </p>
                 )}
                 <div className="flex items-start gap-5">
@@ -342,10 +343,10 @@ export function PlayPage() {
                     )}
                   </div>
                 </div>
-                {!playReadOnly && <CastDistributionPanel playId={play.id} />}
+                <CastDistributionPanel playId={play.id} readOnly={playReadOnly} />
                 {playReadOnly && (
-                  <p className="mt-4 text-sm text-muted">
-                    Состав и распределение ролей доступны на Pro или после восстановления постановки.
+                  <p className="mt-3 text-xs text-muted">
+                    Чтобы назначать исполнителей, восстановите постановку из архива.
                   </p>
                 )}
               </div>

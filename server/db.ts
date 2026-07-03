@@ -100,6 +100,7 @@ export function getDb(): AppDatabase {
     `ALTER TABLE scenes ADD COLUMN act_group TEXT`,
     `ALTER TABLE plays ADD COLUMN act_script_anchors TEXT`,
     `ALTER TABLE users ADD COLUMN registration_approved_at TEXT`,
+    `ALTER TABLE users ADD COLUMN subscription_pro_expires_at TEXT`,
     `CREATE TABLE IF NOT EXISTS platform_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))

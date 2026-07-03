@@ -29,17 +29,34 @@ export interface DeleteAdminUserResult {
 
 export async function updateAdminUserSubscription(
   userId: string,
-  plan: 'free' | 'pro'
-): Promise<{ userId: string; plan: 'free' | 'pro'; mailSent?: boolean }> {
+  payload: {
+    plan: 'free' | 'pro';
+    proDuration?: 'unlimited' | '1m' | '3m' | '12m' | 'custom';
+    proExpiresAt?: string;
+  }
+): Promise<{
+  userId: string;
+  plan: 'free' | 'pro';
+  subscriptionPlanStored?: 'free' | 'pro';
+  subscriptionProExpiresAt?: string | null;
+  mailSent?: boolean | null;
+}> {
   const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/subscription`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify(payload),
   });
   if (response.status === 403) throw new Error('FORBIDDEN');
   if (response.status === 404) throw new Error('NOT_FOUND');
+  if (response.status === 400) throw new Error('UPDATE_SUBSCRIPTION_INVALID');
   if (!response.ok) throw new Error('UPDATE_SUBSCRIPTION_FAILED');
-  return response.json() as Promise<{ userId: string; plan: 'free' | 'pro'; mailSent?: boolean }>;
+  return response.json() as Promise<{
+    userId: string;
+    plan: 'free' | 'pro';
+    subscriptionPlanStored?: 'free' | 'pro';
+    subscriptionProExpiresAt?: string | null;
+    mailSent?: boolean | null;
+  }>;
 }
 
 export async function deleteAdminUser(userId: string): Promise<DeleteAdminUserResult> {
@@ -59,7 +76,7 @@ export async function deleteAdminUser(userId: string): Promise<DeleteAdminUserRe
 
 export async function approveAdminUserRegistration(
   userId: string
-): Promise<{ mailSent?: boolean; alreadyApproved?: boolean }> {
+): Promise<{ mailSent?: boolean | null; alreadyApproved?: boolean }> {
   const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/approve-registration`, {
     method: 'POST',
   });
@@ -67,5 +84,34 @@ export async function approveAdminUserRegistration(
   if (response.status === 404) throw new Error('NOT_FOUND');
   if (response.status === 400) throw new Error('EMAIL_NOT_VERIFIED');
   if (!response.ok) throw new Error('APPROVE_REGISTRATION_FAILED');
-  return response.json() as Promise<{ mailSent?: boolean; alreadyApproved?: boolean }>;
+  return response.json() as Promise<{ mailSent?: boolean | null; alreadyApproved?: boolean }>;
+}
+
+export async function resendAdminUserVerification(
+  userId: string
+): Promise<{ mailSent: boolean; verifyUrl: string | null; alreadyVerified?: boolean }> {
+  const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/resend-verification`, {
+    method: 'POST',
+  });
+  if (response.status === 403) throw new Error('FORBIDDEN');
+  if (response.status === 404) throw new Error('NOT_FOUND');
+  if (response.status === 503) throw new Error('MAIL_NOT_CONFIGURED');
+  if (!response.ok) throw new Error('RESEND_VERIFICATION_FAILED');
+  return response.json() as Promise<{
+    mailSent: boolean;
+    verifyUrl: string | null;
+    alreadyVerified?: boolean;
+  }>;
+}
+
+export async function verifyAdminUserEmail(
+  userId: string
+): Promise<{ alreadyVerified?: boolean }> {
+  const response = await adminFetch(`/admin/users/${encodeURIComponent(userId)}/verify-email`, {
+    method: 'POST',
+  });
+  if (response.status === 403) throw new Error('FORBIDDEN');
+  if (response.status === 404) throw new Error('NOT_FOUND');
+  if (!response.ok) throw new Error('VERIFY_EMAIL_FAILED');
+  return response.json() as Promise<{ alreadyVerified?: boolean }>;
 }

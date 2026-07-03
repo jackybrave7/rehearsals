@@ -8,6 +8,7 @@ export interface AuthUser {
   name: string;
   hasPassword?: boolean;
   subscriptionPlan?: SubscriptionPlan;
+  subscriptionProExpiresAt?: string | null;
 }
 
 export interface TheaterAccessInfo {

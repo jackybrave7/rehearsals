@@ -9,7 +9,8 @@ import { fetchAdminUsers } from '../api/adminUsers';
 import type { AdminUserSummary } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
-import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
+import { formatAdminSubscriptionLabel } from '../utils/subscription';
+import { verifyAdminUserEmail } from '../api/adminUsers';
 
 function authLabel(user: AdminUserSummary): string {
   const methods: string[] = [];
@@ -29,11 +30,20 @@ function registrationStatusClass(status: AdminUserSummary['registrationStatus'])
   return 'bg-emerald-500/15 text-emerald-200';
 }
 
+function emailVerifiedLabel(verified: boolean): string {
+  return verified ? 'Подтверждён' : 'Не подтверждён';
+}
+
+function emailVerifiedClass(verified: boolean): string {
+  return verified ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200';
+}
+
 export function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [verifyingUserId, setVerifyingUserId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +75,20 @@ export function AdminUsersPage() {
         user.name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle)
     );
   }, [query, users]);
+
+  const handleVerifyEmail = async (user: AdminUserSummary) => {
+    if (user.emailVerified || verifyingUserId) return;
+    setVerifyingUserId(user.id);
+    setError(null);
+    try {
+      await verifyAdminUserEmail(user.id);
+      await load();
+    } catch {
+      setError('Не удалось подтвердить email');
+    } finally {
+      setVerifyingUserId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -123,6 +147,7 @@ export function AdminUsersPage() {
             <thead>
               <tr className="border-b border-gold/10 text-muted">
                 <th className="px-4 py-3 font-medium">Пользователь</th>
+                <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Регистрация</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
                 <th className="px-4 py-3 font-medium">Вход</th>
@@ -145,6 +170,25 @@ export function AdminUsersPage() {
                       </p>
                     ) : null}
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-start gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${emailVerifiedClass(user.emailVerified)}`}
+                      >
+                        {emailVerifiedLabel(user.emailVerified)}
+                      </span>
+                      {!user.emailVerified ? (
+                        <button
+                          type="button"
+                          disabled={verifyingUserId === user.id}
+                          onClick={() => void handleVerifyEmail(user)}
+                          className="text-xs text-gold hover:underline disabled:opacity-60"
+                        >
+                          {verifyingUserId === user.id ? 'Подтверждение…' : 'Подтвердить'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-muted">
                     {format(parseISO(user.createdAt), 'd MMM yyyy', { locale: ru })}
                   </td>
@@ -164,7 +208,10 @@ export function AdminUsersPage() {
                           : 'bg-white/5 text-muted'
                       }`}
                     >
-                      {SUBSCRIPTION_PLAN_LABELS[user.subscriptionPlan]}
+                      {formatAdminSubscriptionLabel(user.subscriptionPlan, {
+                        storedPlan: user.subscriptionPlanStored,
+                        expiresAt: user.subscriptionProExpiresAt,
+                      })}
                     </span>
                   </td>
                   <td className="px-4 py-3">

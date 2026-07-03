@@ -2,7 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { assignOrphanTheaters } from './auth.js';
 import { getDb } from './db.js';
 import { isEmailVerified } from './emailVerification.js';
-import { sendRegistrationApprovedEmail } from './mail.js';
+import { isMailConfigured, sendRegistrationApprovedEmail } from './mail.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import {
   approveUserRegistration,
@@ -59,19 +59,25 @@ export function registerAdminPlatformSettingsRoutes(app: Express): void {
       return;
     }
     if (row.registration_approved_at) {
-      res.json({ ok: true, alreadyApproved: true, mailSent: false });
+      res.json({ ok: true, alreadyApproved: true, mailSent: null });
       return;
     }
 
     approveUserRegistration(db, userId);
     assignOrphanTheaters(db, userId);
 
-    let mailSent = false;
-    try {
-      await sendRegistrationApprovedEmail(row.email, row.name);
-      mailSent = true;
-    } catch (error) {
-      console.error('[admin] registration approved mail failed', error);
+    let mailSent: boolean | null = null;
+    if (!isMailConfigured()) {
+      console.error('[admin] registration approved mail skipped: SMTP not configured');
+      mailSent = false;
+    } else {
+      try {
+        await sendRegistrationApprovedEmail(row.email, row.name);
+        mailSent = true;
+      } catch (error) {
+        console.error('[admin] registration approved mail failed', error);
+        mailSent = false;
+      }
     }
 
     console.info(`[admin] approved registration ${row.email} by ${session.user.email}`);

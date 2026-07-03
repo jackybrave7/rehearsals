@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
 import { enrichSessionPayload } from './platformAdmin.js';
-import { getUserSubscriptionPlan } from './subscription.js';
+import { getUserSubscriptionPlan, getUserSubscriptionProExpiresAt } from './subscription.js';
 import { isMailConfigured, sendEmailVerificationEmail, sendEmailConfirmedEmail, sendPasswordResetEmail } from './mail.js';
 import {
   createEmailVerificationToken,
@@ -65,6 +65,7 @@ function toAuthUser(
     name: row.name,
     hasPassword: Boolean(row.password_hash),
     subscriptionPlan: getUserSubscriptionPlan(db, row.id, row.email),
+    subscriptionProExpiresAt: getUserSubscriptionProExpiresAt(db, row.id, row.email),
   };
 }
 

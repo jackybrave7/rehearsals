@@ -11,6 +11,7 @@ import { registerAdminRoutes } from './adminStats.js';
 import { registerAdminDeleteUserRoutes } from './adminDeleteUser.js';
 import { registerAdminSubscriptionRoutes } from './adminSubscription.js';
 import { registerAdminPlatformSettingsRoutes } from './adminPlatformSettings.js';
+import { registerAdminEmailVerificationRoutes } from './adminEmailVerification.js';
 import type { AppState } from '../src/types/index.js';
 import { registerTelegramRoutes } from './telegramRoutes.js';
 import {
@@ -41,6 +42,7 @@ registerAdminRoutes(app);
 registerAdminDeleteUserRoutes(app);
 registerAdminSubscriptionRoutes(app);
 registerAdminPlatformSettingsRoutes(app);
+registerAdminEmailVerificationRoutes(app);
 registerTelegramRoutes(app);
 
 app.get('/api/health', (_req, res) => {

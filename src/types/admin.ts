@@ -70,7 +70,10 @@ export interface AdminUserSummary {
   authMethods: { password: boolean; google: boolean };
   activeSessions: number;
   subscriptionPlan: 'free' | 'pro';
+  subscriptionPlanStored: 'free' | 'pro';
+  subscriptionProExpiresAt: string | null;
   emailVerified: boolean;
+  emailVerifiedAt: string | null;
   registrationApproved: boolean;
   registrationStatus: 'approved' | 'pending_approval' | 'pending_email';
   theaterCount: number;

@@ -48,6 +48,20 @@ API_PORT=3001
 
 По желанию: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
+**Почта (обязательно для регистрации и уведомлений):** в `/var/www/rehearsals/.env` на сервере:
+
+```env
+SMTP_HOST=smtp.timeweb.ru
+SMTP_PORT=465
+SMTP_SECURE=1
+SMTP_USER=support@rehears.ru
+SMTP_PASS=пароль-от-ящика
+SMTP_FROM=support@rehears.ru
+APP_URL=https://rehears.ru
+```
+
+После правки: `docker restart rehearsals-api`. Проверка: `curl -s https://rehears.ru/api/auth/config` — должно быть `"mailConfigured":true`.
+
 **Google Docs (опционально):** `VITE_GOOGLE_CLIENT_ID` — только для синхронизации текста из Google Docs, не для входа в аккаунт. Подставляется **на этапе сборки**. Задайте в `.env` **до** `npm run build`.
 
 ## 4. Сборка и первый запуск API
