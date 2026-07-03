@@ -105,6 +105,9 @@ function loadGsiScript(): Promise<void> {
 
 function getAuthErrorMessage(raw: string): string {
   const lower = raw.toLowerCase();
+  if (lower.includes('disabled_client') || lower.includes('oauth client was disabled')) {
+    return 'OAuth-клиент отключён в Google Cloud. Включите клиент в Credentials или укажите актуальный VITE_GOOGLE_CLIENT_ID на сервере и пересоберите сайт (npm run build).';
+  }
   if (lower.includes('invalid_client') || lower.includes('oauth client was not found')) {
     return 'OAuth Client ID не найден в Google Cloud. Создайте клиент типа «Web application», добавьте origin этой страницы в Authorized JavaScript origins и укажите новый ID в .env (VITE_GOOGLE_CLIENT_ID). После изменения .env перезапустите npm run dev.';
   }

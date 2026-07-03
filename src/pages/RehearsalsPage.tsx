@@ -11,9 +11,10 @@ import {
   formatPerformanceLabel,
   getPlayRoles,
   getTheaterPlays,
-  getTheaterRehearsals,
+  getPlayRehearsals,
   getTheaterTasks,
   getTheaterVenues,
+  getActivePlay,
 } from '../store/selectors';
 import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
@@ -61,18 +62,19 @@ export function RehearsalsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyRehearsal(format(new Date(), 'yyyy-MM-dd')));
   const theaterPlays = getTheaterPlays(state);
-  const theaterRehearsals = getTheaterRehearsals(state);
+  const activePlay = getActivePlay(state);
+  const visibleRehearsals = getPlayRehearsals(state, state.activePlayId);
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
   const activeActors = getActiveActors(state);
 
   const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
   const dayRehearsals = selectedDateStr
-    ? theaterRehearsals.filter((r) => r.date === selectedDateStr)
+    ? visibleRehearsals.filter((r) => r.date === selectedDateStr)
     : [];
   const upcomingRehearsals = useMemo(
-    () => getUpcomingRehearsals(theaterRehearsals, 5),
-    [theaterRehearsals]
+    () => getUpcomingRehearsals(visibleRehearsals, 5),
+    [visibleRehearsals]
   );
 
   const rehearsalScenes = getPlayScenes(state, form.playId ?? state.activePlayId);
@@ -137,7 +139,11 @@ export function RehearsalsPage() {
       <header className={pageHeaderClass}>
         <div>
           <h1 className={pageTitleClass}>Репетиции</h1>
-          <p className="mt-1 text-muted">Календарь и расписание</p>
+          <p className="mt-1 text-muted">
+            {activePlay && theaterPlays.length > 1
+              ? `«${activePlay.title}» — календарь и расписание`
+              : 'Календарь и расписание'}
+          </p>
         </div>
         {!readOnly && (
           <Button onClick={openCreate}>
@@ -152,7 +158,7 @@ export function RehearsalsPage() {
           <Calendar
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
-            rehearsals={theaterRehearsals}
+            rehearsals={visibleRehearsals}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
           />

@@ -161,6 +161,15 @@ if [ -f .env ]; then
     echo "[deploy] WARNING: SMTP_HOST not set in .env — registration email and password reset will fail."
     echo "[deploy] Add SMTP_* vars on the server (see .env.example), then: docker restart rehearsals-api"
   fi
+  google_client_count=$(grep -c '^VITE_GOOGLE_CLIENT_ID=' .env 2>/dev/null || echo 0)
+  google_client_value=$(grep '^VITE_GOOGLE_CLIENT_ID=' .env | tail -1 | cut -d= -f2-)
+  if [ "$google_client_count" -gt 1 ]; then
+    echo "[deploy] WARNING: duplicate VITE_GOOGLE_CLIENT_ID lines in .env — keep only one."
+  fi
+  if [ -z "$google_client_value" ]; then
+    echo "[deploy] WARNING: VITE_GOOGLE_CLIENT_ID is empty — Google Docs sign-in will fail on production."
+    echo "[deploy] Set it in .env before npm run build."
+  fi
 else
   echo "[deploy] WARNING: .env missing. Copy from .env.example before build."
 fi

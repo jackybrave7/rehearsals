@@ -231,7 +231,10 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
       if (error instanceof GoogleDocsClientError && error.code === 'AUTH_EXPIRED') {
         auth.signOut();
       }
-      setSyncError(resolveGoogleDocsSyncError(error));
+      const message = resolveGoogleDocsSyncError(error);
+      if (!options?.silent || message) {
+        setSyncError(message);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -336,13 +339,21 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
               Подключаем Google…
             </span>
           ) : !auth.accessToken ? (
-            <Button variant="secondary" onClick={() => auth.signIn()} disabled={auth.isRequesting}>
+            <Button
+              variant={scenes.length === 0 ? 'primary' : 'secondary'}
+              onClick={() => void auth.signIn()}
+              disabled={auth.isRequesting}
+            >
               {auth.isRequesting ? <Loader2 size={16} className="animate-spin" /> : null}
               Войти в Google
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={() => void handleSync()} disabled={isSyncing}>
+              <Button
+                variant={scenes.length === 0 ? 'primary' : 'secondary'}
+                onClick={() => void handleSync()}
+                disabled={isSyncing}
+              >
                 {isSyncing ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (

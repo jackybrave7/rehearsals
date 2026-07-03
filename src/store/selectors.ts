@@ -31,6 +31,13 @@ export function getTheaterRehearsals(state: AppState) {
   return state.rehearsals.filter((rehearsal) => rehearsal.theaterId === state.activeTheaterId);
 }
 
+/** Репетиции выбранной постановки; без playId — все репетиции театра. */
+export function getPlayRehearsals(state: AppState, playId?: string | null) {
+  const theaterRehearsals = getTheaterRehearsals(state);
+  if (!playId) return theaterRehearsals;
+  return theaterRehearsals.filter((rehearsal) => rehearsal.playId === playId);
+}
+
 export function getRehearsalTemplates(
   state: AppState,
   theaterId: string | null | undefined = state.activeTheaterId

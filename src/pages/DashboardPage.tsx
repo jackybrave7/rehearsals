@@ -9,7 +9,7 @@ import {
   getActiveActors,
   getArchivedActors,
   getTheaterPlays,
-  getTheaterRehearsals,
+  getPlayRehearsals,
   getTheaterTasks,
   getTheaterVenues,
 } from '../store/selectors';
@@ -30,7 +30,7 @@ export function DashboardPage() {
   const activePlay = getActivePlay(state);
   const activeScenes = getPlayScenes(state, state.activePlayId);
   const theaterPlays = getTheaterPlays(state);
-  const theaterRehearsals = getTheaterRehearsals(state);
+  const theaterRehearsals = getPlayRehearsals(state, state.activePlayId);
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
   const today = startOfDay(new Date());

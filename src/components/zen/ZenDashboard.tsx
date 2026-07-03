@@ -8,7 +8,7 @@ import {
   getActivePlay,
   getPlayScenes,
   getTheaterPlays,
-  getTheaterRehearsals,
+  getPlayRehearsals,
   getTheaterTasks,
   getTheaterVenues,
   getShowRehearsalWarnings,
@@ -30,7 +30,7 @@ export function ZenDashboard() {
   const [moreOpen, setMoreOpen] = useState(false);
   const activePlay = getActivePlay(state);
   const activeScenes = getPlayScenes(state, state.activePlayId);
-  const theaterRehearsals = getTheaterRehearsals(state);
+  const theaterRehearsals = getPlayRehearsals(state, state.activePlayId);
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
   const theaterPlays = getTheaterPlays(state);
