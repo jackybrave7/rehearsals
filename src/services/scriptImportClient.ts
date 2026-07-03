@@ -1,4 +1,4 @@
-import type { Scene } from '../types';
+import type { PlayRole, Scene } from '../types';
 import type { DocTextAnchor, SceneAnchorMatch } from '../utils/googleDocs';
 import { API_BASE } from '../api/apiBase';
 
@@ -15,12 +15,15 @@ export class ScriptImportClientError extends Error {
 
 export async function parseScriptImport(
   fileId: string,
-  scenes: Scene[]
+  scenes: Scene[],
+  playRoles: PlayRole[] = []
 ): Promise<{
   matches: SceneAnchorMatch[];
   anchorCount: number;
   anchors: DocTextAnchor[];
   characterCounts: Record<string, number>;
+  descriptions?: Record<string, string>;
+  roleIds?: Record<string, string[]>;
 }> {
   let response: Response;
   try {
@@ -36,6 +39,15 @@ export async function parseScriptImport(
           number: scene.number,
           title: scene.title,
         })),
+        playRoles: playRoles
+          .filter((role) => role.kind === 'character')
+          .map((role) => ({
+            id: role.id,
+            playId: role.playId,
+            name: role.name,
+            kind: role.kind,
+            description: role.description,
+          })),
       }),
     });
   } catch {
@@ -51,6 +63,8 @@ export async function parseScriptImport(
     matches?: SceneAnchorMatch[];
     anchorCount?: number;
     anchors?: DocTextAnchor[];
+    descriptions?: Record<string, string>;
+    roleIds?: Record<string, string[]>;
     characterCounts?: Record<string, number>;
   } | null;
 
@@ -63,6 +77,8 @@ export async function parseScriptImport(
     anchorCount: body?.anchorCount ?? 0,
     anchors: body?.anchors ?? [],
     characterCounts: body?.characterCounts ?? {},
+    descriptions: body?.descriptions ?? {},
+    roleIds: body?.roleIds ?? {},
   };
 }
 

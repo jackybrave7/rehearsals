@@ -22,7 +22,7 @@ import { SceneRoleChip } from '../components/SceneRoleChip';
 import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
 import { ScriptImportPanel } from '../components/ScriptImportPanel';
-import { SceneScriptLink } from '../components/SceneScriptLink';
+import { SceneScriptLink, ActScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { PremiereBanner } from '../components/PremiereBanner';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
@@ -489,9 +489,12 @@ export function ScenesPage() {
               key={group}
               className="rounded-2xl border border-gold/10 bg-surface/40"
             >
-              <div className="border-b border-gold/10 bg-background/30 px-5 py-3">
-                <h2 className="text-sm font-semibold text-gold-light">{group}</h2>
-                <p className="text-xs text-muted">{groupScenes.length} сцен</p>
+              <div className="flex items-start justify-between gap-3 border-b border-gold/10 bg-background/30 px-5 py-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gold-light">{group}</h2>
+                  <p className="text-xs text-muted">{groupScenes.length} сцен</p>
+                </div>
+                <ActScriptLink play={activePlay} actGroup={group} compact />
               </div>
               <div className="divide-y divide-gold/5">
                 {groupScenes.map((scene) => {

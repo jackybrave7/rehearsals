@@ -1,12 +1,15 @@
 import {
-  countSceneCharactersFromGoogleDoc,
   extractDocTextAnchors,
+  extractSceneBodyTextsFromGoogleDoc,
   matchScenesToDocAnchors,
   parseGoogleDocumentId,
+  type DocTextAnchor,
   type SceneAnchorMatch,
   type GoogleDocsDocument,
 } from '../utils/googleDocs';
-import type { Scene } from '../types';
+import { buildSceneDescriptionsFromTexts } from '../utils/sceneDescription';
+import { buildSceneRoleIdsFromTexts } from '../utils/sceneRoleAssignment';
+import type { PlayRole, Scene } from '../types';
 
 export class GoogleDocsClientError extends Error {
   code: string;
@@ -55,6 +58,20 @@ export async function fetchGoogleDocument(
   return response.json();
 }
 
+export async function fetchGoogleDocAnchors(
+  documentUrl: string,
+  accessToken: string
+): Promise<{ anchors: DocTextAnchor[]; anchorCount: number }> {
+  const documentId = parseGoogleDocumentId(documentUrl);
+  if (!documentId) {
+    throw new GoogleDocsClientError('INVALID_URL');
+  }
+
+  const document = await fetchGoogleDocument(documentId, accessToken);
+  const anchors = extractDocTextAnchors(document);
+  return { anchors, anchorCount: anchors.length };
+}
+
 export async function syncSceneAnchorsFromGoogleDoc(
   documentUrl: string,
   scenes: Scene[],
@@ -62,6 +79,7 @@ export async function syncSceneAnchorsFromGoogleDoc(
 ): Promise<{
   matches: SceneAnchorMatch[];
   anchorCount: number;
+  anchors: DocTextAnchor[];
 }> {
   const documentId = parseGoogleDocumentId(documentUrl);
   if (!documentId) {
@@ -72,7 +90,7 @@ export async function syncSceneAnchorsFromGoogleDoc(
   const docAnchors = extractDocTextAnchors(document);
   const matches = matchScenesToDocAnchors(scenes, docAnchors);
 
-  return { matches, anchorCount: docAnchors.length };
+  return { matches, anchorCount: docAnchors.length, anchors: docAnchors };
 }
 
 export async function syncSceneCharacterCountsFromGoogleDoc(
@@ -80,13 +98,42 @@ export async function syncSceneCharacterCountsFromGoogleDoc(
   scenes: Scene[],
   accessToken: string
 ): Promise<Map<string, number>> {
+  const insights = await loadGoogleDocumentSceneInsights(documentUrl, scenes, accessToken);
+  return insights.characterCounts;
+}
+
+export async function loadGoogleDocumentSceneInsights(
+  documentUrl: string,
+  scenes: Scene[],
+  accessToken: string,
+  playRoles: PlayRole[] = [],
+  playId?: string
+): Promise<{
+  characterCounts: Map<string, number>;
+  descriptions: Map<string, string>;
+  roleIds: Map<string, string[]>;
+}> {
   const documentId = parseGoogleDocumentId(documentUrl);
   if (!documentId) {
     throw new GoogleDocsClientError('INVALID_URL');
   }
 
   const document = await fetchGoogleDocument(documentId, accessToken);
-  return countSceneCharactersFromGoogleDoc(document, scenes);
+  const bodyTexts = extractSceneBodyTextsFromGoogleDoc(document, scenes);
+  const characterCounts = new Map<string, number>();
+  for (const [sceneId, text] of bodyTexts) {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length > 0) characterCounts.set(sceneId, normalized.length);
+  }
+  const resolvedPlayId = playId ?? scenes[0]?.playId;
+  return {
+    characterCounts,
+    descriptions: buildSceneDescriptionsFromTexts(bodyTexts),
+    roleIds:
+      resolvedPlayId && playRoles.length > 0
+        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, resolvedPlayId)
+        : new Map(),
+  };
 }
 
 export function resolveGoogleDocsSyncError(error: unknown): string {

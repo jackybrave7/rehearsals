@@ -239,8 +239,8 @@ export function insertStateEntities(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
       google_docs_links_synced_at, script_import_synced_at, script_file_name, script_file_data_url, script_file_url,
-      script_file_mime_type, script_file_size, archived_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      script_file_mime_type, script_file_size, archived_at, act_script_anchors
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
     const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
@@ -260,7 +260,8 @@ export function insertStateEntities(
       play.scriptFileUrl ?? null,
       play.scriptFileMimeType ?? null,
       play.scriptFileSize ?? null,
-      play.archivedAt ?? null
+      play.archivedAt ?? null,
+      play.actScriptAnchors ? JSON.stringify(play.actScriptAnchors) : null
     );
   }
 
@@ -339,8 +340,8 @@ export function insertStateEntities(
   const insertScene = db.prepare(
     `INSERT INTO scenes (
       id, play_id, number, title, description, director_notes, estimated_minutes, status,
-      priority, role_ids, script_anchor, script_character_count, script_character_count_synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      priority, role_ids, act_group, script_anchor, script_character_count, script_character_count_synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const scene of state.scenes) {
     insertScene.run(
@@ -354,6 +355,7 @@ export function insertStateEntities(
       scene.status,
       scene.priority ?? null,
       JSON.stringify(scene.roleIds ?? []),
+      scene.actGroup ?? null,
       scene.scriptAnchor ? JSON.stringify(scene.scriptAnchor) : null,
       scene.scriptCharacterCount ?? null,
       scene.scriptCharacterCountSyncedAt ?? null
@@ -601,6 +603,9 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       scriptFileMimeType: (row.script_file_mime_type as string | null) ?? undefined,
       scriptFileSize: (row.script_file_size as number | null) ?? undefined,
       archivedAt: (row.archived_at as string | null) ?? undefined,
+      actScriptAnchors: parseOptionalJson<Play['actScriptAnchors']>(
+        row.act_script_anchors as string | null
+      ),
     })
   );
 
@@ -718,6 +723,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       status: row.status as Scene['status'],
       priority: (row.priority as Scene['priority'] | null) ?? undefined,
       roleIds: parseJson<string[]>(row.role_ids as string, []),
+      actGroup: (row.act_group as string | null) ?? undefined,
       scriptAnchor: parseOptionalJson<Scene['scriptAnchor']>(row.script_anchor as string),
       scriptCharacterCount: (row.script_character_count as number | null) ?? undefined,
       scriptCharacterCountSyncedAt:

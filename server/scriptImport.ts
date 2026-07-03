@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import mammoth from 'mammoth';
-import type { Scene } from '../src/types/index.js';
+import type { PlayRole, Scene } from '../src/types/index.js';
 import {
   extractSectionsFromPlainText,
   isSupportedScriptImportFile,
   stripHtmlTags,
   syncScenesFromScriptText,
 } from '../src/utils/scriptDocument.js';
+import { buildSceneRoleIdsFromTexts } from '../src/utils/sceneRoleAssignment.js';
+import { extractSceneBodyTextsFromPlainText } from '../src/utils/sceneDescription.js';
 import type { DocTextAnchor } from '../src/utils/googleDocs.js';
 import { getDb } from './db.js';
 import { getFileRecord, getFileStoragePath } from './fileStorage.js';
@@ -68,6 +70,7 @@ export async function handleParseScriptImport(req: Request, res: Response): Prom
 
   const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
   const scenes = Array.isArray(req.body?.scenes) ? (req.body.scenes as Scene[]) : null;
+  const playRoles = Array.isArray(req.body?.playRoles) ? (req.body.playRoles as PlayRole[]) : [];
 
   if (!fileId || !scenes) {
     res.status(400).json({ error: 'INVALID_BODY' });
@@ -93,13 +96,27 @@ export async function handleParseScriptImport(req: Request, res: Response): Prom
       record.originalName,
       record.mimeType
     );
-    const { matches, characterCounts } = syncScenesFromScriptText(text, anchors, scenes);
+    const { matches, characterCounts, descriptions } = syncScenesFromScriptText(text, anchors, scenes);
+    const playId = scenes[0]?.playId;
+    const scenesWithAnchors = scenes.map((scene) => {
+      const match = matches.find((item) => item.sceneId === scene.id);
+      return match ? { ...scene, scriptAnchor: match.anchor } : scene;
+    });
+    const bodyTexts = extractSceneBodyTextsFromPlainText(text, anchors, scenesWithAnchors);
+    const roleIds =
+      playId && playRoles.length > 0
+        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, playId)
+        : new Map<string, string[]>();
 
     res.json({
       anchorCount: anchors.length,
       anchors,
       matches,
       characterCounts: Object.fromEntries(characterCounts.entries()),
+      descriptions: Object.fromEntries(descriptions.entries()),
+      roleIds: Object.fromEntries(
+        [...roleIds.entries()].map(([sceneId, ids]) => [sceneId, ids])
+      ),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PARSE_FAILED';

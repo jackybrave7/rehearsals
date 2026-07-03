@@ -1,10 +1,14 @@
 import type { Scene } from '../types';
 import {
   type DocTextAnchor,
-  isSceneLikeHeading,
+  isImportableSceneHeading,
   matchScenesToDocAnchors,
   type SceneAnchorMatch,
 } from './googleDocs';
+import {
+  buildSceneDescriptionsFromTexts,
+  extractSceneBodyTextsFromPlainText,
+} from './sceneDescription';
 
 const MARKDOWN_HEADING = /^#{1,6}\s+/;
 
@@ -33,7 +37,7 @@ function isHeadingLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
   const withoutHash = trimmed.replace(MARKDOWN_HEADING, '');
-  return isSceneLikeHeading(withoutHash) || isSceneLikeHeading(trimmed);
+  return isImportableSceneHeading(withoutHash) || isImportableSceneHeading(trimmed);
 }
 
 function normalizeHeadingText(line: string): string {
@@ -122,14 +126,20 @@ export function syncScenesFromScriptText(
   fullText: string,
   anchors: DocTextAnchor[],
   scenes: Scene[]
-): { matches: SceneAnchorMatch[]; characterCounts: Map<string, number> } {
+): {
+  matches: SceneAnchorMatch[];
+  characterCounts: Map<string, number>;
+  descriptions: Map<string, string>;
+} {
   const matches = matchScenesToDocAnchors(scenes, anchors);
   const scenesWithAnchors = scenes.map((scene) => {
     const match = matches.find((item) => item.sceneId === scene.id);
     return match ? { ...scene, scriptAnchor: match.anchor } : scene;
   });
+  const bodyTexts = extractSceneBodyTextsFromPlainText(fullText, anchors, scenesWithAnchors);
   const characterCounts = countSceneCharactersFromPlainText(fullText, anchors, scenesWithAnchors);
-  return { matches, characterCounts };
+  const descriptions = buildSceneDescriptionsFromTexts(bodyTexts);
+  return { matches, characterCounts, descriptions };
 }
 
 export function stripHtmlTags(value: string): string {

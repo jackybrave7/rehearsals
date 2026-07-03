@@ -42,6 +42,7 @@ import {
 import { ACTOR_PHOTOS, enrichActorPhotos } from '../utils/actorPhotos';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
+import { scenesNumbersChanged, normalizeAllSceneNumbers, renumberPlayScenesAfterDelete } from '../utils/sceneNumbering';
 import { estimateRehearsalMinutes, resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
 import {
@@ -130,8 +131,12 @@ function ensureTheaterScope(state: AppState): AppState {
 
 function bootstrapAppState(data: AppState): AppState {
   const migrated = runOneTimeMigrations(migrateState(data));
-  syncStoneHeartMigrationKeys(migrated);
-  return migrated;
+  const normalizedScenes = normalizeAllSceneNumbers(migrated.scenes);
+  const withNormalizedScenes = scenesNumbersChanged(migrated.scenes, normalizedScenes)
+    ? { ...migrated, scenes: normalizedScenes }
+    : migrated;
+  syncStoneHeartMigrationKeys(withNormalizedScenes);
+  return withNormalizedScenes;
 }
 
 function mirrorLocalStorage(state: AppState): void {
@@ -193,7 +198,8 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
     const bootstrapped = bootstrapAppState(best);
     const source =
       best === remote ? 'SQLite' : best === local ? 'браузера' : 'резервной копии';
-    const shouldPushToServer = best !== remote;
+    const shouldPushToServer =
+      best !== remote || scenesNumbersChanged(best.scenes, bootstrapped.scenes);
 
     if (remote && best !== remote && scoreAppState(best) > scoreAppState(remote)) {
       console.info(`[rehearsals] В SQLite менее полные данные — восстановление из ${source}`);
@@ -688,7 +694,8 @@ type Action =
         playId: string;
         syncedAt: string;
         importSource?: 'google' | 'file';
-        updates: { sceneId: string; scriptAnchor?: Scene['scriptAnchor'] }[];
+        actScriptAnchors?: Play['actScriptAnchors'];
+        updates: { sceneId: string; scriptAnchor?: Scene['scriptAnchor']; actGroup?: string }[];
       };
     }
   | {
@@ -698,6 +705,22 @@ type Action =
         syncedAt: string;
         applyRehearsalMinutes: boolean;
         updates: { sceneId: string; characterCount: number }[];
+      };
+    }
+  | {
+      type: 'APPLY_SCENE_DESCRIPTIONS';
+      payload: {
+        playId: string;
+        updates: { sceneId: string; description: string }[];
+        onlyIfEmpty?: boolean;
+      };
+    }
+  | {
+      type: 'APPLY_SCENE_ROLE_IDS';
+      payload: {
+        playId: string;
+        updates: { sceneId: string; roleIds: string[] }[];
+        onlyIfEmpty?: boolean;
       };
     }
   | { type: 'DELETE_SCENE'; payload: string }
@@ -922,7 +945,7 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'APPLY_SCENE_SCRIPT_ANCHORS': {
       const updateMap = new Map(
-        action.payload.updates.map((update) => [update.sceneId, update.scriptAnchor])
+        action.payload.updates.map((update) => [update.sceneId, update])
       );
       return {
         ...state,
@@ -933,13 +956,21 @@ function reducer(state: AppState, action: Action): AppState {
                 ...(action.payload.importSource === 'file'
                   ? { scriptImportSyncedAt: action.payload.syncedAt }
                   : { googleDocsLinksSyncedAt: action.payload.syncedAt }),
+                ...(action.payload.actScriptAnchors !== undefined
+                  ? { actScriptAnchors: action.payload.actScriptAnchors }
+                  : {}),
               }
             : play
         ),
         scenes: state.scenes.map((scene) => {
           if (scene.playId !== action.payload.playId) return scene;
-          if (!updateMap.has(scene.id)) return scene;
-          return { ...scene, scriptAnchor: updateMap.get(scene.id) };
+          const update = updateMap.get(scene.id);
+          if (!update) return scene;
+          return {
+            ...scene,
+            ...(update.scriptAnchor !== undefined ? { scriptAnchor: update.scriptAnchor } : {}),
+            ...(update.actGroup !== undefined ? { actGroup: update.actGroup } : {}),
+          };
         }),
       };
     }
@@ -967,10 +998,42 @@ function reducer(state: AppState, action: Action): AppState {
         }),
       };
     }
+    case 'APPLY_SCENE_DESCRIPTIONS': {
+      const updateMap = new Map(
+        action.payload.updates.map((update) => [update.sceneId, update.description])
+      );
+      const onlyIfEmpty = action.payload.onlyIfEmpty !== false;
+      return {
+        ...state,
+        scenes: state.scenes.map((scene) => {
+          if (scene.playId !== action.payload.playId) return scene;
+          const description = updateMap.get(scene.id);
+          if (!description) return scene;
+          if (onlyIfEmpty && scene.description?.trim()) return scene;
+          return { ...scene, description };
+        }),
+      };
+    }
+    case 'APPLY_SCENE_ROLE_IDS': {
+      const updateMap = new Map(
+        action.payload.updates.map((update) => [update.sceneId, update.roleIds])
+      );
+      const onlyIfEmpty = action.payload.onlyIfEmpty !== false;
+      return {
+        ...state,
+        scenes: state.scenes.map((scene) => {
+          if (scene.playId !== action.payload.playId) return scene;
+          const roleIds = updateMap.get(scene.id);
+          if (!roleIds) return scene;
+          if (onlyIfEmpty && (scene.roleIds?.length ?? 0) > 0) return scene;
+          return { ...scene, roleIds };
+        }),
+      };
+    }
     case 'DELETE_SCENE':
       return {
         ...state,
-        scenes: state.scenes.filter((s) => s.id !== action.payload),
+        scenes: renumberPlayScenesAfterDelete(state.scenes, action.payload),
       };
     case 'ADD_TASK':
       return {

@@ -102,6 +102,8 @@ export interface Play {
   scriptFileSize?: number;
   /** Архивная постановка — на Free только просмотр */
   archivedAt?: string;
+  /** Якоря заголовков актов/действий в тексте (ключ — подпись группы, напр. «Действие первое») */
+  actScriptAnchors?: Record<string, SceneScriptAnchor>;
 }
 
 export type SceneStatus = 'not_started' | 'in_progress' | 'ready';
@@ -128,6 +130,8 @@ export interface Scene {
   priority?: ScenePriority;
   /** Роли персонажей, участвующих в сцене */
   roleIds?: string[];
+  /** Группа для списка сцен: «Акт 1», «Действие второе» (из структуры документа) */
+  actGroup?: string;
   /** Якорь для быстрого открытия фрагмента текста в Google Docs */
   scriptAnchor?: SceneScriptAnchor;
   /** Знаков текста сцены из Google Docs (после синхронизации) */

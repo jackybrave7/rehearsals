@@ -89,6 +89,39 @@ export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): str
   return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
 }
 
+export function mapActAnchorsFromDocument(
+  anchors: DocTextAnchor[]
+): Record<string, SceneScriptAnchor> {
+  const result: Record<string, SceneScriptAnchor> = {};
+  for (const anchor of anchors) {
+    if (!isStructuralActHeading(anchor.text)) continue;
+    const label = resolveActGroupLabel(anchor.text);
+    if (!label) continue;
+    result[label] = { type: anchor.type, id: anchor.id };
+  }
+  return result;
+}
+
+export function resolveActScriptUrl(play: Play | undefined, actGroup: string): string | null {
+  if (!play || actGroup === 'Сцены') return null;
+
+  const anchor = play.actScriptAnchors?.[actGroup];
+  const scriptUrl = resolvePlayScriptUrl(play);
+  const documentId =
+    play.googleDocumentId ??
+    (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
+
+  if (anchor && documentId && !anchor.id.startsWith('file-')) {
+    return buildGoogleDocsAnchorUrl(documentId, anchor);
+  }
+
+  if (scriptUrl) return scriptUrl;
+
+  if (!documentId) return null;
+
+  return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
+}
+
 function normalizeTitle(value: string): string {
   return value
     .toLowerCase()
@@ -134,6 +167,86 @@ export function isSceneLikeHeading(text: string): boolean {
     /^(?:акт\s+\d+|сцена\s+\d+|акт\s+\d+(?:,\s*\d+\s*часть)?,\s*сц\.?\s*\d+)/i.test(trimmed) ||
     /^сц\.?\s*\d+/i.test(trimmed)
   );
+}
+
+/** Заголовки уровня акта/действия — не отдельные сцены для репетиций. */
+export function isStructuralActHeading(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/сц\.?\s*\d+/i.test(trimmed) || /^сцена\s+\d+/i.test(trimmed)) return false;
+
+  return /^(?:акт|действие)\s+(?:\d+|[IVXLC]+|первое|второе|третье|четв[её]ртое|пятое|шестое|седьмое|восьмое|девятое|десятое)\s*$/i.test(
+    trimmed
+  );
+}
+
+/** Заголовок, из которого можно создать сцену при импорте. */
+export function isImportableSceneHeading(text: string): boolean {
+  if (isStructuralActHeading(text)) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/^сцена\s+\d+/i.test(trimmed)) return true;
+  return isSceneLikeHeading(trimmed);
+}
+
+export function filterImportableSceneAnchors<T extends { text: string }>(anchors: T[]): T[] {
+  return anchors.filter((anchor) => isImportableSceneHeading(anchor.text));
+}
+
+export function resolveActGroupLabel(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (isStructuralActHeading(trimmed)) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  const actInTitle = trimmed.match(/^(Акт\s+\d+(?:,\s*\d+\s*часть)?)/i);
+  return actInTitle?.[1] ?? null;
+}
+
+export function mapActGroupsToMatchedScenes(
+  anchors: DocTextAnchor[],
+  matches: SceneAnchorMatch[]
+): Map<string, string | undefined> {
+  const sceneIdByAnchorKey = new Map(
+    matches.map((match) => [`${match.anchor.type}:${match.anchor.id}`, match.sceneId])
+  );
+  let currentAct: string | undefined;
+  const result = new Map<string, string | undefined>();
+
+  for (const anchor of anchors) {
+    if (isStructuralActHeading(anchor.text)) {
+      currentAct = resolveActGroupLabel(anchor.text) ?? currentAct;
+      continue;
+    }
+    const sceneId = sceneIdByAnchorKey.get(`${anchor.type}:${anchor.id}`);
+    if (!sceneId) continue;
+    const actFromTitle = resolveActGroupLabel(anchor.text);
+    result.set(sceneId, actFromTitle ?? currentAct);
+    if (actFromTitle) currentAct = actFromTitle;
+  }
+
+  return result;
+}
+
+export function listImportableScenesWithActGroups<T extends { text: string }>(
+  anchors: T[]
+): Array<{ anchor: T; actGroup?: string }> {
+  const result: Array<{ anchor: T; actGroup?: string }> = [];
+  let currentAct: string | undefined;
+
+  for (const anchor of anchors) {
+    if (isStructuralActHeading(anchor.text)) {
+      currentAct = resolveActGroupLabel(anchor.text) ?? currentAct;
+      continue;
+    }
+    if (!isImportableSceneHeading(anchor.text)) continue;
+    const actFromTitle = resolveActGroupLabel(anchor.text);
+    const actGroup = actFromTitle ?? currentAct;
+    result.push({ anchor, actGroup });
+    if (actFromTitle) currentAct = actFromTitle;
+  }
+
+  return result;
 }
 
 function scoreSceneHeadingMatch(sceneTitle: string, anchorText: string): number {
@@ -387,12 +500,12 @@ function extractPlainTextInRange(
   return parts.join('');
 }
 
-/** Подсчёт знаков текста сцены между заголовками в Google Docs. */
-export function countSceneCharactersFromGoogleDoc(
+/** Текст сцен между заголовками в Google Docs. */
+export function extractSceneBodyTextsFromGoogleDoc(
   document: GoogleDocsDocument,
   scenes: Scene[]
-): Map<string, number> {
-  const counts = new Map<string, number>();
+): Map<string, string> {
+  const texts = new Map<string, string>();
   const docEnd =
     document.body?.content?.[document.body.content.length - 1]?.endIndex ?? 0;
 
@@ -412,12 +525,22 @@ export function countSceneCharactersFromGoogleDoc(
       document.body?.content?.find((element) => element.startIndex === current.startIndex)
         ?.endIndex ?? current.startIndex;
     const nextStart = positioned[index + 1]?.startIndex ?? docEnd;
-    const text = extractPlainTextInRange(document, headingEnd, nextStart);
-    const normalized = text.replace(/\s+/g, ' ').trim();
-    if (normalized.length > 0) {
-      counts.set(current.sceneId, normalized.length);
-    }
+    const text = extractPlainTextInRange(document, headingEnd, nextStart).trim();
+    if (text) texts.set(current.sceneId, text);
   }
 
+  return texts;
+}
+
+/** Подсчёт знаков текста сцены между заголовками в Google Docs. */
+export function countSceneCharactersFromGoogleDoc(
+  document: GoogleDocsDocument,
+  scenes: Scene[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const [sceneId, text] of extractSceneBodyTextsFromGoogleDoc(document, scenes)) {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length > 0) counts.set(sceneId, normalized.length);
+  }
   return counts;
 }

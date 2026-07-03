@@ -3,7 +3,7 @@ import type { Scene, Play } from '../types';
 import { getSceneShortLabel, groupScenesByAct } from '../utils/sceneLabels';
 import { setPlanPoolDragData } from '../utils/schedulePlan';
 import { SceneStatusBadge } from './SceneStatusBadge';
-import { SceneScriptLink } from './SceneScriptLink';
+import { SceneScriptLink, ActScriptLink } from './SceneScriptLink';
 
 const priorityLabels = {
   high: 'Важно',
@@ -34,9 +34,12 @@ export function SceneListGrouped({ scenes, play, compact, draggable }: SceneList
     <div className="space-y-4">
       {groups.map(({ group, scenes: groupScenes }) => (
         <section key={group}>
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-gold/80">
-            {group}
-          </h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-gold/80">
+              {group}
+            </h3>
+            {play && <ActScriptLink play={play} actGroup={group} compact />}
+          </div>
           <ul className={compact ? 'space-y-1' : 'space-y-2'}>
             {groupScenes.map((scene) => (
               <li

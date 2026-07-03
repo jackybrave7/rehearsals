@@ -3,8 +3,10 @@ import { Link2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
-import { syncSceneAnchorsFromGoogleDoc, syncSceneCharacterCountsFromGoogleDoc, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
-import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc } from '../utils/googleDocs';
+import { syncSceneAnchorsFromGoogleDoc, fetchGoogleDocAnchors, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
+import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
+import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
+import { generateId } from '../utils/id';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { Button } from './Button';
 
@@ -52,29 +54,73 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
   const syncedAtLabel = formatSyncDate(play.googleDocsLinksSyncedAt);
   const likelyOfficeUpload = isLikelyUploadedOfficeDoc(play.documentUrl);
 
-  const applyCharacterCounts = async (scenesForCount: Scene[], token: string): Promise<number> => {
-    if (!play.documentUrl) return 0;
-    const counts = await syncSceneCharacterCountsFromGoogleDoc(
-      play.documentUrl,
-      scenesForCount,
-      token
-    );
-    if (counts.size === 0) return 0;
+  const characterRoles = useMemo(
+    () => state.playRoles.filter((role) => role.playId === play.id && role.kind === 'character'),
+    [play.id, state.playRoles]
+  );
 
-    const settings = resolveSceneTimingSettings(state.appMeta);
-    dispatch({
-      type: 'APPLY_SCENE_CHARACTER_COUNTS',
-      payload: {
-        playId: play.id,
-        syncedAt: new Date().toISOString(),
-        applyRehearsalMinutes: settings.autoFillRehearsalMinutes,
-        updates: [...counts.entries()].map(([sceneId, characterCount]) => ({
-          sceneId,
-          characterCount,
-        })),
-      },
-    });
-    return counts.size;
+  const applySceneInsights = async (
+    scenesForInsights: Scene[],
+    token: string
+  ): Promise<{ counted: number; described: number; rostered: number }> => {
+    if (!play.documentUrl) return { counted: 0, described: 0, rostered: 0 };
+    const insights = await loadGoogleDocumentSceneInsights(
+      play.documentUrl,
+      scenesForInsights,
+      token,
+      characterRoles,
+      play.id
+    );
+
+    if (insights.characterCounts.size > 0) {
+      const settings = resolveSceneTimingSettings(state.appMeta);
+      dispatch({
+        type: 'APPLY_SCENE_CHARACTER_COUNTS',
+        payload: {
+          playId: play.id,
+          syncedAt: new Date().toISOString(),
+          applyRehearsalMinutes: settings.autoFillRehearsalMinutes,
+          updates: [...insights.characterCounts.entries()].map(([sceneId, characterCount]) => ({
+            sceneId,
+            characterCount,
+          })),
+        },
+      });
+    }
+
+    if (insights.descriptions.size > 0) {
+      dispatch({
+        type: 'APPLY_SCENE_DESCRIPTIONS',
+        payload: {
+          playId: play.id,
+          onlyIfEmpty: true,
+          updates: [...insights.descriptions.entries()].map(([sceneId, description]) => ({
+            sceneId,
+            description,
+          })),
+        },
+      });
+    }
+
+    if (insights.roleIds.size > 0) {
+      dispatch({
+        type: 'APPLY_SCENE_ROLE_IDS',
+        payload: {
+          playId: play.id,
+          onlyIfEmpty: true,
+          updates: [...insights.roleIds.entries()].map(([sceneId, roleIds]) => ({
+            sceneId,
+            roleIds,
+          })),
+        },
+      });
+    }
+
+    return {
+      counted: insights.characterCounts.size,
+      described: insights.descriptions.size,
+      rostered: insights.roleIds.size,
+    };
   };
 
   const handleSync = async (options?: { silent?: boolean }) => {
@@ -98,11 +144,46 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         return;
       }
 
-      const { matches, anchorCount } = await syncSceneAnchorsFromGoogleDoc(
+      let targetScenes = scenes;
+      let createdCount = 0;
+
+      if (targetScenes.length === 0) {
+        const { anchors } = await fetchGoogleDocAnchors(play.documentUrl, token);
+        const sceneAnchors = listImportableScenesWithActGroups(anchors);
+        if (sceneAnchors.length === 0) {
+          if (!options?.silent) {
+            setSyncError(
+              anchors.length === 0
+                ? 'В документе не найдены заголовки. Оформите названия сцен как заголовки (H1–H6) в Google Docs.'
+                : 'В документе нет заголовков сцен — только акты/действия. Оформите сцены как «Сцена 1», «Сцена 2» и т.д.'
+            );
+          }
+          return;
+        }
+
+        const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
+          id: generateId(),
+          playId: play.id,
+          number: index + 1,
+          title: anchor.text,
+          actGroup,
+          status: 'not_started',
+          priority: 'medium',
+          roleIds: [],
+          estimatedMinutes: DEFAULT_SCENE_REHEARSAL_MINUTES,
+        }));
+        createdScenes.forEach((scene) => dispatch({ type: 'ADD_SCENE', payload: scene }));
+        targetScenes = createdScenes;
+        createdCount = createdScenes.length;
+      }
+
+      const { matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
         play.documentUrl,
-        scenes,
+        targetScenes,
         token
       );
+      const actGroups = mapActGroupsToMatchedScenes(anchors, matches);
+      const actScriptAnchors = mapActAnchorsFromDocument(anchors);
 
       if (matches.length === 0) {
         if (!options?.silent) {
@@ -122,24 +203,29 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           playId: play.id,
           syncedAt,
           importSource: 'google',
+          actScriptAnchors,
           updates: matches.map((match) => ({
             sceneId: match.sceneId,
             scriptAnchor: match.anchor,
+            actGroup: actGroups.get(match.sceneId),
           })),
         },
       });
 
-      const scenesWithAnchors = scenes.map((scene) => {
+      const scenesWithAnchors = targetScenes.map((scene) => {
         const match = matches.find((item) => item.sceneId === scene.id);
         return match ? { ...scene, scriptAnchor: match.anchor } : scene;
       });
-      const counted = await applyCharacterCounts(scenesWithAnchors, token);
+      const { counted, described, rostered } = await applySceneInsights(scenesWithAnchors, token);
 
       setSyncMessage(
-        (matches.length === scenes.length
-          ? `Сопоставлено ${matches.length} из ${scenes.length} сцен (в документе ${anchorCount} заголовков).`
-          : `Сопоставлено ${matches.length} из ${scenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`) +
-          (counted > 0 ? ` Подсчитаны знаки для ${counted} сцен.` : '')
+        (createdCount > 0 ? `Создано ${createdCount} сцен из документа. ` : '') +
+          (matches.length === targetScenes.length
+          ? `Сопоставлено ${matches.length} из ${targetScenes.length} сцен (в документе ${anchorCount} заголовков).`
+          : `Сопоставлено ${matches.length} из ${targetScenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`) +
+          (counted > 0 ? ` Подсчитаны знаки для ${counted} сцен.` : '') +
+          (described > 0 ? ` Краткие описания для ${described} сцен.` : '') +
+          (rostered > 0 ? ` Персонажи для ${rostered} сцен.` : '')
       );
     } catch (error) {
       if (error instanceof GoogleDocsClientError && error.code === 'AUTH_EXPIRED') {
@@ -155,8 +241,8 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
     if (
       auth.isRestoring ||
       !auth.isConfigured ||
+      !auth.accessToken ||
       likelyOfficeUpload ||
-      scenes.length === 0 ||
       linkedCount > 0 ||
       play.googleDocsLinksSyncedAt ||
       autoSyncAttemptedRef.current === play.id
@@ -170,11 +256,11 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
   }, [
     auth.isConfigured,
     auth.isRestoring,
+    auth.accessToken,
     likelyOfficeUpload,
     linkedCount,
     play.googleDocsLinksSyncedAt,
     play.id,
-    scenes.length,
   ]);
 
   const handleCountCharacters = async () => {
@@ -199,13 +285,17 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         return;
       }
 
-      const counted = await applyCharacterCounts(scenes, token);
-      if (counted === 0) {
+      const { counted, described, rostered } = await applySceneInsights(scenes, token);
+      if (counted === 0 && described === 0 && rostered === 0) {
         setSyncError('Не удалось извлечь текст сцен из документа. Проверьте заголовки.');
         return;
       }
 
-      setSyncMessage(`Подсчитаны знаки для ${counted} сцен.`);
+      setSyncMessage(
+        (counted > 0 ? `Подсчитаны знаки для ${counted} сцен.` : '') +
+          (described > 0 ? ` Краткие описания для ${described} сцен.` : '') +
+          (rostered > 0 ? ` Персонажи для ${rostered} сцен.` : '')
+      );
     } catch (error) {
       if (error instanceof GoogleDocsClientError && error.code === 'AUTH_EXPIRED') {
         auth.signOut();
@@ -227,7 +317,9 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           <p className="mt-1 text-xs text-muted">
             {linkedCount > 0
               ? `Привязано ${linkedCount} из ${scenes.length} сцен`
-              : 'Сопоставьте сцены с заголовками документа для быстрого открытия фрагмента текста'}
+              : scenes.length === 0
+                ? 'Можно создать сцены из заголовков документа'
+                : 'Сопоставьте сцены с заголовками документа для быстрого открытия фрагмента текста'}
             {countedCount > 0 ? ` · хронометраж для ${countedCount} сцен` : ''}
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
@@ -250,13 +342,13 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={() => void handleSync()} disabled={isSyncing || scenes.length === 0}>
+              <Button variant="secondary" onClick={() => void handleSync()} disabled={isSyncing}>
                 {isSyncing ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
                   <RefreshCw size={16} />
                 )}
-                Ссылки и хронометраж
+                {scenes.length === 0 ? 'Импортировать сцены' : 'Ссылки и хронометраж'}
               </Button>
               <Button
                 variant="secondary"

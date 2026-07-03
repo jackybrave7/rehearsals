@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS plays (
   script_file_url TEXT,
   script_file_mime_type TEXT,
   script_file_size INTEGER,
-  archived_at TEXT
+  archived_at TEXT,
+  act_script_anchors TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (
@@ -136,6 +137,7 @@ CREATE TABLE IF NOT EXISTS scenes (
   status TEXT NOT NULL,
   priority TEXT,
   role_ids TEXT NOT NULL DEFAULT '[]',
+  act_group TEXT,
   script_anchor TEXT,
   script_character_count INTEGER,
   script_character_count_synced_at TEXT

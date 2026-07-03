@@ -97,6 +97,8 @@ export function getDb(): AppDatabase {
     `ALTER TABLE users ADD COLUMN email_verification_token_hash TEXT`,
     `ALTER TABLE users ADD COLUMN email_verification_expires_at TEXT`,
     `ALTER TABLE users ADD COLUMN terms_accepted_at TEXT`,
+    `ALTER TABLE scenes ADD COLUMN act_group TEXT`,
+    `ALTER TABLE plays ADD COLUMN act_script_anchors TEXT`,
   ]) {
     try {
       db.exec(migration);

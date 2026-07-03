@@ -10,6 +10,7 @@ import {
   isSupportedScriptImportFile,
   parseScriptFileId,
 } from '../utils/scriptDocument';
+import { listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
@@ -53,6 +54,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
   const countedCount = useMemo(
     () => scenes.filter((scene) => scene.scriptCharacterCount && scene.scriptCharacterCount > 0).length,
     [scenes]
+  );
+
+  const characterRoles = useMemo(
+    () => state.playRoles.filter((role) => role.playId === play.id && role.kind === 'character'),
+    [play.id, state.playRoles]
   );
 
   const uploadScriptFile = async (file: File) => {
@@ -108,19 +114,23 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
       let createdCount = 0;
 
       if (targetScenes.length === 0) {
-        const { anchors } = await parseScriptImport(currentFileId, []);
-        if (anchors.length === 0) {
+        const { anchors } = await parseScriptImport(currentFileId, [], characterRoles);
+        const sceneAnchors = listImportableScenesWithActGroups(anchors);
+        if (sceneAnchors.length === 0) {
           setSyncError(
-            'В файле не найдены заголовки сцен. Оформите названия как отдельные строки: «АКТ 1, сц. 2» или стили «Заголовок» в Word.'
+            anchors.length === 0
+              ? 'В файле не найдены заголовки сцен. Оформите названия как отдельные строки: «АКТ 1, сц. 2» или стили «Заголовок» в Word.'
+              : 'В файле нет заголовков сцен — только акты/действия. Оформите сцены как «Сцена 1», «АКТ 1, сц. 2» и т.д.'
           );
           return;
         }
 
-        const createdScenes: Scene[] = anchors.map((anchor, index) => ({
+        const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
           id: generateId(),
           playId: play.id,
           number: index + 1,
           title: anchor.text,
+          actGroup,
           status: 'not_started',
           priority: 'medium',
           roleIds: [],
@@ -131,10 +141,8 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         createdCount = createdScenes.length;
       }
 
-      const { matches, anchorCount, characterCounts } = await parseScriptImport(
-        currentFileId,
-        targetScenes
-      );
+      const { matches, anchorCount, characterCounts, descriptions, roleIds, anchors } =
+        await parseScriptImport(currentFileId, targetScenes, characterRoles);
 
       if (matches.length === 0) {
         setSyncError(
@@ -146,15 +154,19 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
       }
 
       const syncedAt = new Date().toISOString();
+      const actGroups = mapActGroupsToMatchedScenes(anchors, matches);
+      const actScriptAnchors = mapActAnchorsFromDocument(anchors);
       dispatch({
         type: 'APPLY_SCENE_SCRIPT_ANCHORS',
         payload: {
           playId: play.id,
           syncedAt,
           importSource: 'file',
+          actScriptAnchors,
           updates: matches.map((match) => ({
             sceneId: match.sceneId,
             scriptAnchor: match.anchor,
+            actGroup: actGroups.get(match.sceneId),
           })),
         },
       });
@@ -176,6 +188,38 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         });
       }
 
+      const descriptionEntries = Object.entries(descriptions ?? {}).filter(
+        ([, value]) => value.trim().length > 0
+      );
+      if (descriptionEntries.length > 0) {
+        dispatch({
+          type: 'APPLY_SCENE_DESCRIPTIONS',
+          payload: {
+            playId: play.id,
+            onlyIfEmpty: true,
+            updates: descriptionEntries.map(([sceneId, description]) => ({
+              sceneId,
+              description,
+            })),
+          },
+        });
+      }
+
+      const roleEntries = Object.entries(roleIds ?? {}).filter(([, value]) => value.length > 0);
+      if (roleEntries.length > 0) {
+        dispatch({
+          type: 'APPLY_SCENE_ROLE_IDS',
+          payload: {
+            playId: play.id,
+            onlyIfEmpty: true,
+            updates: roleEntries.map(([sceneId, ids]) => ({
+              sceneId,
+              roleIds: ids,
+            })),
+          },
+        });
+      }
+
       setSyncMessage(
         (createdCount > 0
           ? `Создано ${createdCount} сцен из файла. `
@@ -183,7 +227,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
           (matches.length === targetScenes.length
             ? `Сопоставлено ${matches.length} из ${targetScenes.length} сцен (в файле ${anchorCount} заголовков).`
             : `Сопоставлено ${matches.length} из ${targetScenes.length} сцен. В файле ${anchorCount} заголовков — часть из них не сцены.`) +
-          (countEntries.length > 0 ? ` Подсчитаны знаки для ${countEntries.length} сцен.` : '')
+          (countEntries.length > 0 ? ` Подсчитаны знаки для ${countEntries.length} сцен.` : '') +
+          (descriptionEntries.length > 0
+            ? ` Краткие описания для ${descriptionEntries.length} сцен.`
+            : '') +
+          (roleEntries.length > 0 ? ` Персонажи для ${roleEntries.length} сцен.` : '')
       );
     } catch (error) {
       setSyncError(resolveScriptImportError(error));
