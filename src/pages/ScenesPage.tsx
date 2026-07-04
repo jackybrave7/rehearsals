@@ -27,6 +27,7 @@ import { PremiereBanner } from '../components/PremiereBanner';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
+import { buildPlayReadinessReport, heatLevelColors, heatLevelLabel } from '../utils/sceneReadiness';
 import { sceneMatchesCharacterFilter, sceneMatchesSearch } from '../utils/sceneFilters';
 
 const statusLabels: Record<SceneStatus, string> = {
@@ -166,6 +167,12 @@ export function ScenesPage() {
     }
     return counts;
   }, [sorted]);
+
+  const readinessBySceneId = useMemo(() => {
+    if (!state.activePlayId) return new Map<string, ReturnType<typeof buildPlayReadinessReport>['items'][number]>();
+    const report = buildPlayReadinessReport(state, state.activePlayId);
+    return new Map(report.items.map((item) => [item.scene.id, item]));
+  }, [state, state.activePlayId]);
 
   const priorityCounts = useMemo(() => {
     const counts: Record<ScenePriority, number> = {
@@ -625,6 +632,7 @@ export function ScenesPage() {
                   const roles = getSceneRoles(state, scene);
                   const priority = scene.priority ?? 'medium';
                   const history = buildSceneWorkHistory(state, scene.id);
+                  const readiness = readinessBySceneId.get(scene.id);
                   return (
                     <div
                       key={scene.id}
@@ -643,6 +651,14 @@ export function ScenesPage() {
                           >
                             {priorityLabels[priority]}
                           </span>
+                          {readiness && readiness.heat !== 'recent' && (
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${heatLevelColors(readiness.heat)}`}
+                              title={heatLevelLabel(readiness.heat)}
+                            >
+                              {heatLevelLabel(readiness.heat)}
+                            </span>
+                          )}
                         </div>
                         {scene.description && (
                           <p className="mt-1 text-xs leading-relaxed text-muted">

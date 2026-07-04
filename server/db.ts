@@ -106,6 +106,7 @@ export function getDb(): AppDatabase {
       registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
     )`,
     `ALTER TABLE platform_settings ADD COLUMN legacy_registration_backfill_at TEXT`,
+    `ALTER TABLE rehearsals ADD COLUMN rsvp TEXT DEFAULT '{}'`,
   ]) {
     try {
       db.exec(migration);

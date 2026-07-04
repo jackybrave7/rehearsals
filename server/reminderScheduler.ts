@@ -1,8 +1,9 @@
 import type { AppState, Rehearsal } from '../src/types/index.js';
 import { getDb, type AppDatabase } from './db.js';
 import { loadState } from './stateRepository.js';
-import { getTelegramBotToken, sendTelegramHtmlMessage } from './telegram.js';
+import { getTelegramBotToken, sendTelegramHtmlMessage, sendTelegramMessageWithInlineKeyboard } from './telegram.js';
 import { buildActorReminderTelegramBotMessage } from '../src/utils/rehearsalTelegramExport.js';
+import { buildRsvpTelegramKeyboard } from '../src/utils/rehearsalRsvp.js';
 import { getParticipatingActorIds } from '../src/utils/rehearsalActors.js';
 import {
   hasReminderBeenSent,
@@ -127,6 +128,26 @@ async function processRehearsalReminder(
       console.log(
         `[reminders] sent ${reminderType} to actor ${actorId} for rehearsal ${rehearsal.id} (${date} ${startTime})`
       );
+
+      if (!hasReminderBeenSent(rehearsal.remindersSent, 'rsvp_prompt', actorId)) {
+        const rsvpHtml =
+          `<b>Подтвердите участие</b>\n` +
+          `Репетиция ${date} в ${startTime}. Нажмите кнопку ниже:`;
+        await sendTelegramMessageWithInlineKeyboard(
+          chatId,
+          rsvpHtml,
+          buildRsvpTelegramKeyboard(rehearsal.id),
+          token
+        );
+        const rsvpEntry: RehearsalReminderSent = {
+          kind: 'rsvp_prompt',
+          at: now.toISOString(),
+          actorId,
+        };
+        appendReminderSent(db, rehearsal.id, rsvpEntry);
+        rehearsal.remindersSent = [...(rehearsal.remindersSent ?? []), rsvpEntry];
+        console.log(`[reminders] sent rsvp_prompt to actor ${actorId} for rehearsal ${rehearsal.id}`);
+      }
     }
   }
 }

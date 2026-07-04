@@ -19,11 +19,13 @@ export interface TheaterReminderSettings {
 }
 
 export interface RehearsalReminderSent {
-  kind: ReminderType | 'T-24h' | 'T-2h' | 'custom';
+  kind: ReminderType | 'T-24h' | 'T-2h' | 'custom' | 'rsvp_prompt';
   at: string;
   actorId?: string;
   offsetHours?: number;
 }
+
+export type RsvpStatus = 'confirmed' | 'declined' | 'late';
 
 export interface ActorUnavailability {
   id: string;
@@ -199,6 +201,8 @@ export interface Rehearsal {
   schedule: ScheduleBlock[];
   actorIds: string[];
   attendance?: Record<string, AttendanceStatus>;
+  /** Ответы участников в Telegram (или вручную режиссёром) */
+  rsvp?: Record<string, RsvpStatus>;
   /** Порядок участников в списке репетиции (все потенциальные, не только отмеченные) */
   participantOrder?: string[];
   googleCalendarEventId?: string;

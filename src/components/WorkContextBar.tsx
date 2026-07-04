@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { appPaths } from '../navigation/appPaths';
 import {
   formatPerformanceLabel,
   getActivePlay,
@@ -60,6 +62,20 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
         }`}
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs sm:text-sm">
+          {variant === 'zen' ? (
+            <>
+              <Link
+                to={appPaths.home}
+                className="shrink-0 transition-opacity hover:opacity-80"
+                aria-label="Репетиции"
+              >
+                <AppLogo size="sm" variant="zen" />
+              </Link>
+              <span className="shrink-0 text-muted/40" aria-hidden>
+                ·
+              </span>
+            </>
+          ) : null}
           <ContextValue
             value={theaterValue}
             to={workContextLinks.theater}

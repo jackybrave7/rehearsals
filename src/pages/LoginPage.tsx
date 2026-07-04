@@ -115,7 +115,7 @@ export function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="auth-card w-full max-w-md p-8">
           <div className="mb-8 flex items-center gap-3">
-            <AppLogo size="lg" />
+            <AppLogo size="lg" variant="zen" />
             <div>
               <h1 className="text-2xl font-bold text-foreground">Репетиции</h1>
               <p className="text-sm text-muted">Вход в планировщик постановки</p>

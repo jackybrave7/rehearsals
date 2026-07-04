@@ -187,7 +187,8 @@ CREATE TABLE IF NOT EXISTS rehearsals (
   series_id TEXT,
   dismissed_warning_ids TEXT NOT NULL DEFAULT '[]',
   reminders_sent TEXT NOT NULL DEFAULT '[]',
-  reminder_opt_out INTEGER NOT NULL DEFAULT 0
+  reminder_opt_out INTEGER NOT NULL DEFAULT 0,
+  rsvp TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS schedule_blocks (

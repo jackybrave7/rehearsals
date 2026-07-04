@@ -10,7 +10,7 @@ export interface TheaterReminderSettings {
 }
 
 export interface RehearsalReminderSent {
-  kind: ReminderType | 'T-24h' | 'T-2h' | 'custom';
+  kind: ReminderType | 'T-24h' | 'T-2h' | 'custom' | 'rsvp_prompt';
   at: string;
   actorId?: string;
   offsetHours?: number;
@@ -85,10 +85,10 @@ export function reminderSentKey(kind: ReminderType, actorId: string): string {
 
 export function hasReminderBeenSent(
   sent: RehearsalReminderSent[] | undefined,
-  kind: ReminderType,
+  kind: RehearsalReminderSent['kind'],
   actorId: string
 ): boolean {
-  const key = reminderSentKey(kind, actorId);
+  const key = reminderSentKey(kind as ReminderType, actorId);
   return (sent ?? []).some((entry) => {
     if (entry.actorId !== actorId) return false;
     if (entry.kind === kind) return true;
@@ -103,6 +103,7 @@ export function formatReminderKindLabel(kind: RehearsalReminderSent['kind'], off
   if (kind === 'morning_of') return 'утром в день репетиции';
   if (kind === 'two_hours' || kind === 'T-2h') return 'за 2 ч';
   if (kind === 'custom') return `за ${offsetHours ?? '?'} ч`;
+  if (kind === 'rsvp_prompt') return 'запрос RSVP';
   return String(kind);
 }
 

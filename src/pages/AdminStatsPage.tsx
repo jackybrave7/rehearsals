@@ -80,6 +80,15 @@ export function AdminStatsPage() {
 
       <AdminErrorBanner error={error} />
 
+      {stats && stats.pendingRegistrations > 0 ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          В режиме бета {stats.pendingRegistrations} пользователей подтвердили email и ждут вашего одобрения.{' '}
+          <Link to={`${appPaths.adminUsers}?filter=pending`} className="font-medium text-gold-light hover:underline">
+            Открыть список →
+          </Link>
+        </div>
+      ) : null}
+
       {stats ? (
         <AdminPlatformSettingsPanel
           initialMode={stats.registrationMode}

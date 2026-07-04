@@ -6,6 +6,7 @@ export const appPaths = {
   overview: `${APP_BASE}/overview`,
   play: `${APP_BASE}/play`,
   scenes: `${APP_BASE}/scenes`,
+  readiness: `${APP_BASE}/readiness`,
   actors: `${APP_BASE}/actors`,
   actor: (id: string) => `${APP_BASE}/actors/${id}`,
   rehearsals: `${APP_BASE}/rehearsals`,

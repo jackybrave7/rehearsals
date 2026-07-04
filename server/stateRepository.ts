@@ -387,9 +387,9 @@ export function insertStateEntities(
   const insertRehearsal = db.prepare(
     `INSERT INTO rehearsals (
       id, theater_id, series_id, date, start_time, end_time, venue_id, location, notes, play_id, performance_id,
-      scene_ids, task_ids, actor_ids, attendance, participant_order, google_calendar_event_id,
+      scene_ids, task_ids, actor_ids, attendance, rsvp, participant_order, google_calendar_event_id,
       dismissed_warning_ids, reminders_sent, reminder_opt_out
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const rehearsal of state.rehearsals) {
     insertRehearsal.run(
@@ -408,6 +408,7 @@ export function insertStateEntities(
       JSON.stringify(rehearsal.taskIds ?? []),
       JSON.stringify(rehearsal.actorIds ?? []),
       JSON.stringify(rehearsal.attendance ?? {}),
+      JSON.stringify(rehearsal.rsvp ?? {}),
       JSON.stringify(rehearsal.participantOrder ?? []),
       rehearsal.googleCalendarEventId ?? null,
       JSON.stringify(rehearsal.dismissedWarningIds ?? []),
@@ -778,6 +779,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       taskIds: parseJson<string[]>(row.task_ids as string, []),
       actorIds: parseJson<string[]>(row.actor_ids as string, []),
       attendance: parseJson<Rehearsal['attendance']>(row.attendance as string | undefined, {}),
+      rsvp: parseJson<Rehearsal['rsvp']>(row.rsvp as string | undefined, {}),
       participantOrder: parseJson<string[]>(row.participant_order as string | undefined, []),
       googleCalendarEventId: (row.google_calendar_event_id as string | null) ?? undefined,
       dismissedWarningIds: parseJson<string[]>(row.dismissed_warning_ids as string | undefined, []),

@@ -14,6 +14,7 @@ import {
   getTheaterVenues,
 } from '../store/selectors';
 import { resolveRehearsalLocation } from '../utils/venue';
+import { countRsvpSummary, formatRsvpSummaryLine } from '../utils/rehearsalRsvp';
 import { useDesign } from '../store/DesignContext';
 import { ZenDashboard } from '../components/zen/ZenDashboard';
 import { PlayOverviewMini } from './OverviewPage';
@@ -119,6 +120,7 @@ export function DashboardPage() {
           <div className="space-y-3">
             {upcoming.map((r) => {
               const location = resolveRehearsalLocation(r, theaterVenues);
+              const rsvpLine = formatRsvpSummaryLine(countRsvpSummary(r, r.actorIds));
               return (
               <Link
                 key={r.id}
@@ -133,6 +135,9 @@ export function DashboardPage() {
                     {r.startTime}–{r.endTime}
                     {location && ` · ${location}`}
                   </p>
+                  {r.actorIds.length > 0 && (
+                    <p className="mt-1 text-xs text-gold-light/80">RSVP: {rsvpLine}</p>
+                  )}
                 </div>
                 <span className="rounded-full bg-gold/10 px-3 py-1 text-xs text-gold-light">
                   {r.schedule.length} блоков

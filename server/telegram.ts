@@ -82,6 +82,54 @@ export async function sendTelegramHtmlMessage(
   }
 }
 
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
+export async function sendTelegramMessageWithInlineKeyboard(
+  chatId: string,
+  html: string,
+  keyboard: InlineKeyboardButton[][],
+  token: string = getTelegramBotToken() ?? ''
+): Promise<void> {
+  if (!token) throw new Error('BOT_NOT_CONFIGURED');
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: html,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup: { inline_keyboard: keyboard },
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(formatTelegramApiError(body) || `Telegram API ${response.status}`);
+  }
+}
+
+export async function answerTelegramCallbackQuery(
+  callbackQueryId: string,
+  text: string,
+  token: string = getTelegramBotToken() ?? ''
+): Promise<void> {
+  if (!token) return;
+  await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: false,
+    }),
+  });
+}
+
 function formatTelegramApiError(body: string): string {
   try {
     const data = JSON.parse(body) as { description?: string };

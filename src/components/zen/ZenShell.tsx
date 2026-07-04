@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { AppLogo } from '../AppLogo';
 import { useDesign } from '../../store/DesignContext';
 import { useRehearsalStore } from '../../store/RehearsalContext';
 import { TheaterSwitcher } from '../TheaterSwitcher';
@@ -64,10 +65,17 @@ export function ZenShell({
           />
           <aside className="zen-drawer absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Меню</p>
-                <p className="text-xs text-muted">Театр и разделы</p>
-              </div>
+              <Link
+                to={appPaths.home}
+                onClick={() => setMenuOpen(false)}
+                className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-80"
+              >
+                <AppLogo size="md" variant="zen" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">Репетиции</p>
+                  <p className="text-xs text-muted">Театр и разделы</p>
+                </div>
+              </Link>
               <button type="button" className="zen-icon-btn" onClick={() => setMenuOpen(false)} aria-label="Закрыть">
                 <X size={18} />
               </button>

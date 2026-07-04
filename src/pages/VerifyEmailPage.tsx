@@ -28,7 +28,7 @@ export function VerifyEmailPage() {
     <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10">
       <div className="auth-card w-full max-w-md p-8 text-center">
         <div className="mx-auto mb-6">
-          <AppLogo size="lg" className="justify-center" />
+          <AppLogo size="lg" variant="zen" className="justify-center" />
         </div>
 
         {status === 'loading' && (

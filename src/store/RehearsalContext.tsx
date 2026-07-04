@@ -1114,10 +1114,8 @@ function reducer(state: AppState, action: Action): AppState {
       const actorIds = previous
         ? mergeActorsForNewScenes(state, action.payload, previous.sceneIds, sceneIds)
         : action.payload.actorIds;
-      const rehearsalDraft = clearRemindersOnScheduleChange(
-        { ...action.payload, schedule, sceneIds, actorIds },
-        previous
-      );
+      const merged: Rehearsal = { ...action.payload, schedule, sceneIds, actorIds };
+      const rehearsalDraft = clearRemindersOnScheduleChange(merged, previous);
       const participantOrder = resolveParticipantOrder(state, {
         ...rehearsalDraft,
         participantOrder: action.payload.participantOrder ?? previous?.participantOrder,

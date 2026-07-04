@@ -62,6 +62,7 @@ import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import type {
   AttendanceStatus,
   Rehearsal,
+  RsvpStatus,
   Scene,
   ScheduleBlock,
   ScheduleBlockType,
@@ -81,6 +82,12 @@ import {
 } from '../utils/rehearsalInsights';
 import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
 import { appPaths } from '../navigation/appPaths';
+import {
+  countRsvpSummary,
+  formatRsvpSummaryLine,
+  rsvpColors,
+  rsvpLabels,
+} from '../utils/rehearsalRsvp';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
   scene: 'Сцена',
@@ -103,6 +110,8 @@ const attendanceColors: Record<AttendanceStatus, string> = {
   absent: 'attendance-badge attendance-badge-absent',
   substitute: 'attendance-badge attendance-badge-substitute',
 };
+
+const rsvpEmptyLabel = 'Без ответа';
 
 export function RehearsalDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -300,6 +309,17 @@ export function RehearsalDetailPage() {
     });
   };
 
+  const updateRsvp = (actorId: string, status: RsvpStatus | '') => {
+    if (readOnly) return;
+    const next = { ...(rehearsal.rsvp ?? {}) };
+    if (!status) delete next[actorId];
+    else next[actorId] = status;
+    dispatch({
+      type: 'UPDATE_REHEARSAL',
+      payload: { ...rehearsal, rsvp: next },
+    });
+  };
+
   const handleEditScenesChange = (sceneIds: string[]) => {
     if (!editForm) return;
     const schedule = removeDeselectedScenesFromSchedule(editForm, sceneIds);
@@ -380,6 +400,7 @@ export function RehearsalDetailPage() {
   const participantActors = participantActorIds
     .map((aid) => state.actors.find((a) => a.id === aid))
     .filter(Boolean);
+  const rsvpSummary = countRsvpSummary(rehearsal, rehearsal.actorIds);
 
   const theaterActorPool = getActiveActors(state).filter(
     (actor) => !participantActorIds.includes(actor.id)
@@ -609,13 +630,19 @@ export function RehearsalDetailPage() {
             </h2>
             <p className="participants-hint mb-3 text-xs leading-relaxed">
               Перетащите за ⋮⋮ для порядка. Добавьте замену или техника вручную. Статус посещаемости
-              влияет на историю и Telegram.
+              влияет на историю и Telegram. RSVP приходит из Telegram-бота или задаётся вручную.
             </p>
+            {rehearsal.actorIds.length > 0 && (
+              <p className="mb-3 text-xs font-medium text-gold-light">
+                RSVP: {formatRsvpSummaryLine(rsvpSummary)}
+              </p>
+            )}
             {participantActors.length > 0 ? (
               <div className="space-y-2">
                 {participantActors.map((actor, index) => {
                   const selected = rehearsal.actorIds.includes(actor!.id);
                   const attendance = rehearsal.attendance?.[actor!.id] ?? (selected ? 'present' : 'absent');
+                  const rsvpStatus = rehearsal.rsvp?.[actor!.id];
                   const unavailable = isActorUnavailable(actor!, rehearsal.date);
                   const unavailReason = unavailable
                     ? getActorUnavailabilityReason(actor!, rehearsal.date)
@@ -702,6 +729,37 @@ export function RehearsalDetailPage() {
                             </option>
                           ))}
                         </select>
+                        {selected && (
+                          readOnly ? (
+                            <span
+                              className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                                rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
+                              }`}
+                            >
+                              RSVP: {rsvpStatus ? rsvpLabels[rsvpStatus] : rsvpEmptyLabel}
+                            </span>
+                          ) : (
+                            <select
+                              value={rsvpStatus ?? ''}
+                              onChange={(event) =>
+                                updateRsvp(actor!.id, event.target.value as RsvpStatus | '')
+                              }
+                              className={`mt-2 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+                                rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
+                              }`}
+                              aria-label={`RSVP: ${actor!.name}`}
+                            >
+                              <option value="" className="bg-surface text-white">
+                                {rsvpEmptyLabel}
+                              </option>
+                              {Object.entries(rsvpLabels).map(([value, label]) => (
+                                <option key={value} value={value} className="bg-surface text-white">
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          )
+                        )}
                       </div>
                     </div>
                   );
