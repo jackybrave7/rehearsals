@@ -138,7 +138,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         if (!options?.silent) setSyncError('У постановки не указан Google Docs URL.');
         return;
       }
-      const token = await auth.getAccessToken({ interactive: !options?.silent });
+      const token = await auth.getAccessToken({ interactive: true });
       if (!token) {
         if (!options?.silent) setSyncError('Не удалось получить доступ Google.');
         return;
@@ -242,7 +242,6 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
   useEffect(() => {
     if (
-      auth.isRestoring ||
       !auth.isConfigured ||
       !auth.accessToken ||
       likelyOfficeUpload ||
@@ -255,10 +254,9 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
     autoSyncAttemptedRef.current = play.id;
     void handleSync({ silent: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-sync once per play when scenes appear
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-sync once per play when token already exists
   }, [
     auth.isConfigured,
-    auth.isRestoring,
     auth.accessToken,
     likelyOfficeUpload,
     linkedCount,
@@ -276,7 +274,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         setSyncError('У постановки не указан Google Docs URL.');
         return;
       }
-      const token = await auth.getAccessToken();
+      const token = await auth.getAccessToken({ interactive: true });
       if (!token) {
         setSyncError('Не удалось получить доступ Google.');
         return;
@@ -333,11 +331,6 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Добавьте VITE_GOOGLE_CLIENT_ID в .env
             </span>
-          ) : !auth.accessToken && auth.isRestoring ? (
-            <span className="inline-flex items-center gap-2 rounded-lg border border-gold/15 bg-surface/60 px-3 py-2 text-xs text-muted">
-              <Loader2 size={14} className="animate-spin" />
-              Подключаем Google…
-            </span>
           ) : !auth.accessToken ? (
             <Button
               variant={scenes.length === 0 ? 'primary' : 'secondary'}
@@ -345,7 +338,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
               disabled={auth.isRequesting}
             >
               {auth.isRequesting ? <Loader2 size={16} className="animate-spin" /> : null}
-              Войти в Google
+              Подключить Google Docs
             </Button>
           ) : (
             <>

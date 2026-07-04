@@ -153,53 +153,22 @@ async function requestAccessTokenFromGoogle(
   });
 }
 
-let silentRefreshPromise: Promise<string | null> | null = null;
-
-async function restoreGoogleSession(clientId: string): Promise<string | null> {
-  const stored = readStoredToken();
-  if (stored?.accessToken) return stored.accessToken;
-  if (!hasStoredConsent()) return null;
-
-  if (!silentRefreshPromise) {
-    silentRefreshPromise = requestAccessTokenFromGoogle(clientId, '')
-      .then(({ accessToken, expiresIn }) => {
-        writeStoredToken(accessToken, expiresIn);
-        return accessToken;
-      })
-      .catch(() => null)
-      .finally(() => {
-        silentRefreshPromise = null;
-      });
-  }
-
-  return silentRefreshPromise;
+/** Только валидный токен из localStorage — без всплывающего окна Google. */
+function readValidStoredAccessToken(): string | null {
+  return readStoredToken()?.accessToken ?? null;
 }
 
 export function GoogleDocsAuthProvider({ children }: { children: ReactNode }) {
   const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
-  const [accessToken, setAccessToken] = useState<string | null>(() => readStoredToken()?.accessToken ?? null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => readValidStoredAccessToken());
   const [isRequesting, setIsRequesting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(() => Boolean(clientId) && !readStoredToken() && hasStoredConsent());
+  const [isRestoring, setIsRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clientId) return;
-
-    let cancelled = false;
-    setIsRestoring(!readStoredToken() && hasStoredConsent());
-
-    void restoreGoogleSession(clientId).then((token) => {
-      if (cancelled) return;
-      if (token) {
-        setAccessToken(token);
-        setError(null);
-      }
-      setIsRestoring(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    const stored = readValidStoredAccessToken();
+    if (stored) setAccessToken(stored);
   }, [clientId]);
 
   const signIn = useCallback(async () => {
@@ -237,10 +206,10 @@ export function GoogleDocsAuthProvider({ children }: { children: ReactNode }) {
 
   const getAccessToken = useCallback(
     async (options?: { interactive?: boolean }) => {
-      const stored = readStoredToken();
-      if (stored?.accessToken) {
-        setAccessToken(stored.accessToken);
-        return stored.accessToken;
+      const stored = readValidStoredAccessToken();
+      if (stored) {
+        setAccessToken(stored);
+        return stored;
       }
       if (accessToken) return accessToken;
 
@@ -250,12 +219,7 @@ export function GoogleDocsAuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!options?.interactive) {
-        const silent = await restoreGoogleSession(clientId);
-        if (silent) {
-          setAccessToken(silent);
-          setError(null);
-          return silent;
-        }
+        return null;
       }
 
       return signIn();
