@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { SceneWorkHistoryEntry } from '../utils/sceneRehearsalHistory';
+import { DecidedNotesDisplay } from './DecidedNotesDisplay';
 
 function historyCountLabel(count: number): string {
   const mod10 = count % 10;
@@ -56,8 +57,11 @@ export function SceneWorkHistoryPanel({ history }: SceneWorkHistoryPanelProps) {
                   {participants.label}: {participants.text}
                 </p>
               )}
-              {block.decidedNotes?.trim() && <p>Решили: {block.decidedNotes.trim()}</p>}
-              {block.remainingNotes?.trim() && <p>Осталось: {block.remainingNotes.trim()}</p>}
+              {block.decidedNotes?.trim() && (
+                <p>
+                  Решения: <DecidedNotesDisplay text={block.decidedNotes.trim()} />
+                </p>
+              )}
             </div>
           ))}
         </div>

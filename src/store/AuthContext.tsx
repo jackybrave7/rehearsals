@@ -35,6 +35,11 @@ interface AuthContextValue {
   getTheaterRole: (theaterId: string | null | undefined) => TheaterAccessRole | null;
   canEditTheater: (theaterId: string | null | undefined) => boolean;
   canManageMembers: (theaterId: string | null | undefined) => boolean;
+  isActorOnly: (theaterId: string | null | undefined) => boolean;
+  /** Нет ни одной роли владельца или редактора — только приглашённый актёр */
+  isActorOnlyAccount: boolean;
+  canCreateTheater: boolean;
+  canManageTheater: (theaterId: string | null | undefined) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -117,6 +122,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [getTheaterRole]
   );
 
+  const isActorOnly = useCallback(
+    (theaterId: string | null | undefined) => {
+      if (!theaterId) return false;
+      const role = getTheaterRole(theaterId);
+      return role === 'actor';
+    },
+    [getTheaterRole]
+  );
+
+  const isActorOnlyAccount = useMemo(
+    () => theaters.length > 0 && !theaters.some((entry) => entry.role === 'owner' || entry.role === 'editor'),
+    [theaters]
+  );
+
+  const canCreateTheater = useMemo(() => {
+    if (isActorOnlyAccount) return false;
+    return (
+      theaters.length === 0 ||
+      theaters.some((entry) => entry.role === 'owner' || entry.role === 'editor')
+    );
+  }, [theaters, isActorOnlyAccount]);
+
+  const canManageTheater = useCallback(
+    (theaterId: string | null | undefined) => getTheaterRole(theaterId) === 'owner',
+    [getTheaterRole]
+  );
+
   const updateProfile = useCallback(
     async (payload: { name?: string; currentPassword?: string; newPassword?: string }) => {
       const session = await updateAuthProfile(payload);
@@ -154,6 +186,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       getTheaterRole,
       canEditTheater,
       canManageMembers,
+      isActorOnly,
+      isActorOnlyAccount,
+      canCreateTheater,
+      canManageTheater,
     }),
     [
       user,
@@ -169,6 +205,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       getTheaterRole,
       canEditTheater,
       canManageMembers,
+      isActorOnly,
+      isActorOnlyAccount,
+      canCreateTheater,
+      canManageTheater,
     ]
   );
 

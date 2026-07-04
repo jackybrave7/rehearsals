@@ -13,6 +13,8 @@ import {
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Rehearsal } from '../types';
+import type { CalendarPlayMarker } from '../utils/rehearsalCalendarMarkers';
+import { CalendarPlayMarkers } from './CalendarPlayMarkers';
 
 interface CalendarProps {
   currentMonth: Date;
@@ -20,6 +22,33 @@ interface CalendarProps {
   rehearsals: Rehearsal[];
   selectedDate: Date | null;
   onSelectDate: (date: Date) => void;
+  getPlayMarkers?: (rehearsal: Rehearsal) => CalendarPlayMarker[];
+}
+
+function DayMarkers({
+  dayRehearsals,
+  getPlayMarkers,
+}: {
+  dayRehearsals: Rehearsal[];
+  getPlayMarkers?: (rehearsal: Rehearsal) => CalendarPlayMarker[];
+}) {
+  if (dayRehearsals.length === 0 || !getPlayMarkers) return null;
+
+  const markerById = new Map<string, CalendarPlayMarker>();
+  for (const rehearsal of dayRehearsals) {
+    for (const marker of getPlayMarkers(rehearsal)) {
+      markerById.set(marker.id, marker);
+    }
+  }
+
+  const list = [...markerById.values()].slice(0, 4);
+  if (list.length === 0) return null;
+
+  return (
+    <span className="pointer-events-none absolute bottom-0 left-1/2 max-w-[calc(100%-4px)] -translate-x-1/2">
+      <CalendarPlayMarkers markers={list} size="calendar" />
+    </span>
+  );
 }
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -30,6 +59,7 @@ export function Calendar({
   rehearsals,
   selectedDate,
   onSelectDate,
+  getPlayMarkers,
 }: CalendarProps) {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -80,12 +110,14 @@ export function Calendar({
           const isToday = isSameDay(day, new Date());
           const count = getRehearsalsForDay(day).length;
 
+          const dayRehearsals = getRehearsalsForDay(day);
+
           return (
             <button
               key={dateStr}
               type="button"
               onClick={() => onSelectDate(day)}
-              className={`relative flex h-10 items-center justify-center rounded-lg text-sm transition-colors ${
+              className={`relative flex h-11 items-center justify-center rounded-lg text-sm transition-colors ${
                 !isSameMonth(day, currentMonth)
                   ? 'text-muted/30'
                   : isSelected
@@ -97,7 +129,7 @@ export function Calendar({
             >
               {format(day, 'd')}
               {hasRehearsal && !isSelected && (
-                <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-gold" />
+                <DayMarkers dayRehearsals={dayRehearsals} getPlayMarkers={getPlayMarkers} />
               )}
               {count > 1 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold/80 text-[10px] font-bold text-background">

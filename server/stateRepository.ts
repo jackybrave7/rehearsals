@@ -6,6 +6,7 @@ import type {
   Play,
   PlayRole,
   Rehearsal,
+  RehearsalActorNote,
   Scene,
   ScheduleBlock,
   Task,
@@ -15,6 +16,7 @@ import type {
 } from '../src/types/index.js';
 import { backupState } from './backup.js';
 import { getDb, type AppDatabase } from './db.js';
+import { syncDecidedNotesToActorNotes } from '../src/utils/decidedNotesMentions.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -141,6 +143,7 @@ export function filterStateByTheaters(state: AppState, theaterIds: Set<string>):
       tasks: [],
       venues: [],
       rehearsals: [],
+      rehearsalActorNotes: [],
       appMeta: state.appMeta,
     };
   }
@@ -168,6 +171,9 @@ export function filterStateByTheaters(state: AppState, theaterIds: Set<string>):
     rehearsals: state.rehearsals
       .filter((r) => r.theaterId && theaterIds.has(r.theaterId))
       .map((r) => ({ ...r, schedule: r.schedule ?? [] })),
+    rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+      (note) => note.theaterId && theaterIds.has(note.theaterId)
+    ),
     appMeta: state.appMeta,
   };
 }
@@ -188,6 +194,7 @@ export function deleteTheaterContent(db: AppDatabase, theaterId: string): void {
   db.prepare('DELETE FROM schedule_blocks WHERE rehearsal_id IN (SELECT id FROM rehearsals WHERE theater_id = ?)').run(
     theaterId
   );
+  db.prepare('DELETE FROM rehearsal_actor_notes WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM rehearsals WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM tasks WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM plays WHERE theater_id = ?').run(theaterId);
@@ -239,8 +246,8 @@ export function insertStateEntities(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
       google_docs_links_synced_at, script_import_synced_at, script_file_name, script_file_data_url, script_file_url,
-      script_file_mime_type, script_file_size, archived_at, act_script_anchors
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      script_file_mime_type, script_file_size, archived_at, act_script_anchors, cover_url, icon_url, icon_color
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
     const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
@@ -261,14 +268,17 @@ export function insertStateEntities(
       play.scriptFileMimeType ?? null,
       play.scriptFileSize ?? null,
       play.archivedAt ?? null,
-      play.actScriptAnchors ? JSON.stringify(play.actScriptAnchors) : null
+      play.actScriptAnchors ? JSON.stringify(play.actScriptAnchors) : null,
+      play.coverUrl ?? null,
+      play.iconUrl ?? null,
+      play.iconColor ?? null
     );
   }
 
   const insertActor = db.prepare(
     `INSERT INTO actors (
-      id, theater_id, name, status, archive_reason, photo_url, phone, email, telegram_username, telegram_chat_id, notes, unavailability
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      id, theater_id, name, status, archive_reason, photo_url, phone, email, telegram_username, telegram_chat_id, notes, unavailability, memorization_by_scene
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const actor of state.actors) {
     const linkedChatId =
@@ -287,7 +297,8 @@ export function insertStateEntities(
       actor.telegramUsername ?? null,
       linkedChatId,
       actor.notes ?? null,
-      JSON.stringify(actor.unavailability ?? [])
+      JSON.stringify(actor.unavailability ?? []),
+      JSON.stringify(actor.memorizationByScene ?? {})
     );
   }
 
@@ -299,11 +310,19 @@ export function insertStateEntities(
   }
 
   const insertRole = db.prepare(
-    `INSERT INTO play_roles (id, play_id, name, kind, role_order, description)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO play_roles (id, play_id, name, kind, role_order, description, script_aliases)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   for (const role of state.playRoles) {
-    insertRole.run(role.id, role.playId, role.name, role.kind, role.order, role.description ?? null);
+    insertRole.run(
+      role.id,
+      role.playId,
+      role.name,
+      role.kind,
+      role.order,
+      role.description ?? null,
+      role.scriptAliases?.length ? JSON.stringify(role.scriptAliases) : null
+    );
   }
 
   const insertPerformance = db.prepare(
@@ -388,8 +407,8 @@ export function insertStateEntities(
     `INSERT INTO rehearsals (
       id, theater_id, series_id, date, start_time, end_time, venue_id, location, notes, play_id, performance_id,
       scene_ids, task_ids, actor_ids, attendance, rsvp, participant_order, google_calendar_event_id,
-      dismissed_warning_ids, reminders_sent, reminder_opt_out
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      dismissed_warning_ids, reminders_sent, reminder_opt_out, telegram_plan_sent_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const rehearsal of state.rehearsals) {
     insertRehearsal.run(
@@ -413,15 +432,16 @@ export function insertStateEntities(
       rehearsal.googleCalendarEventId ?? null,
       JSON.stringify(rehearsal.dismissedWarningIds ?? []),
       JSON.stringify(rehearsal.remindersSent ?? []),
-      rehearsal.reminderOptOut ? 1 : 0
+      rehearsal.reminderOptOut ? 1 : 0,
+      rehearsal.telegramPlanSentAt ?? null
     );
   }
 
   const insertBlock = db.prepare(
     `INSERT INTO schedule_blocks (
       id, rehearsal_id, start_time, duration_minutes, type, title, scene_id, task_id, notes,
-      decided_notes, remaining_notes, block_order, completed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      decided_notes, remaining_notes, play_id, actor_ids, outcome_notes, block_order, completed
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const rehearsal of state.rehearsals) {
     rehearsal.schedule.forEach((block, index) => {
@@ -437,10 +457,33 @@ export function insertStateEntities(
         block.notes ?? null,
         block.decidedNotes ?? null,
         block.remainingNotes ?? null,
+        block.playId ?? null,
+        JSON.stringify(block.actorIds ?? []),
+        block.outcomeNotes ?? null,
         index,
         block.completed === undefined ? null : block.completed ? 1 : 0
       );
     });
+  }
+
+  const insertNote = db.prepare(
+    `INSERT INTO rehearsal_actor_notes (
+      id, theater_id, rehearsal_id, actor_id, scene_id, schedule_block_id, text, created_at, sent_at, acknowledged_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  for (const note of state.rehearsalActorNotes ?? []) {
+    insertNote.run(
+      note.id,
+      note.theaterId,
+      note.rehearsalId,
+      note.actorId,
+      note.sceneId ?? null,
+      note.scheduleBlockId ?? null,
+      note.text,
+      note.createdAt,
+      note.sentAt ?? null,
+      note.acknowledgedAt ?? null
+    );
   }
 }
 
@@ -464,6 +507,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       tasks: [],
       venues: [],
       rehearsals: [],
+      rehearsalActorNotes: [],
       appMeta: parseJson(settings?.app_meta, {}),
     };
   }
@@ -498,6 +542,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       tasks: [],
       venues: [],
       rehearsals: [],
+      rehearsalActorNotes: [],
       appMeta: parseJson(settings?.app_meta, {}),
     };
   }
@@ -516,13 +561,13 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
   const scheduleByRehearsal = new Map<string, ScheduleBlock[]>();
   const scheduleSql = hasTheaterFilter
     ? `SELECT sb.id, sb.rehearsal_id, sb.start_time, sb.duration_minutes, sb.type, sb.title, sb.scene_id, sb.task_id,
-              sb.notes, sb.decided_notes, sb.remaining_notes, sb.completed
+              sb.notes, sb.decided_notes, sb.remaining_notes, sb.play_id, sb.actor_ids, sb.outcome_notes, sb.completed
        FROM schedule_blocks sb
        JOIN rehearsals r ON r.id = sb.rehearsal_id
        WHERE r.theater_id IN (${theaterIn!.sql})
        ORDER BY sb.rehearsal_id, sb.block_order, sb.start_time`
     : `SELECT id, rehearsal_id, start_time, duration_minutes, type, title, scene_id, task_id,
-              notes, decided_notes, remaining_notes, completed
+              notes, decided_notes, remaining_notes, play_id, actor_ids, outcome_notes, completed
        FROM schedule_blocks
        ORDER BY rehearsal_id, block_order, start_time`;
   const scheduleRows = (
@@ -541,6 +586,9 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
     notes: string | null;
     decided_notes: string | null;
     remaining_notes: string | null;
+    play_id: string | null;
+    actor_ids: string | null;
+    outcome_notes: string | null;
     completed: number | null;
   }>;
 
@@ -556,6 +604,9 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       notes: row.notes ?? undefined,
       decidedNotes: row.decided_notes ?? undefined,
       remainingNotes: row.remaining_notes ?? undefined,
+      playId: row.play_id ?? undefined,
+      actorIds: parseJson(row.actor_ids, [] as string[]),
+      outcomeNotes: row.outcome_notes ?? undefined,
       completed:
         row.completed === null || row.completed === undefined
           ? undefined
@@ -607,6 +658,9 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       actScriptAnchors: parseOptionalJson<Play['actScriptAnchors']>(
         row.act_script_anchors as string | null
       ),
+      coverUrl: (row.cover_url as string | null) ?? undefined,
+      iconUrl: (row.icon_url as string | null) ?? undefined,
+      iconColor: (row.icon_color as string | null) ?? undefined,
     })
   );
 
@@ -636,6 +690,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       telegramChatId: (row.telegram_chat_id as string | null)?.trim() || undefined,
       notes: (row.notes as string | null) ?? undefined,
       unavailability: parseJson(row.unavailability as string, []),
+      memorizationByScene: parseJson(row.memorization_by_scene as string, {}),
     })
   );
 
@@ -669,6 +724,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       kind: row.kind as PlayRole['kind'],
       order: Number(row.role_order),
       description: (row.description as string | null) ?? undefined,
+      scriptAliases: parseOptionalJson<string[]>(row.script_aliases as string | null),
     })
   );
 
@@ -785,9 +841,31 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       dismissedWarningIds: parseJson<string[]>(row.dismissed_warning_ids as string | undefined, []),
       remindersSent: parseJson<Rehearsal['remindersSent']>(row.reminders_sent as string | undefined, []),
       reminderOptOut: asBool(row.reminder_opt_out as number | null | undefined),
+      telegramPlanSentAt: (row.telegram_plan_sent_at as string | null) ?? undefined,
       schedule: scheduleByRehearsal.get(String(row.id)) ?? [],
     })
   );
+
+  const noteSql = hasTheaterFilter
+    ? `SELECT * FROM rehearsal_actor_notes WHERE theater_id IN (${theaterIn!.sql}) ORDER BY created_at DESC`
+    : `SELECT * FROM rehearsal_actor_notes ORDER BY created_at DESC`;
+  const noteRows = (
+    hasTheaterFilter
+      ? db.prepare(noteSql).all(...theaterIn!.params)
+      : db.prepare(noteSql).all()
+  ) as Array<Record<string, unknown>>;
+  const rehearsalActorNotes: RehearsalActorNote[] = noteRows.map((row) => ({
+    id: String(row.id),
+    theaterId: String(row.theater_id),
+    rehearsalId: String(row.rehearsal_id),
+    actorId: String(row.actor_id),
+    sceneId: (row.scene_id as string | null) ?? undefined,
+    scheduleBlockId: (row.schedule_block_id as string | null) ?? undefined,
+    text: String(row.text),
+    createdAt: String(row.created_at),
+    sentAt: (row.sent_at as string | null) ?? undefined,
+    acknowledgedAt: (row.acknowledged_at as string | null) ?? undefined,
+  }));
 
   return {
     theaters,
@@ -803,6 +881,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
     tasks,
     venues,
     rehearsals,
+    rehearsalActorNotes,
     appMeta: parseJson(settings?.app_meta, {}),
   };
 }
@@ -828,7 +907,23 @@ export function saveState(state: AppState, db: AppDatabase = getDb()): void {
       ).map((row) => [row.id, row.telegram_chat_id])
     );
 
+    const existingRsvpRows = db
+      .prepare(`SELECT id, rsvp FROM rehearsals`)
+      .all() as Array<{ id: string; rsvp: string }>;
+    const rsvpByRehearsalId = new Map(
+      existingRsvpRows.map((row) => [row.id, parseJson<Record<string, string>>(row.rsvp, {})])
+    );
+    const stateToSave: AppState = syncDecidedNotesToActorNotes({
+      ...state,
+      rehearsals: state.rehearsals.map((rehearsal) => {
+        const dbRsvp = rsvpByRehearsalId.get(rehearsal.id);
+        if (!dbRsvp || Object.keys(dbRsvp).length === 0) return rehearsal;
+        return { ...rehearsal, rsvp: { ...dbRsvp, ...(rehearsal.rsvp ?? {}) } };
+      }),
+    });
+
     db.prepare('DELETE FROM schedule_blocks').run();
+    db.prepare('DELETE FROM rehearsal_actor_notes').run();
     db.prepare('DELETE FROM rehearsals').run();
     db.prepare('DELETE FROM tasks').run();
     db.prepare('DELETE FROM scenes').run();
@@ -851,7 +946,7 @@ export function saveState(state: AppState, db: AppDatabase = getDb()): void {
       JSON.stringify(state.appMeta ?? {})
     );
 
-    insertStateEntities(db, state, { preservedActorTelegramChatIds });
+    insertStateEntities(db, stateToSave, { preservedActorTelegramChatIds });
   });
 
   tx();

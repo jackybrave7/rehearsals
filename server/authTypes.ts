@@ -1,4 +1,4 @@
-export type TheaterAccessRole = 'owner' | 'editor' | 'observer';
+export type TheaterAccessRole = 'owner' | 'editor' | 'observer' | 'actor';
 
 export interface AuthUser {
   id: string;

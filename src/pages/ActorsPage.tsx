@@ -4,6 +4,7 @@ import { Plus, Pencil, Phone, Archive, ArchiveRestore, AtSign, CalendarOff, Tras
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActiveActors, getArchivedActors, formatActorRolesSummary, countActorRoles } from '../store/selectors';
+import { ImageCropField } from '../components/ImageCropField';
 import { uploadFile } from '../api/files';
 import { generateId } from '../utils/id';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
@@ -194,9 +195,7 @@ export function ActorsPage() {
     setModalOpen(true);
   };
 
-  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handlePhotoCropped = async (file: File) => {
     try {
       const uploaded = await uploadFile(file);
       setForm((f) => ({ ...f, photoUrl: uploaded.url }));
@@ -379,10 +378,13 @@ export function ActorsPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <ActorAvatar name={form.name || 'Участник'} photoUrl={form.photoUrl} size="lg" />
-            <label className="cursor-pointer rounded-lg border border-gold/20 px-4 py-2 text-sm text-gold-light hover:bg-gold/10">
+            <ImageCropField
+              title="Фото участника"
+              className="cursor-pointer rounded-lg border border-gold/20 px-4 py-2 text-sm text-gold-light hover:bg-gold/10"
+              onCropped={handlePhotoCropped}
+            >
               Загрузить фото
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-            </label>
+            </ImageCropField>
           </div>
           <Input
             label="Имя"

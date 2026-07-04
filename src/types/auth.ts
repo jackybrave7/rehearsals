@@ -1,4 +1,4 @@
-export type TheaterAccessRole = 'owner' | 'editor' | 'observer';
+export type TheaterAccessRole = 'owner' | 'editor' | 'observer' | 'actor';
 
 export type SubscriptionPlan = 'free' | 'pro';
 
@@ -27,10 +27,14 @@ export interface TheaterMember {
   email: string;
   name: string;
   role: TheaterAccessRole;
+  /** Имя из карточки участника труппы (actors), если привязана по email */
+  actorName?: string;
+  photoUrl?: string;
 }
 
 export const THEATER_ROLE_LABELS: Record<TheaterAccessRole, string> = {
   owner: 'Владелец',
   editor: 'Редактор',
   observer: 'Наблюдатель',
+  actor: 'Актёр',
 };

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useDesign } from '../store/DesignContext';
 import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import { syncSceneAnchorsFromGoogleDoc, fetchGoogleDocAnchors, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
 import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
@@ -9,6 +10,7 @@ import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { Button } from './Button';
+import { Modal } from './Modal';
 
 interface GoogleDocsLinksPanelProps {
   play: Play;
@@ -29,11 +31,15 @@ function formatSyncDate(value: string | undefined): string | null {
 
 export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps) {
   const { state, dispatch } = useRehearsalStore();
+  const { isZen } = useDesign();
   const auth = useGoogleDocsAuth();
+  const [modalOpen, setModalOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const autoSyncAttemptedRef = useRef<string | null>(null);
+
+  const hasGoogleDocs = Boolean(play.documentUrl && isGoogleDocsUrl(play.documentUrl));
 
   const linkedCount = useMemo(
     () => scenes.filter((scene) => scene.scriptAnchor).length,
@@ -47,12 +53,8 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
   const appOrigin =
     typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
-  if (!play.documentUrl || !isGoogleDocsUrl(play.documentUrl)) {
-    return null;
-  }
-
   const syncedAtLabel = formatSyncDate(play.googleDocsLinksSyncedAt);
-  const likelyOfficeUpload = isLikelyUploadedOfficeDoc(play.documentUrl);
+  const likelyOfficeUpload = hasGoogleDocs ? isLikelyUploadedOfficeDoc(play.documentUrl!) : false;
 
   const characterRoles = useMemo(
     () => state.playRoles.filter((role) => role.playId === play.id && role.kind === 'character'),
@@ -242,6 +244,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
   useEffect(() => {
     if (
+      !hasGoogleDocs ||
       !auth.isConfigured ||
       !auth.accessToken ||
       likelyOfficeUpload ||
@@ -256,6 +259,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
     void handleSync({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-sync once per play when token already exists
   }, [
+    hasGoogleDocs,
     auth.isConfigured,
     auth.accessToken,
     likelyOfficeUpload,
@@ -307,15 +311,51 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
     }
   };
 
+  if (!hasGoogleDocs) {
+    return null;
+  }
+
+  const triggerHint = linkedCount > 0
+    ? `${linkedCount} из ${scenes.length} привязано`
+    : !auth.isConfigured
+      ? 'не настроено'
+      : !auth.accessToken
+        ? 'не подключено'
+        : null;
+
   return (
-    <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Link2 size={16} className="text-gold" />
-            Ссылки на текст (Google Docs)
-          </h2>
-          <p className="mt-1 text-xs text-muted">
+    <>
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+          isZen
+            ? 'border-border/60 text-muted hover:bg-black/[0.03] hover:text-foreground'
+            : 'border-gold/15 text-muted hover:bg-white/5 hover:text-white'
+        }`}
+      >
+        <Link2 size={16} className={isZen ? 'text-accent' : 'text-gold'} />
+        Google Docs
+        {triggerHint ? (
+          <span className="max-w-[12rem] truncate text-xs font-normal opacity-80">· {triggerHint}</span>
+        ) : null}
+      </button>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Ссылки на текст (Google Docs)"
+        wide
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>
+              Закрыть
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
             {linkedCount > 0
               ? `Привязано ${linkedCount} из ${scenes.length} сцен`
               : scenes.length === 0
@@ -324,95 +364,99 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             {countedCount > 0 ? ` · хронометраж для ${countedCount} сцен` : ''}
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          {!auth.isConfigured ? (
-            <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              Добавьте VITE_GOOGLE_CLIENT_ID в .env
-            </span>
-          ) : !auth.accessToken ? (
-            <Button
-              variant={scenes.length === 0 ? 'primary' : 'secondary'}
-              onClick={() => void auth.signIn()}
-              disabled={auth.isRequesting}
-            >
-              {auth.isRequesting ? <Loader2 size={16} className="animate-spin" /> : null}
-              Подключить Google Docs
-            </Button>
-          ) : (
-            <>
+          <div className="flex flex-wrap gap-2">
+            {!auth.isConfigured ? (
+              <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                Добавьте VITE_GOOGLE_CLIENT_ID в .env
+              </span>
+            ) : !auth.accessToken ? (
               <Button
                 variant={scenes.length === 0 ? 'primary' : 'secondary'}
-                onClick={() => void handleSync()}
-                disabled={isSyncing}
+                onClick={() => void auth.signIn()}
+                disabled={auth.isRequesting}
               >
-                {isSyncing ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={16} />
-                )}
-                {scenes.length === 0 ? 'Импортировать сцены' : 'Ссылки и хронометраж'}
+                {auth.isRequesting ? <Loader2 size={16} className="animate-spin" /> : null}
+                Подключить Google Docs
               </Button>
-              <Button
-                variant="secondary"
-                onClick={handleCountCharacters}
-                disabled={isSyncing || linkedCount === 0}
-              >
-                Подсчитать знаки
-              </Button>
-              <Button variant="ghost" onClick={auth.signOut} title="Выйти из Google">
-                <LogOut size={16} />
-              </Button>
-            </>
+            ) : (
+              <>
+                <Button
+                  variant={scenes.length === 0 ? 'primary' : 'secondary'}
+                  onClick={() => void handleSync()}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={16} />
+                  )}
+                  {scenes.length === 0 ? 'Импортировать сцены' : 'Ссылки и хронометраж'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleCountCharacters}
+                  disabled={isSyncing || linkedCount === 0}
+                >
+                  Подсчитать знаки
+                </Button>
+                <Button variant="ghost" onClick={auth.signOut} title="Выйти из Google">
+                  <LogOut size={16} />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {(likelyOfficeUpload || auth.error || syncError || syncMessage) && (
+            <div className="space-y-1 text-sm">
+              {likelyOfficeUpload && !syncError && (
+                <p className="text-amber-200">
+                  Похоже, это загруженный Word, а не Google Документ. Для сопоставления ссылок сохраните его как
+                  Google Документ (Файл → «Сохранить как Google Документ») и обновите ссылку в постановке.
+                </p>
+              )}
+              {auth.error && <p className="text-red-300">{auth.error}</p>}
+              {syncError && <p className="text-red-300">{syncError}</p>}
+              {syncMessage && <p className="text-emerald-300">{syncMessage}</p>}
+            </div>
+          )}
+
+          {(auth.error?.includes('OAuth Client ID') || !auth.isConfigured) && (
+            <div
+              className={`space-y-2 rounded-lg border p-3 text-sm text-muted ${
+                isZen ? 'border-border/60 bg-black/[0.02]' : 'border-amber-500/20 bg-amber-500/5'
+              }`}
+            >
+              <p className="font-medium text-amber-100">Настройка Google Cloud Console</p>
+              <ol className="list-decimal space-y-1 pl-4">
+                <li>
+                  <a
+                    href="https://console.cloud.google.com/apis/library/docs.googleapis.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold-light hover:underline"
+                  >
+                    Включите Google Docs API
+                  </a>
+                </li>
+                <li>
+                  Credentials → Create credentials → OAuth client ID → тип{' '}
+                  <strong className="text-white">Web application</strong>
+                </li>
+                <li>
+                  Authorized JavaScript origins: добавьте{' '}
+                  <code className="rounded bg-white/5 px-1">{appOrigin}</code>
+                </li>
+                <li>
+                  Скопируйте Client ID в <code className="rounded bg-white/5 px-1">.env</code> как{' '}
+                  <code className="rounded bg-white/5 px-1">VITE_GOOGLE_CLIENT_ID=...</code>
+                </li>
+                <li>Перезапустите приложение (restart.bat)</li>
+              </ol>
+            </div>
           )}
         </div>
-      </div>
-
-      {(likelyOfficeUpload || auth.error || syncError || syncMessage) && (
-        <div className="mt-3 space-y-1 text-xs">
-          {likelyOfficeUpload && !syncError && (
-            <p className="text-amber-200">
-              Похоже, это загруженный Word, а не Google Документ. Для сопоставления ссылок сохраните его как
-              Google Документ (Файл → «Сохранить как Google Документ») и обновите ссылку в постановке.
-            </p>
-          )}
-          {auth.error && <p className="text-red-300">{auth.error}</p>}
-          {syncError && <p className="text-red-300">{syncError}</p>}
-          {syncMessage && <p className="text-emerald-300">{syncMessage}</p>}
-        </div>
-      )}
-
-      {(auth.error?.includes('OAuth Client ID') || !auth.isConfigured) && (
-        <div className="mt-3 space-y-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-muted">
-          <p className="font-medium text-amber-100">Настройка Google Cloud Console</p>
-          <ol className="list-decimal space-y-1 pl-4">
-            <li>
-              <a
-                href="https://console.cloud.google.com/apis/library/docs.googleapis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gold-light hover:underline"
-              >
-                Включите Google Docs API
-              </a>
-            </li>
-            <li>
-              Credentials → Create credentials → OAuth client ID → тип{' '}
-              <strong className="text-white">Web application</strong>
-            </li>
-            <li>
-              Authorized JavaScript origins: добавьте{' '}
-              <code className="rounded bg-white/5 px-1">{appOrigin}</code>
-            </li>
-            <li>
-              Скопируйте Client ID в <code className="rounded bg-white/5 px-1">.env</code> как{' '}
-              <code className="rounded bg-white/5 px-1">VITE_GOOGLE_CLIENT_ID=...</code>
-            </li>
-            <li>Перезапустите приложение (restart.bat)</li>
-          </ol>
-        </div>
-      )}
-    </section>
+      </Modal>
+    </>
   );
 }

@@ -18,7 +18,7 @@ import { ActorTelegramBotLink } from '../components/ActorTelegramBotLink';
 import { Button } from '../components/Button';
 import { UpgradePrompt } from '../components/UpgradePrompt';
 import { useSubscription } from '../hooks/useSubscription';
-import { getActorUnavailabilityBadge } from '../utils/actorAvailability';
+import { formatUnavailabilityTimeRange, getActorUnavailabilityBadge } from '../utils/actorAvailability';
 import { getActorWorkload, groupRolesByPlay } from '../utils/actorInsights';
 import { formatPhone } from '../utils/phone';
 import { resolveRehearsalLocation } from '../utils/venue';
@@ -208,6 +208,7 @@ export function ActorDetailPage() {
                   {period.from.split('-').reverse().join('.')}
                   {period.from !== period.to &&
                     ` — ${period.to.split('-').reverse().join('.')}`}
+                  <span className="text-muted"> · {formatUnavailabilityTimeRange(period)}</span>
                 </p>
                 {period.reason && <p className="text-muted">{period.reason}</p>}
               </li>

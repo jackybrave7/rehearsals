@@ -15,15 +15,21 @@ export function Modal({ open, onClose, title, children, footer, wide, xl }: Moda
   if (!open) return null;
 
   const widthClass = xl ? 'max-w-4xl' : wide ? 'max-w-2xl' : 'max-w-lg';
+  const titleId = 'modal-title';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={`relative flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-gold/20 bg-surface shadow-2xl sm:max-h-[90vh] sm:rounded-2xl ${widthClass}`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gold/10 px-4 py-4 sm:px-6">
-          <h2 className="text-lg font-semibold text-gold-light">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-gold-light">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}

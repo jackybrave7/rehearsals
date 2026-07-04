@@ -10,7 +10,7 @@ import { appPaths } from '../navigation/appPaths';
 const welcomeStorageKey = (userId: string) => `rehearsals-welcome-seen:${userId}`;
 
 function NoTheaterAccess() {
-  const { user, logout, refreshSession } = useAuth();
+  const { user, logout, refreshSession, canCreateTheater } = useAuth();
   const { retryConnection } = useRehearsalStore();
   const { createTheater } = useCreateTheater();
   const [welcomeOpen, setWelcomeOpen] = useState(false);
@@ -39,17 +39,26 @@ function NoTheaterAccess() {
       <WelcomeOnboardingModal
         open={welcomeOpen}
         onClose={markWelcomeSeen}
-        onCreateTheater={createTheater}
+        onCreateTheater={canCreateTheater ? createTheater : undefined}
       />
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <h1 className="text-2xl font-bold text-white">Добро пожаловать</h1>
         <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted">
-          У аккаунта <span className="text-foreground">{user?.email}</span> пока нет театров. Создайте
-          свой коллектив или дождитесь приглашения — владелец добавит вас в настройках «Доступ к
-          театру» с тем же email.
+          {canCreateTheater ? (
+            <>
+              У аккаунта <span className="text-foreground">{user?.email}</span> пока нет театров. Создайте
+              свой коллектив или дождитесь приглашения — владелец добавит вас в настройках «Доступ к
+              театру» с тем же email.
+            </>
+          ) : (
+            <>
+              У аккаунта <span className="text-foreground">{user?.email}</span> пока нет театров. Дождитесь
+              приглашения — режиссёр добавит вас в настройках «Доступ к театру» с тем же email.
+            </>
+          )}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Button onClick={() => void createTheater()}>Создать театр</Button>
+          {canCreateTheater ? <Button onClick={() => void createTheater()}>Создать театр</Button> : null}
           <Button variant="secondary" onClick={checkAccess}>
             Проверить доступ
           </Button>

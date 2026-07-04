@@ -21,6 +21,7 @@ import { addMinutes } from '../utils/time';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { recalculateScheduleStartTimes, setPlanPoolDragData } from '../utils/schedulePlan';
 import { fetchTelegramStatus, sendTelegramHtmlMessage } from '../api/telegram';
+import { fetchRehearsalRsvp } from '../api/rehearsalRsvp';
 import { resolveRehearsalLocation } from '../utils/venue';
 import {
   buildRehearsalTelegramBotMessage,
@@ -36,11 +37,7 @@ import {
   updateSceneDurationInSchedule,
 } from '../utils/scheduleSync';
 import {
-  formatPerformanceLabel,
   getActorAssignments,
-  getPlayPerformances,
-  getPlayRoles,
-  getPlayScenes,
   getTheaterPlays,
   getTheaterTasks,
   getTheaterVenues,
@@ -50,13 +47,15 @@ import {
 import {
   getRehearsalParticipantActorIds,
   mergeActorsForNewScenes,
-  resolveRehearsalPerformanceId,
+  resolvePerformanceIdForPlay,
   sortParticipantOrderByParticipation,
 } from '../utils/rehearsalActors';
+import { getArchivedPlaysInRehearsal, getRehearsalPlayIds } from '../utils/rehearsalPlays';
+import { getRehearsalEventLabel } from '../utils/rehearsalCalendarMarkers';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import { ActorAvatar } from '../components/ActorAvatar';
-import { SceneListGrouped } from '../components/SceneListGrouped';
-import { ScenePicker } from '../components/ScenePicker';
+import { TheaterSceneListGrouped } from '../components/TheaterSceneListGrouped';
+import { TheaterScenePicker } from '../components/TheaterScenePicker';
 import { SceneSelect } from '../components/SceneSelect';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import type {
@@ -75,18 +74,23 @@ import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
+import { GuideContextHelp } from '../components/guide/GuideContextHelp';
+import { markGuidePlanExported } from '../utils/guidePlanExport';
+import { MentionTextarea } from '../components/MentionTextarea';
+import { buildMentionOptions } from '../utils/decidedNotesMentions';
 import {
   dismissRehearsalWarning,
   getActorScheduleConflicts,
   getRehearsalWarnings,
+  getVenueScheduleConflicts,
 } from '../utils/rehearsalInsights';
-import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
 import { appPaths } from '../navigation/appPaths';
 import {
   countRsvpSummary,
   formatRsvpSummaryLine,
   rsvpColors,
   rsvpLabels,
+  rsvpShortLabels,
 } from '../utils/rehearsalRsvp';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
@@ -95,6 +99,7 @@ const blockTypeLabels: Record<ScheduleBlockType, string> = {
   break: 'Перерыв',
   warmup: 'Разминка',
   custom: 'Другое',
+  etude: 'Этюд',
 };
 
 const attendanceLabels: Record<AttendanceStatus, string> = {
@@ -148,15 +153,57 @@ export function RehearsalDetailPage() {
     void fetchTelegramStatus(theaterId).then((status) => setTelegramConfigured(status.configured));
   }, [telegramModalOpen, rehearsal?.theaterId, state.activeTheaterId]);
 
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    const refreshRsvp = async () => {
+      try {
+        const rsvp = await fetchRehearsalRsvp(id);
+        if (cancelled) return;
+        dispatch({ type: 'PATCH_REHEARSAL_RSVP', payload: { rehearsalId: id, rsvp } });
+      } catch {
+        // ignore transient polling errors
+      }
+    };
+
+    void refreshRsvp();
+    const intervalId = window.setInterval(() => void refreshRsvp(), 15_000);
+    const onFocus = () => void refreshRsvp();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [id, dispatch]);
+
   const rehearsalInsights = useMemo(() => {
     if (!rehearsal) {
-      return { warnings: [], conflicts: [] };
+      return { warnings: [], conflicts: [], venueConflicts: [] };
     }
     return {
       warnings: getRehearsalWarnings(state, rehearsal),
       conflicts: getActorScheduleConflicts(state, rehearsal),
+      venueConflicts: getVenueScheduleConflicts(state, rehearsal),
     };
   }, [state, rehearsal]);
+
+  const editDraftRehearsal = useMemo<Rehearsal | null>(() => {
+    if (!editForm || !rehearsal) return null;
+    return { ...editForm, id: rehearsal.id };
+  }, [editForm, rehearsal]);
+
+  const editInsights = useMemo(() => {
+    if (!editDraftRehearsal) {
+      return { warnings: [], conflicts: [], venueConflicts: [] };
+    }
+    return {
+      warnings: getRehearsalWarnings(state, editDraftRehearsal),
+      conflicts: getActorScheduleConflicts(state, editDraftRehearsal),
+      venueConflicts: getVenueScheduleConflicts(state, editDraftRehearsal),
+    };
+  }, [state, editDraftRehearsal]);
 
   if (!rehearsal) {
     return (
@@ -343,16 +390,56 @@ export function RehearsalDetailPage() {
 
   const handleBlockTypeChange = (type: ScheduleBlockType) => {
     setBlockForm((f) => {
-      const updated = { ...f, type };
-      if (type === 'scene' && f.sceneId) {
-        const scene = state.scenes.find((s) => s.id === f.sceneId);
-        if (scene) updated.title = scene.title;
+      const common = {
+        startTime: f.startTime,
+        durationMinutes: f.durationMinutes,
+        title: f.title,
+        notes: f.notes,
+        type,
+      };
+      if (type === 'scene') {
+        const scene = f.sceneId ? state.scenes.find((s) => s.id === f.sceneId) : undefined;
+        return {
+          ...common,
+          sceneId: f.sceneId,
+          title: scene?.title ?? f.title,
+          decidedNotes: f.decidedNotes,
+        };
       }
-      if (type === 'task' && f.taskId) {
-        const task = theaterTasks.find((t) => t.id === f.taskId);
-        if (task) updated.title = task.title;
+      if (type === 'task') {
+        const task = f.taskId ? theaterTasks.find((t) => t.id === f.taskId) : undefined;
+        return {
+          ...common,
+          taskId: f.taskId,
+          title: task?.title ?? f.title,
+        };
       }
-      return updated;
+      if (type === 'etude') {
+        return {
+          ...common,
+          playId: f.playId,
+          actorIds: f.actorIds,
+          title: f.title || 'Этюд',
+        };
+      }
+      return common;
+    });
+  };
+
+  const handleEtudePlaySelect = (playId: string) => {
+    setBlockForm((f) => ({
+      ...f,
+      playId: playId || undefined,
+    }));
+  };
+
+  const toggleEtudeActor = (actorId: string) => {
+    setBlockForm((f) => {
+      const current = f.actorIds ?? [];
+      const actorIds = current.includes(actorId)
+        ? current.filter((id) => id !== actorId)
+        : [...current, actorId];
+      return { ...f, actorIds: actorIds.length > 0 ? actorIds : undefined };
     });
   };
 
@@ -378,31 +465,25 @@ export function RehearsalDetailPage() {
   const linkedScenes = rehearsal.sceneIds
     .map((sid) => state.scenes.find((s) => s.id === sid))
     .filter((scene): scene is Scene => Boolean(scene));
-  const playScenes = getPlayScenes(state, rehearsal.playId ?? state.activePlayId);
-  const editPerformances = getPlayPerformances(state, editForm?.playId ?? rehearsal.playId ?? state.activePlayId ?? '');
-  const pickerCharacterRoles = getPlayRoles(
-    state,
-    editForm?.playId ?? rehearsal.playId ?? state.activePlayId ?? '',
-    'character'
+  const theaterScenes = state.scenes.filter((scene) =>
+    theaterPlays.some((play) => play.id === scene.playId)
   );
+  const playsById = Object.fromEntries(theaterPlays.map((play) => [play.id, play]));
   const linkedTasks = rehearsal.taskIds
     .map((tid) => theaterTasks.find((t) => t.id === tid))
     .filter((task): task is Task => Boolean(task));
-  const rehearsalPlay = theaterPlays.find(
-    (play) => play.id === (rehearsal.playId ?? state.activePlayId)
-  );
-  const calendarTitle = getRehearsalEventTitle(rehearsalPlay?.title);
-
-  const rehearsalPerformance = state.performances.find(
-    (p) => p.id === resolveRehearsalPerformanceId(state, rehearsal)
-  );
+  const calendarTitle = getRehearsalEventLabel(state, rehearsal);
+  const rehearsalPlayTitles = getRehearsalPlayIds(state, rehearsal)
+    .map((playId) => theaterPlays.find((play) => play.id === playId)?.title)
+    .filter((title): title is string => Boolean(title));
   const participantActorIds = getRehearsalParticipantActorIds(state, rehearsal);
   const participantActors = participantActorIds
     .map((aid) => state.actors.find((a) => a.id === aid))
     .filter(Boolean);
-  const rsvpSummary = countRsvpSummary(rehearsal, rehearsal.actorIds);
+  const rsvpSummary = countRsvpSummary(rehearsal, participantActorIds);
+  const activeActors = getActiveActors(state);
 
-  const theaterActorPool = getActiveActors(state).filter(
+  const theaterActorPool = activeActors.filter(
     (actor) => !participantActorIds.includes(actor.id)
   );
 
@@ -440,16 +521,31 @@ export function RehearsalDetailPage() {
     setParticipantDragOverIndex(null);
   };
 
-  const actorRolesInPlay = (actorId: string) => {
-    const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
+  const actorRolesInRehearsal = (actorId: string) => {
+    const playIds = getRehearsalPlayIds(state, rehearsal);
+    if (playIds.length === 0) return '';
 
-    if (!performanceId) return '';
+    const parts: string[] = [];
+    for (const playId of playIds) {
+      const performanceId = resolvePerformanceIdForPlay(state, playId);
+      if (!performanceId) continue;
 
-    return getActorAssignments(state, actorId)
-      .filter((a) => a.performanceId === performanceId)
-      .map((a) => state.playRoles.find((r) => r.id === a.roleId)?.name)
-      .filter(Boolean)
-      .join(', ');
+      const roleNames = getActorAssignments(state, actorId)
+        .filter((a) => a.performanceId === performanceId)
+        .map((a) => state.playRoles.find((r) => r.id === a.roleId)?.name)
+        .filter(Boolean);
+
+      if (roleNames.length === 0) continue;
+
+      const play = theaterPlays.find((p) => p.id === playId);
+      if (playIds.length > 1 && play) {
+        parts.push(`${roleNames.join(', ')} · «${play.title}»`);
+      } else {
+        parts.push(roleNames.join(', '));
+      }
+    }
+
+    return parts.join(' · ');
   };
 
   const telegramMessage = buildRehearsalTelegramMessage(state, rehearsal);
@@ -480,6 +576,11 @@ export function RehearsalDetailPage() {
           initiatedBy: user?.name?.trim() || user?.email,
         })
       );
+      dispatch({
+        type: 'UPDATE_REHEARSAL',
+        payload: { ...rehearsal, telegramPlanSentAt: new Date().toISOString() },
+      });
+      markGuidePlanExported(dispatch);
       setTelegramSent(true);
       window.setTimeout(() => setTelegramSent(false), 3000);
     } catch (error) {
@@ -519,9 +620,9 @@ export function RehearsalDetailPage() {
                 <MapPin size={16} /> {rehearsalLocation}
               </span>
             )}
-            {rehearsalPerformance && (
+            {rehearsalPlayTitles.length > 0 && (
               <span className="rounded-full bg-gold/10 px-2.5 py-0.5 text-xs text-gold-light">
-                {formatPerformanceLabel(rehearsalPerformance)}
+                {rehearsalPlayTitles.map((title) => `«${title}»`).join(' · ')}
               </span>
             )}
           </div>
@@ -533,6 +634,7 @@ export function RehearsalDetailPage() {
           title={calendarTitle}
           location={rehearsalLocation}
           onTelegram={openTelegramExport}
+          onPlanExported={() => markGuidePlanExported(dispatch)}
           onEdit={readOnly ? undefined : openEditRehearsal}
           onDelete={readOnly ? undefined : deleteRehearsal}
         />
@@ -543,6 +645,7 @@ export function RehearsalDetailPage() {
         <RehearsalWarningsPanel
           warnings={rehearsalInsights.warnings}
           conflicts={rehearsalInsights.conflicts}
+          venueConflicts={rehearsalInsights.venueConflicts}
           dismissedIds={rehearsal.dismissedWarningIds}
           onDismiss={dismissRehearsalWarningItem}
         />
@@ -615,9 +718,9 @@ export function RehearsalDetailPage() {
                 Сцены ({linkedScenes.length})
               </h2>
               <p className="mb-3 text-xs text-muted">Перетащите в план справа</p>
-              <SceneListGrouped
+              <TheaterSceneListGrouped
+                plays={theaterPlays}
                 scenes={linkedScenes}
-                play={rehearsalPlay}
                 compact
                 draggable={!readOnly}
               />
@@ -643,9 +746,15 @@ export function RehearsalDetailPage() {
                   const selected = rehearsal.actorIds.includes(actor!.id);
                   const attendance = rehearsal.attendance?.[actor!.id] ?? (selected ? 'present' : 'absent');
                   const rsvpStatus = rehearsal.rsvp?.[actor!.id];
-                  const unavailable = isActorUnavailable(actor!, rehearsal.date);
+                  const unavailable = isActorUnavailable(actor!, rehearsal.date, {
+                    startTime: rehearsal.startTime,
+                    endTime: rehearsal.endTime,
+                  });
                   const unavailReason = unavailable
-                    ? getActorUnavailabilityReason(actor!, rehearsal.date)
+                    ? getActorUnavailabilityReason(actor!, rehearsal.date, {
+                        startTime: rehearsal.startTime,
+                        endTime: rehearsal.endTime,
+                      })
                     : undefined;
                   return (
                     <div
@@ -703,7 +812,7 @@ export function RehearsalDetailPage() {
                               )}
                             </p>
                             <p className="participant-role line-clamp-2 text-xs leading-snug">
-                              {actorRolesInPlay(actor!.id) || 'Роль не указана'}
+                              {actorRolesInRehearsal(actor!.id) || 'Роль не указана'}
                             </p>
                           </button>
                           <span
@@ -713,7 +822,42 @@ export function RehearsalDetailPage() {
                           >
                             {selected ? 'участвует' : 'нет'}
                           </span>
+                          {rsvpStatus && (
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${rsvpColors[rsvpStatus]}`}
+                              title={`RSVP: ${rsvpLabels[rsvpStatus]}`}
+                            >
+                              {rsvpShortLabels[rsvpStatus]} {rsvpLabels[rsvpStatus]}
+                            </span>
+                          )}
                         </div>
+                        {readOnly ? (
+                          !rsvpStatus && (
+                            <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-muted">
+                              RSVP: {rsvpEmptyLabel}
+                            </span>
+                          )
+                        ) : (
+                          <select
+                            value={rsvpStatus ?? ''}
+                            onChange={(event) =>
+                              updateRsvp(actor!.id, event.target.value as RsvpStatus | '')
+                            }
+                            className={`mt-2 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+                              rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
+                            }`}
+                            aria-label={`RSVP: ${actor!.name}`}
+                          >
+                            <option value="" className="bg-surface text-white">
+                              {rsvpEmptyLabel}
+                            </option>
+                            {Object.entries(rsvpLabels).map(([value, label]) => (
+                              <option key={value} value={value} className="bg-surface text-white">
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <select
                           value={attendance}
                           disabled={readOnly}
@@ -729,37 +873,6 @@ export function RehearsalDetailPage() {
                             </option>
                           ))}
                         </select>
-                        {selected && (
-                          readOnly ? (
-                            <span
-                              className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-                                rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
-                              }`}
-                            >
-                              RSVP: {rsvpStatus ? rsvpLabels[rsvpStatus] : rsvpEmptyLabel}
-                            </span>
-                          ) : (
-                            <select
-                              value={rsvpStatus ?? ''}
-                              onChange={(event) =>
-                                updateRsvp(actor!.id, event.target.value as RsvpStatus | '')
-                              }
-                              className={`mt-2 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
-                                rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
-                              }`}
-                              aria-label={`RSVP: ${actor!.name}`}
-                            >
-                              <option value="" className="bg-surface text-white">
-                                {rsvpEmptyLabel}
-                              </option>
-                              {Object.entries(rsvpLabels).map(([value, label]) => (
-                                <option key={value} value={value} className="bg-surface text-white">
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                          )
-                        )}
                       </div>
                     </div>
                   );
@@ -781,9 +894,15 @@ export function RehearsalDetailPage() {
                     >
                       <option value="">Выберите из состава…</option>
                       {theaterActorPool.map((actor) => {
-                        const unavailable = isActorUnavailable(actor, rehearsal.date);
+                        const unavailable = isActorUnavailable(actor, rehearsal.date, {
+                          startTime: rehearsal.startTime,
+                          endTime: rehearsal.endTime,
+                        });
                         const reason = unavailable
-                          ? getActorUnavailabilityReason(actor, rehearsal.date)
+                          ? getActorUnavailabilityReason(actor, rehearsal.date, {
+                              startTime: rehearsal.startTime,
+                              endTime: rehearsal.endTime,
+                            })
                           : undefined;
                         return (
                           <option
@@ -854,12 +973,16 @@ export function RehearsalDetailPage() {
               </ul>
             </section>
           )}
+
         </div>
 
         <div className="min-w-0">
+          <div className="mb-2 flex justify-end">
+            <GuideContextHelp anchor="репетиция" label="Справка: репетиция и план" />
+          </div>
           <RehearsalScheduleEditor
             rehearsal={rehearsal}
-            play={rehearsalPlay}
+            playsById={playsById}
             linkedScenes={linkedScenes}
             linkedTasks={linkedTasks}
             onScheduleChange={updateSchedule}
@@ -895,6 +1018,38 @@ export function RehearsalDetailPage() {
               value={editForm.date}
               onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
             />
+
+            {(editInsights.warnings.length > 0 ||
+              editInsights.conflicts.length > 0 ||
+              editInsights.venueConflicts.length > 0) && (
+              <div className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm">
+                {editInsights.warnings.map((warning) => (
+                  <p key={warning.id} className="text-amber-100">
+                    {warning.message}
+                  </p>
+                ))}
+                {editInsights.conflicts.map((conflict) => (
+                  <p
+                    key={`${conflict.actor.id}-${conflict.otherRehearsal.id}`}
+                    className="text-amber-100"
+                  >
+                    {conflict.actor.name} уже в репетиции «{conflict.otherPlayTitle}» в это время (
+                    {conflict.otherRehearsal.startTime}–{conflict.otherRehearsal.endTime}).
+                  </p>
+                ))}
+                {editInsights.venueConflicts.map((conflict) => (
+                  <p
+                    key={`${conflict.venue.id}-${conflict.otherRehearsal.id}`}
+                    className="text-amber-100"
+                  >
+                    Площадка «{conflict.venue.name}» уже занята репетицией «
+                    {conflict.otherPlayTitle}» в это время (
+                    {conflict.otherRehearsal.startTime}–{conflict.otherRehearsal.endTime}).
+                  </p>
+                ))}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Начало"
@@ -920,51 +1075,21 @@ export function RehearsalDetailPage() {
               value={editForm.notes ?? ''}
               onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
             />
-            {theaterPlays.length > 1 && (
-              <Select
-                label="Постановка"
-                value={editForm.playId ?? ''}
-                onChange={(e) => {
-                  const playId = e.target.value || undefined;
-                  const performanceId = playId
-                    ? resolveRehearsalPerformanceId(state, { playId })
-                    : undefined;
-                  setEditForm({
-                    ...editForm,
-                    playId,
-                    performanceId,
-                    sceneIds: [],
-                  });
-                }}
-                options={[
-                  { value: '', label: 'Без привязки' },
-                  ...theaterPlays.map((p) => ({ value: p.id, label: p.title })),
-                ]}
-              />
+            {getArchivedPlaysInRehearsal(state, { ...editForm, id: rehearsal.id }).length > 0 && (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                В плане есть сцены из архивных постановок:{' '}
+                {getArchivedPlaysInRehearsal(state, { ...editForm, id: rehearsal.id })
+                  .map((play) => `«${play.title}»`)
+                  .join(', ')}
+              </div>
             )}
-            {editPerformances.length > 0 && editForm.playId && (
-              <Select
-                label="Показ"
-                value={editForm.performanceId ?? resolveRehearsalPerformanceId(state, editForm) ?? ''}
-                onChange={(e) =>
-                  setEditForm({
-                    ...editForm,
-                    performanceId: e.target.value || undefined,
-                  })
-                }
-                options={editPerformances.map((performance) => ({
-                  value: performance.id,
-                  label: formatPerformanceLabel(performance),
-                }))}
-              />
-            )}
-            {playScenes.length > 0 && (
-              <ScenePicker
-                scenes={playScenes}
+            {theaterScenes.length > 0 && (
+              <TheaterScenePicker
+                plays={theaterPlays}
+                scenes={theaterScenes}
                 selectedIds={editForm.sceneIds}
                 onChange={handleEditScenesChange}
-                characterRoles={pickerCharacterRoles}
-                playId={editForm.playId ?? state.activePlayId ?? undefined}
+                defaultPlayId={editForm.playId ?? rehearsal.playId ?? state.activePlayId}
                 excludeRehearsalId={rehearsal.id}
               />
             )}
@@ -973,7 +1098,7 @@ export function RehearsalDetailPage() {
                 <p className="text-sm text-muted">Длительность сцен в плане (мин)</p>
                 <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-3">
                   {getSceneIdsFromSchedule(editForm.schedule).map((sceneId) => {
-                    const scene = playScenes.find((item) => item.id === sceneId);
+                    const scene = state.scenes.find((item) => item.id === sceneId);
                     if (!scene) return null;
                     const durations = getSceneDurationsFromSchedule(editForm.schedule);
                     const value =
@@ -1037,10 +1162,10 @@ export function RehearsalDetailPage() {
             options={Object.entries(blockTypeLabels).map(([value, label]) => ({ value, label }))}
           />
 
-          {blockForm.type === 'scene' && playScenes.length > 0 && (
+          {blockForm.type === 'scene' && linkedScenes.length > 0 && (
             <SceneSelect
               label="Сцена"
-              scenes={playScenes}
+              scenes={linkedScenes}
               value={blockForm.sceneId ?? ''}
               onChange={handleSceneSelect}
             />
@@ -1056,6 +1181,59 @@ export function RehearsalDetailPage() {
                 ...theaterTasks.map((t) => ({ value: t.id, label: t.title })),
               ]}
             />
+          )}
+
+          {blockForm.type === 'etude' && theaterPlays.length > 0 && (
+            <Select
+              label="Постановка"
+              value={blockForm.playId ?? ''}
+              onChange={(e) => handleEtudePlaySelect(e.target.value)}
+              options={[
+                { value: '', label: '— без привязки —' },
+                ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
+              ]}
+            />
+          )}
+
+          {blockForm.type === 'etude' && activeActors.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted">Участники этюда</p>
+              <div className="max-h-32 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-2">
+                <div className="flex flex-wrap gap-2">
+                  {activeActors.map((actor) => {
+                    const selected = blockForm.actorIds?.includes(actor.id) ?? false;
+                    const unavailable = isActorUnavailable(actor, rehearsal.date, {
+                      startTime: rehearsal.startTime,
+                      endTime: rehearsal.endTime,
+                    });
+                    const reason = unavailable
+                      ? getActorUnavailabilityReason(actor, rehearsal.date, {
+                          startTime: rehearsal.startTime,
+                          endTime: rehearsal.endTime,
+                        })
+                      : undefined;
+                    return (
+                      <button
+                        key={actor.id}
+                        type="button"
+                        title={reason ? `Недоступен: ${reason}` : undefined}
+                        onClick={() => toggleEtudeActor(actor.id)}
+                        className={`rounded-full px-3 py-1 text-sm transition-colors ${
+                          selected
+                            ? 'bg-gold/20 text-gold-light'
+                            : unavailable
+                              ? 'bg-amber-500/10 text-amber-200/80 hover:bg-amber-500/20'
+                              : 'bg-white/5 text-muted hover:bg-white/10'
+                        }`}
+                      >
+                        {actor.name}
+                        {unavailable ? ' ⚠' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
 
           <Input
@@ -1085,18 +1263,14 @@ export function RehearsalDetailPage() {
             onChange={(e) => setBlockForm({ ...blockForm, notes: e.target.value })}
           />
           {blockForm.type === 'scene' && (
-            <>
-              <Textarea
-                label="Что решили (внутренне, не для Telegram)"
-                value={blockForm.decidedNotes ?? ''}
-                onChange={(e) => setBlockForm({ ...blockForm, decidedNotes: e.target.value })}
-              />
-              <Textarea
-                label="Что осталось сделать (внутренне, не для Telegram)"
-                value={blockForm.remainingNotes ?? ''}
-                onChange={(e) => setBlockForm({ ...blockForm, remainingNotes: e.target.value })}
-              />
-            </>
+            <MentionTextarea
+              label="Решения и корректировки"
+              value={blockForm.decidedNotes ?? ''}
+              onChange={(decidedNotes) => setBlockForm({ ...blockForm, decidedNotes })}
+              options={buildMentionOptions(state, rehearsal, blockForm.sceneId)}
+              rows={4}
+              placeholder="Опишите решения. Введите @, чтобы адресовать строку актёру или роли."
+            />
           )}
         </div>
       </Modal>

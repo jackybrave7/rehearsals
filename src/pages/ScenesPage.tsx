@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, Pencil, Search, X } from 'lucide-react';
+import { Plus, Pencil, Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useDesign } from '../store/DesignContext';
 import { isPlayReadOnly } from '../utils/subscription';
 import { UpgradePrompt } from '../components/UpgradePrompt';
 import { getActivePlay, getPlayRoles, getPlayScenes, getSceneRoles, getSelectedPerformance, getActorNamesForRoleInPerformance, formatPerformanceLabel } from '../store/selectors';
@@ -21,6 +22,7 @@ import { SceneRoleChip } from '../components/SceneRoleChip';
 import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
 import { ScriptImportPanel } from '../components/ScriptImportPanel';
+import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { SceneScriptLink, ActScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { PremiereBanner } from '../components/PremiereBanner';
@@ -28,6 +30,7 @@ import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
 import { buildPlayReadinessReport, heatLevelColors, heatLevelLabel } from '../utils/sceneReadiness';
+import { buildSceneMemorizationSummary } from '../utils/sceneMemorizationReadiness';
 import { sceneMatchesCharacterFilter, sceneMatchesSearch } from '../utils/sceneFilters';
 
 const statusLabels: Record<SceneStatus, string> = {
@@ -70,6 +73,8 @@ const priorityColors: Record<ScenePriority, string> = {
 
 export function ScenesPage() {
   const { state, dispatch, readOnly } = useRehearsalStore();
+  const { isZen } = useDesign();
+  const heatVariant = isZen ? 'zen' : 'theater';
   const { confirm } = useConfirmDialog();
   const activePlay = getActivePlay(state);
   const playReadOnly = activePlay ? isPlayReadOnly(activePlay) : false;
@@ -86,6 +91,7 @@ export function ScenesPage() {
   const [characterFilterOnlySelected, setCharacterFilterOnlySelected] = useState(false);
   const [actFilter, setActFilter] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [scriptLinkInput, setScriptLinkInput] = useState('');
 
   const openCreate = () => {
@@ -334,6 +340,13 @@ export function ScenesPage() {
     characterFilter.size > 0 ||
     characterFilterOnlySelected;
 
+  const activeFilterCount =
+    statusFilter.size +
+    priorityFilter.size +
+    actFilter.size +
+    characterFilter.size +
+    (characterFilterOnlySelected ? 1 : 0);
+
   if (!activePlay) {
     return (
       <div className="space-y-6">
@@ -360,7 +373,10 @@ export function ScenesPage() {
     <div className="space-y-6">
       <header className={pageHeaderClass}>
         <div>
-          <h1 className={pageTitleClass}>Сцены</h1>
+          <div className="flex items-center gap-2">
+            <h1 className={pageTitleClass}>Сцены</h1>
+            <GuideContextHelp anchor="сцены-и-текст" label="Справка: сцены и текст пьесы" />
+          </div>
           <p className="mt-1 text-muted">
             «{activePlay.title}» —{' '}
             {hasActiveFilters
@@ -376,10 +392,14 @@ export function ScenesPage() {
             </p>
           )}
         </div>
-        <Button onClick={openCreate} disabled={playReadOnly}>
-          <Plus size={18} />
-          Добавить сцену
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
+          <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
+          <Button onClick={openCreate} disabled={playReadOnly}>
+            <Plus size={18} />
+            Добавить сцену
+          </Button>
+        </div>
       </header>
 
       {playReadOnly && (
@@ -391,60 +411,93 @@ export function ScenesPage() {
 
       <PremiereBanner state={state} playId={activePlay.id} />
 
-      <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
-
-      <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
-
       {sorted.length > 0 && (
-        <div className="sticky top-0 z-30 -mx-4 space-y-3 border-b border-gold/10 bg-background/95 px-4 py-3 backdrop-blur-sm sm:-mx-5 lg:-mx-8 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <span className="font-medium text-foreground">
-                {filteredScenes.length === sorted.length
-                  ? `${sorted.length} сцен`
-                  : `${filteredScenes.length} из ${sorted.length} сцен`}
-              </span>
-              <span className="text-muted">
-                хронометраж: {formatDuration(filteredDurationMinutes)}
-              </span>
+        <div
+          className={`space-y-3 border-b pb-3 ${
+            isZen ? 'border-border/60' : 'border-gold/10'
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Поиск…"
+                className={`w-full rounded-xl border py-2.5 pl-9 pr-9 text-sm focus:outline-none focus:ring-1 ${
+                  isZen
+                    ? 'border-border/60 bg-surface text-foreground placeholder:text-muted/70 focus:border-accent/40 focus:ring-accent/20'
+                    : 'border-gold/20 bg-surface/60 text-white placeholder:text-muted/60 focus:border-gold/45 focus:ring-gold/25'
+                }`}
+                aria-label="Поиск сцен"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-white/5 hover:text-white"
+                  aria-label="Очистить поиск"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setFiltersExpanded((open) => !open)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                isZen
+                  ? filtersExpanded || activeFilterCount > 0
+                    ? 'border-accent/30 bg-accent/10 text-foreground'
+                    : 'border-border/60 text-muted hover:bg-black/[0.03]'
+                  : filtersExpanded || activeFilterCount > 0
+                    ? 'border-gold/30 bg-gold/15 text-gold-light'
+                    : 'border-gold/15 text-muted hover:bg-white/5 hover:text-white'
+              }`}
+              aria-expanded={filtersExpanded}
+            >
+              <SlidersHorizontal size={16} />
+              Фильтры
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-accent/20 px-1.5 text-xs">{activeFilterCount}</span>
+              ) : null}
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className={isZen ? 'font-medium text-foreground' : 'font-medium text-foreground'}>
+              {filteredScenes.length === sorted.length
+                ? `${sorted.length} сцен`
+                : `${filteredScenes.length} из ${sorted.length} сцен`}
+              <span className="ml-2 font-normal text-muted">
+                · {formatDuration(filteredDurationMinutes)}
+              </span>
+            </span>
             {hasActiveFilters && (
               <button
                 type="button"
-                onClick={clearAllFilters}
-                className="shrink-0 text-xs text-muted underline-offset-2 hover:text-gold-light hover:underline"
+                onClick={() => {
+                  clearAllFilters();
+                  setFiltersExpanded(false);
+                }}
+                className="text-xs text-muted underline-offset-2 hover:underline"
               >
-                Сбросить фильтры
+                Сбросить
               </button>
             )}
           </div>
 
-          <div className="relative">
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Поиск по названию, описанию, персонажам…"
-              className="w-full rounded-xl border border-gold/20 bg-surface/60 py-2.5 pl-9 pr-9 text-sm text-white placeholder:text-muted/60 focus:border-gold/45 focus:outline-none focus:ring-1 focus:ring-gold/25"
-              aria-label="Поиск сцен"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-white/5 hover:text-white"
-                aria-label="Очистить поиск"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
+          {filtersExpanded && (
+            <div className="space-y-3 rounded-xl border border-border/40 bg-black/[0.02] p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted">Статус:</span>
             <button
@@ -599,6 +652,8 @@ export function ScenesPage() {
               </label>
             </div>
           )}
+            </div>
+          )}
         </div>
       )}
 
@@ -653,7 +708,7 @@ export function ScenesPage() {
                           </span>
                           {readiness && readiness.heat !== 'recent' && (
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] ${heatLevelColors(readiness.heat)}`}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${heatLevelColors(readiness.heat, heatVariant)}`}
                               title={heatLevelLabel(readiness.heat)}
                             >
                               {heatLevelLabel(readiness.heat)}
@@ -665,6 +720,14 @@ export function ScenesPage() {
                             {scene.description}
                           </p>
                         )}
+                        {(() => {
+                          const memorizationSummary = buildSceneMemorizationSummary(state, scene.id);
+                          return memorizationSummary ? (
+                            <p className="mt-1 text-xs text-gold-light/90">
+                              Заучивание: {memorizationSummary}
+                            </p>
+                          ) : null;
+                        })()}
                         <SceneTimingHint scene={scene} appMeta={state.appMeta} compact className="mt-1" />
                         {scene.directorNotes?.trim() && (
                           <p className="mt-1 line-clamp-2 rounded-lg bg-gold/5 px-2 py-1 text-xs text-gold-light">

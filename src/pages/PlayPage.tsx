@@ -7,6 +7,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { UpgradePrompt } from '../components/UpgradePrompt';
 import { generateId } from '../utils/id';
 import { formatFileSize } from '../utils/file';
+import { ImageCropField } from '../components/ImageCropField';
 import { uploadFile } from '../api/files';
 import { resolvePlayScriptUrl } from '../utils/fileUrls';
 import type { Play } from '../types';
@@ -16,7 +17,13 @@ import { Modal } from '../components/Modal';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea } from '../components/FormFields';
 import { CastDistributionPanel } from '../components/CastDistributionPanel';
-import { getTheaterPlays } from '../store/selectors';
+import { PlayIcon } from '../components/PlayIcon';
+import { ArchivedPlaysMenu } from '../components/ArchivedPlaysMenu';
+import {
+  getActiveTheaterPlays,
+  getArchivedTheaterPlays,
+  getTheaterPlays,
+} from '../store/selectors';
 import { useHashScroll } from '../hooks/useHashScroll';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import {
@@ -30,6 +37,9 @@ const emptyPlay = (): Omit<Play, 'id'> => ({
   title: '',
   author: '',
   description: '',
+  coverUrl: undefined,
+  iconUrl: undefined,
+  iconColor: undefined,
   year: undefined,
   documentUrl: '',
   scriptFileName: undefined,
@@ -48,7 +58,11 @@ export function PlayPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyPlay());
   const [fileError, setFileError] = useState<string | null>(null);
+  const [iconError, setIconError] = useState<string | null>(null);
+  const [viewingPlayId, setViewingPlayId] = useState<string | null>(null);
   const theaterPlays = getTheaterPlays(state);
+  const activePlays = getActiveTheaterPlays(state);
+  const archivedPlays = getArchivedTheaterPlays(state);
   const ownedTheaterIds = getOwnedTheaterIdsFromAccess(accessTheaters);
   const ownedActivePlayCount = countOwnedActivePlays(state, ownedTheaterIds);
 
@@ -65,6 +79,7 @@ export function PlayPage() {
     setEditingId(null);
     setForm(emptyPlay());
     setFileError(null);
+    setIconError(null);
     setModalOpen(true);
   };
 
@@ -75,7 +90,33 @@ export function PlayPage() {
       documentUrl: play.documentUrl ?? '',
     });
     setFileError(null);
+    setIconError(null);
     setModalOpen(true);
+  };
+
+  const handleIconCropped = async (file: File) => {
+    setIconError(null);
+    try {
+      const uploaded = await uploadFile(file);
+      setForm((current) => ({
+        ...current,
+        iconUrl: uploaded.url,
+      }));
+    } catch (error) {
+      setIconError(
+        error instanceof Error && error.message === 'FILE_TOO_LARGE'
+          ? 'Файл слишком большой. Максимум — 5 МБ.'
+          : 'Не удалось загрузить изображение.'
+      );
+    }
+  };
+
+  const removeIcon = () => {
+    setForm((current) => ({
+      ...current,
+      iconUrl: undefined,
+    }));
+    setIconError(null);
   };
 
   const handleScriptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,6 +183,13 @@ export function PlayPage() {
         archivedAt: archiving ? new Date().toISOString() : undefined,
       },
     });
+    if (archiving && viewingPlayId === play.id) {
+      setViewingPlayId(null);
+    }
+    if (!archiving) {
+      setViewingPlayId(null);
+      dispatch({ type: 'SET_ACTIVE_PLAY', payload: play.id });
+    }
   };
 
   const handleSave = () => {
@@ -171,26 +219,40 @@ export function PlayPage() {
     dispatch({ type: 'DELETE_PLAY', payload: play.id });
   };
 
-  const selectedPlayId =
-    state.activePlayId && theaterPlays.some((p) => p.id === state.activePlayId)
-      ? state.activePlayId
-      : (theaterPlays[0]?.id ?? null);
+  const displayedPlayId =
+    viewingPlayId && theaterPlays.some((play) => play.id === viewingPlayId)
+      ? viewingPlayId
+      : state.activePlayId && theaterPlays.some((play) => play.id === state.activePlayId)
+        ? state.activePlayId
+        : (activePlays[0]?.id ?? theaterPlays[0]?.id ?? null);
 
-  const selectedPlay = theaterPlays.find((p) => p.id === selectedPlayId) ?? null;
+  const selectedPlay = theaterPlays.find((play) => play.id === displayedPlayId) ?? null;
 
-  useHashScroll([selectedPlayId]);
+  useHashScroll([displayedPlayId]);
 
   useEffect(() => {
-    if (theaterPlays.length === 0) return;
-    const isValid =
-      state.activePlayId !== null && theaterPlays.some((p) => p.id === state.activePlayId);
-    if (!isValid) {
-      dispatch({ type: 'SET_ACTIVE_PLAY', payload: theaterPlays[0].id });
+    if (activePlays.length === 0) return;
+    const isActiveValid =
+      state.activePlayId !== null && activePlays.some((play) => play.id === state.activePlayId);
+    if (!isActiveValid) {
+      dispatch({ type: 'SET_ACTIVE_PLAY', payload: activePlays[0].id });
     }
-  }, [theaterPlays, state.activePlayId, dispatch]);
+  }, [activePlays, state.activePlayId, dispatch]);
 
-  const selectPlay = (playId: string) => {
+  useEffect(() => {
+    if (!viewingPlayId) return;
+    if (!archivedPlays.some((play) => play.id === viewingPlayId)) {
+      setViewingPlayId(null);
+    }
+  }, [archivedPlays, viewingPlayId]);
+
+  const selectActivePlay = (playId: string) => {
+    setViewingPlayId(null);
     dispatch({ type: 'SET_ACTIVE_PLAY', payload: playId });
+  };
+
+  const selectArchivedPlay = (playId: string) => {
+    setViewingPlayId(playId);
   };
 
   return (
@@ -226,22 +288,30 @@ export function PlayPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {theaterPlays.length > 1 && (
-            <div className="flex flex-wrap gap-2 border-b border-gold/10 pb-1">
-              {theaterPlays.map((play) => (
+          {(activePlays.length > 1 || archivedPlays.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-gold/10 pb-1">
+              {activePlays.map((play) => (
                 <button
                   key={play.id}
                   type="button"
-                  onClick={() => selectPlay(play.id)}
-                  className={`rounded-t-lg px-4 py-2.5 text-sm transition-colors ${
-                    selectedPlayId === play.id
+                  onClick={() => selectActivePlay(play.id)}
+                  className={`inline-flex items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm transition-colors ${
+                    !viewingPlayId && displayedPlayId === play.id
                       ? 'bg-gold/15 text-gold-light'
                       : 'text-muted hover:bg-white/5 hover:text-white'
-                  } ${play.archivedAt ? 'opacity-70' : ''}`}
+                  }`}
                 >
-                  «{play.title}»{play.archivedAt ? ' · архив' : ''}
+                  <PlayIcon play={play} size="sm" />
+                  «{play.title}»
                 </button>
               ))}
+              {archivedPlays.length > 0 && (
+                <ArchivedPlaysMenu
+                  plays={archivedPlays}
+                  selectedPlayId={viewingPlayId}
+                  onSelect={selectArchivedPlay}
+                />
+              )}
             </div>
           )}
 
@@ -263,9 +333,7 @@ export function PlayPage() {
                   </p>
                 )}
                 <div className="flex items-start gap-5">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
-                    <BookOpen size={28} />
-                  </div>
+                  <PlayIcon play={play} size="lg" className="!h-14 !w-14 !text-lg" />
                   <div className="min-w-0 flex-1">
                     <h2 className="text-xl font-bold text-white">«{play.title}»</h2>
                     <p className="mt-1 text-gold-light">{play.author}</p>
@@ -394,6 +462,55 @@ export function PlayPage() {
             label="Описание"
             value={form.description ?? ''}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+
+          <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-4">
+            <p className="text-sm font-medium text-white">Аватар постановки</p>
+            <p className="text-xs text-muted">
+              Круглое изображение для переключателя постановок и календаря репетиций
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <PlayIcon
+                play={{
+                  title: form.title || 'Постановка',
+                  iconUrl: form.iconUrl,
+                  iconColor: form.iconColor,
+                }}
+                size="lg"
+                className="!h-14 !w-14 !text-lg"
+              />
+              <div className="flex flex-wrap gap-2">
+                <ImageCropField
+                  title="Аватар постановки"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gold/25 px-3 py-2 text-sm text-gold-light transition-colors hover:border-gold/40 hover:bg-gold/5"
+                  onPickError={setIconError}
+                  onCropped={handleIconCropped}
+                >
+                  <Upload size={16} />
+                  {form.iconUrl ? 'Заменить' : 'Загрузить'}
+                </ImageCropField>
+                {form.iconUrl && (
+                  <Button variant="secondary" className="!px-3 !py-2 text-sm" onClick={removeIcon}>
+                    Убрать
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Input
+              label="Цвет заглушки (если нет изображения)"
+              value={form.iconColor ?? ''}
+              onChange={(e) => setForm({ ...form, iconColor: e.target.value || undefined })}
+              placeholder="#b45309"
+            />
+            {iconError && <p className="text-sm text-red-400">{iconError}</p>}
+          </div>
+
+          <Input
+            label="URL обложки"
+            type="url"
+            value={form.coverUrl ?? ''}
+            onChange={(e) => setForm({ ...form, coverUrl: e.target.value || undefined })}
+            placeholder="https://…"
           />
 
           <Input

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import type { PlayRole, Scene, SceneStatus } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { getSceneRoles } from '../store/selectors';
+import { getActorNamesForRoleInPerformance, getSceneRoles } from '../store/selectors';
 import { groupScenesByAct, getSceneShortLabel } from '../utils/sceneLabels';
 import { buildSceneRehearsalDatesMap } from '../utils/sceneRehearsalHistory';
 import {
@@ -13,7 +13,10 @@ import {
   sceneStatusFilterOrder,
   sceneStatusLabels,
 } from '../utils/sceneFilters';
+import type { SceneReadinessItem } from '../utils/sceneReadiness';
+import { heatLevelColors, heatLevelLabel } from '../utils/sceneReadiness';
 import { SceneStatusBadge } from './SceneStatusBadge';
+import { SceneRoleChip } from './SceneRoleChip';
 
 const priorityLabels = {
   high: 'Важно',
@@ -33,6 +36,9 @@ interface ScenePickerProps {
   onChange: (ids: string[]) => void;
   characterRoles?: PlayRole[];
   playId?: string;
+  performanceId?: string;
+  performanceLabel?: string;
+  readinessBySceneId?: Map<string, SceneReadinessItem>;
   excludeRehearsalId?: string;
 }
 
@@ -42,6 +48,9 @@ export function ScenePicker({
   onChange,
   characterRoles = [],
   playId,
+  performanceId,
+  performanceLabel = 'Состав',
+  readinessBySceneId,
   excludeRehearsalId,
 }: ScenePickerProps) {
   const { state } = useRehearsalStore();
@@ -62,6 +71,7 @@ export function ScenePicker({
       buildSceneRehearsalDatesMap(state.rehearsals, {
         playId,
         excludeRehearsalId,
+        getScenePlayId: (sceneId) => state.scenes.find((s) => s.id === sceneId)?.playId,
       }),
     [state.rehearsals, playId, excludeRehearsalId]
   );
@@ -333,6 +343,7 @@ export function ScenePicker({
                       const sceneCharacters = getSceneRoles(state, scene).filter(
                         (role) => role.kind === 'character'
                       );
+                      const readiness = readinessBySceneId?.get(scene.id);
                       return (
                         <li
                           key={scene.id}
@@ -368,6 +379,14 @@ export function ScenePicker({
                                   {getSceneShortLabel(scene)}
                                 </span>
                                 <SceneStatusBadge status={scene.status} />
+                                {readiness && readiness.heat !== 'recent' && (
+                                  <span
+                                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${heatLevelColors(readiness.heat, 'theater')}`}
+                                    title={heatLevelLabel(readiness.heat)}
+                                  >
+                                    {heatLevelLabel(readiness.heat)}
+                                  </span>
+                                )}
                                 <span
                                   className={`rounded-full px-2 py-0.5 text-[10px] ${
                                     priorityColors[scene.priority ?? 'medium']
@@ -383,14 +402,27 @@ export function ScenePicker({
                               )}
                               {sceneCharacters.length > 0 && (
                                 <span className="mt-1.5 flex flex-wrap gap-1">
-                                  {sceneCharacters.map((role) => (
-                                    <span
-                                      key={role.id}
-                                      className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold-light"
-                                    >
-                                      {role.name.split(',')[0]}
-                                    </span>
-                                  ))}
+                                  {sceneCharacters.map((role) =>
+                                    performanceId ? (
+                                      <SceneRoleChip
+                                        key={role.id}
+                                        roleName={role.name.split(',')[0]}
+                                        performanceName={performanceLabel}
+                                        actorNames={getActorNamesForRoleInPerformance(
+                                          state,
+                                          performanceId,
+                                          role.id
+                                        )}
+                                      />
+                                    ) : (
+                                      <span
+                                        key={role.id}
+                                        className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold-light"
+                                      >
+                                        {role.name.split(',')[0]}
+                                      </span>
+                                    )
+                                  )}
                                 </span>
                               )}
                               {pastDates && pastDates.length > 0 && (

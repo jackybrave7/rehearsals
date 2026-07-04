@@ -4,12 +4,13 @@ import { X } from 'lucide-react';
 import { AppLogo } from '../AppLogo';
 import { useDesign } from '../../store/DesignContext';
 import { useRehearsalStore } from '../../store/RehearsalContext';
+import { useActorNavMode } from '../../hooks/useActorNavMode';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
 import { MobileBottomNav } from '../MobileBottomNav';
 import { NoTheaterGate } from '../NoTheaterGate';
 import { appPaths } from '../../navigation/appPaths';
-import { getMainNavLabel, getVisibleMainNavItems } from '../../navigation/mainNav';
+import { getMainNavLabel, getNavItemsForUser } from '../../navigation/mainNav';
 import { getTheaterPlays } from '../../store/selectors';
 
 export function ZenShell({
@@ -25,7 +26,8 @@ export function ZenShell({
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { state } = useRehearsalStore();
-  const visibleNavItems = getVisibleMainNavItems(getTheaterPlays(state).length);
+  const actorOnly = useActorNavMode();
+  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -66,7 +68,7 @@ export function ZenShell({
           <aside className="zen-drawer absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <Link
-                to={appPaths.home}
+                to={actorOnly ? appPaths.my : appPaths.home}
                 onClick={() => setMenuOpen(false)}
                 className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-80"
               >
@@ -87,7 +89,7 @@ export function ZenShell({
                 <NavLink
                   key={to}
                   to={to}
-                  end={to === appPaths.home}
+                  end={to === appPaths.home || to === appPaths.my}
                   className={({ isActive }) =>
                     `zen-nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all ${
                       isActive ? 'zen-nav-link-active' : 'text-muted hover:bg-black/[0.03] hover:text-foreground'

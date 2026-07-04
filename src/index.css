@@ -358,8 +358,14 @@ html[data-design='zen'] .text-amber-300 {
 }
 
 html[data-design='zen'] .text-amber-100,
-html[data-design='zen'] .text-amber-200\/90 {
+html[data-design='zen'] .text-amber-200\/90,
+html[data-design='zen'] .text-amber-200\/80 {
   color: #78350f;
+}
+
+html[data-design='zen'] .text-sky-100,
+html[data-design='zen'] .text-sky-200 {
+  color: #0c4a6e;
 }
 
 html[data-design='zen'] .text-red-100,
@@ -373,6 +379,60 @@ html[data-design='zen'] .text-emerald-300 {
 
 html[data-design='zen'] .text-red-300 {
   color: #b91c1c;
+}
+
+html[data-design='zen'] .text-rose-100,
+html[data-design='zen'] .text-rose-200,
+html[data-design='zen'] .text-rose-700,
+html[data-design='zen'] .text-rose-800,
+html[data-design='zen'] .text-rose-900,
+html[data-design='zen'] .text-rose-950 {
+  color: #9f1239;
+}
+
+html[data-design='zen'] .text-rose-900 {
+  color: #881337;
+}
+
+html[data-design='zen'] .text-amber-900,
+html[data-design='zen'] .text-amber-950 {
+  color: #78350f;
+}
+
+html[data-design='zen'] .bg-rose-50 {
+  background-color: #fff1f2;
+}
+
+html[data-design='zen'] .bg-rose-100 {
+  background-color: #ffe4e6;
+}
+
+html[data-design='zen'] .bg-amber-100 {
+  background-color: #fef3c7;
+}
+
+html[data-design='zen'] .bg-rose-500\/15 {
+  background-color: #ffe4e6;
+}
+
+html[data-design='zen'] .border-rose-300 {
+  border-color: #fda4af;
+}
+
+html[data-design='zen'] .border-amber-400 {
+  border-color: #fbbf24;
+}
+
+html[data-design='zen'] .border-emerald-400 {
+  border-color: #34d399;
+}
+
+html[data-design='zen'] .text-emerald-900 {
+  color: #065f46;
+}
+
+html[data-design='zen'] .bg-amber-50 {
+  background-color: #fffbeb;
 }
 
 html[data-design='zen'] .text-white\/80 {

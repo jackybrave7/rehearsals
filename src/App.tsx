@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useParams, useLocation, Outlet } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
 import { GoogleDocsAuthProvider } from './store/GoogleDocsAuthContext';
 import { RehearsalProvider } from './store/RehearsalContext';
@@ -7,6 +7,9 @@ import { ConfirmDialogProvider } from './components/ConfirmDialogContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
+import { ActorSettingsPage } from './pages/ActorSettingsPage';
+import { LearnScenePage } from './pages/LearnScenePage';
+import { MyPage } from './pages/MyPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ActorsPage } from './pages/ActorsPage';
 import { ActorDetailPage } from './pages/ActorDetailPage';
@@ -35,10 +38,38 @@ import { OfferPage } from './pages/legal/OfferPage';
 import { AdminRoute } from './components/AdminRoute';
 import { ScrollToTop } from './components/ScrollToTop';
 import { appPaths } from './navigation/appPaths';
+import { useActorNavMode } from './hooks/useActorNavMode';
+
+const actorAllowedPathPrefixes: string[] = [appPaths.my, appPaths.actorSettings, appPaths.support];
+
+function isActorAllowedPath(pathname: string): boolean {
+  if (actorAllowedPathPrefixes.includes(pathname)) return true;
+  if (pathname.startsWith(`${appPaths.my}/learn/`)) return true;
+  return false;
+}
+
+function ActorRouteGuard() {
+  const actorNav = useActorNavMode();
+  const location = useLocation();
+
+  if (actorNav && !isActorAllowedPath(location.pathname)) {
+    return <Navigate to={appPaths.my} replace />;
+  }
+
+  return <Outlet />;
+}
 
 function LegacyRehearsalRedirect() {
   const { id } = useParams();
   return <Navigate to={id ? appPaths.rehearsal(id) : appPaths.rehearsals} replace />;
+}
+
+function AppHomeRoute() {
+  const actorNav = useActorNavMode();
+  if (actorNav) {
+    return <Navigate to={appPaths.my} replace />;
+  }
+  return <DashboardPage />;
 }
 
 export default function App() {
@@ -78,20 +109,25 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<DashboardPage />} />
-                <Route path="overview" element={<OverviewPage />} />
-                <Route path="actors" element={<ActorsPage />} />
-                <Route path="actors/:id" element={<ActorDetailPage />} />
-                <Route path="play" element={<PlayPage />} />
-                <Route path="scenes" element={<ScenesPage />} />
-                <Route path="readiness" element={<ReadinessPage />} />
-                <Route path="tasks" element={<TasksPage />} />
-                <Route path="venues" element={<VenuesPage />} />
-                <Route path="rehearsals" element={<RehearsalsPage />} />
-                <Route path="availability" element={<AvailabilityPage />} />
-                <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="guide" element={<GuidePage />} />
+                <Route element={<ActorRouteGuard />}>
+                  <Route index element={<AppHomeRoute />} />
+                  <Route path="my" element={<MyPage />} />
+                  <Route path="my/learn/:sceneId" element={<LearnScenePage />} />
+                  <Route path="my/settings" element={<ActorSettingsPage />} />
+                  <Route path="overview" element={<OverviewPage />} />
+                  <Route path="actors" element={<ActorsPage />} />
+                  <Route path="actors/:id" element={<ActorDetailPage />} />
+                  <Route path="play" element={<PlayPage />} />
+                  <Route path="scenes" element={<ScenesPage />} />
+                  <Route path="readiness" element={<ReadinessPage />} />
+                  <Route path="tasks" element={<TasksPage />} />
+                  <Route path="venues" element={<VenuesPage />} />
+                  <Route path="rehearsals" element={<RehearsalsPage />} />
+                  <Route path="availability" element={<AvailabilityPage />} />
+                  <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="guide" element={<GuidePage />} />
+                </Route>
                 <Route path="support" element={<SupportPage />} />
                 <Route
                   path="admin"

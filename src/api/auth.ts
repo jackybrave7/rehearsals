@@ -123,6 +123,14 @@ export async function logout(): Promise<void> {
   await authFetch('/auth/logout', { method: 'POST' });
 }
 
+export async function deleteAuthAccount(password?: string): Promise<void> {
+  const response = await authFetch('/auth/delete-account', {
+    method: 'POST',
+    body: JSON.stringify(password ? { password } : {}),
+  });
+  if (!response.ok) throw new Error(await parseAuthError(response));
+}
+
 export async function fetchTheaterMembers(theaterId: string): Promise<TheaterMember[]> {
   const response = await authFetch(`/theaters/${encodeURIComponent(theaterId)}/members`);
   if (!response.ok) throw new Error(`MEMBERS_${response.status}`);
@@ -166,6 +174,7 @@ async function parseAuthError(
     if (code === 'WRONG_PASSWORD') return 'Неверный текущий пароль';
     if (code === 'INVALID_PASSWORD') return 'Новый пароль должен быть не короче 8 символов';
     if (code === 'INVALID_NAME') return 'Укажите имя';
+    if (code === 'DELETE_ACCOUNT_FAILED') return 'Не удалось удалить аккаунт. Попробуйте позже или напишите в поддержку.';
     if (code === 'MAIL_NOT_CONFIGURED') {
       return 'Почта на сервере не настроена. Обратитесь к администратору (SMTP в .env).';
     }

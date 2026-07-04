@@ -164,8 +164,11 @@ function characterHintScore(sceneHint: string | null, anchorHint: string | null)
 export function isSceneLikeHeading(text: string): boolean {
   const trimmed = text.trim();
   return (
-    /^(?:акт\s+\d+|сцена\s+\d+|акт\s+\d+(?:,\s*\d+\s*часть)?,\s*сц\.?\s*\d+)/i.test(trimmed) ||
-    /^сц\.?\s*\d+/i.test(trimmed)
+    /^(?:\d+\s*акт|акт\s+\d+|сцена\s+\d+|акт\s+\d+(?:,\s*\d+\s*часть)?,\s*сц\.?\s*\d+)/i.test(
+      trimmed
+    ) ||
+    /^сц\.?\s*\d+/i.test(trimmed) ||
+    /^\d+\s*акт\b.*\d+\s*сцен/i.test(trimmed)
   );
 }
 
@@ -294,6 +297,7 @@ interface GoogleDocsParagraphElement {
   textRun?: {
     content?: string;
     textStyle?: {
+      italic?: boolean;
       link?: {
         heading?: { id?: string };
         bookmark?: { id?: string };
@@ -328,6 +332,85 @@ function readParagraphText(paragraph: GoogleDocsParagraph): string {
     .join('')
     .replace(/\n$/, '')
     .trim();
+}
+
+function paragraphIsEntirelyItalic(paragraph: GoogleDocsParagraph): boolean {
+  let hasText = false;
+  for (const element of paragraph.elements ?? []) {
+    const run = element.textRun;
+    if (!run?.content?.trim()) continue;
+    hasText = true;
+    if (!run.textStyle?.italic) return false;
+  }
+  return hasText;
+}
+
+function paragraphToLearnText(paragraph: GoogleDocsParagraph): string {
+  let result = '';
+  let italicBuffer = '';
+
+  const flushItalic = () => {
+    const text = italicBuffer.replace(/\s+/g, ' ').trim();
+    if (text) result += `(${text})`;
+    italicBuffer = '';
+  };
+
+  for (const element of paragraph.elements ?? []) {
+    const run = element.textRun;
+    if (!run?.content) continue;
+    const text = run.content.replace(/\n$/, '');
+    if (!text) continue;
+
+    if (run.textStyle?.italic) {
+      italicBuffer += text;
+      continue;
+    }
+
+    flushItalic();
+    result += text;
+  }
+
+  flushItalic();
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+function extractLearnTextInRange(
+  document: GoogleDocsDocument,
+  rangeStart: number,
+  rangeEnd: number
+): string {
+  const lines: string[] = [];
+  let remarkParts: string[] = [];
+
+  const flushRemark = () => {
+    if (remarkParts.length === 0) return;
+    lines.push(`(${remarkParts.join(' ')})`);
+    remarkParts = [];
+  };
+
+  for (const element of document.body?.content ?? []) {
+    const elementStart = element.startIndex ?? 0;
+    const elementEnd = element.endIndex ?? 0;
+    if (elementEnd <= rangeStart || elementStart >= rangeEnd) continue;
+
+    const paragraph = element.paragraph;
+    if (!paragraph) continue;
+
+    const line = paragraphToLearnText(paragraph);
+    if (!line) continue;
+
+    if (paragraphIsEntirelyItalic(paragraph)) {
+      const inner = line.match(/^\(([\s\S]+)\)$/)?.[1] ?? line;
+      remarkParts.push(inner);
+      continue;
+    }
+
+    flushRemark();
+    lines.push(line);
+  }
+
+  flushRemark();
+  return lines.join('\n');
 }
 
 function isHeadingStyle(namedStyleType: string | undefined): boolean {
@@ -526,6 +609,38 @@ export function extractSceneBodyTextsFromGoogleDoc(
         ?.endIndex ?? current.startIndex;
     const nextStart = positioned[index + 1]?.startIndex ?? docEnd;
     const text = extractPlainTextInRange(document, headingEnd, nextStart).trim();
+    if (text) texts.set(current.sceneId, text);
+  }
+
+  return texts;
+}
+
+/** Текст сцен для режима «Учить» — курсив → ремарки в скобках. */
+export function extractSceneLearnTextsFromGoogleDoc(
+  document: GoogleDocsDocument,
+  scenes: Scene[]
+): Map<string, string> {
+  const texts = new Map<string, string>();
+  const docEnd =
+    document.body?.content?.[document.body.content.length - 1]?.endIndex ?? 0;
+
+  const positioned = scenes
+    .filter((scene) => scene.scriptAnchor)
+    .map((scene) => ({
+      sceneId: scene.id,
+      anchor: scene.scriptAnchor!,
+      startIndex: findAnchorStartIndex(document, scene.scriptAnchor!),
+    }))
+    .filter((entry): entry is typeof entry & { startIndex: number } => entry.startIndex !== null)
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  for (let index = 0; index < positioned.length; index += 1) {
+    const current = positioned[index];
+    const headingEnd =
+      document.body?.content?.find((element) => element.startIndex === current.startIndex)
+        ?.endIndex ?? current.startIndex;
+    const nextStart = positioned[index + 1]?.startIndex ?? docEnd;
+    const text = extractLearnTextInRange(document, headingEnd, nextStart).trim();
     if (text) texts.set(current.sceneId, text);
   }
 

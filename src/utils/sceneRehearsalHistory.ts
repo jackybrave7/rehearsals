@@ -27,6 +27,19 @@ function formatRehearsalDateLabel(isoDate: string): string {
 export interface SceneRehearsalHistoryOptions {
   playId?: string;
   excludeRehearsalId?: string;
+  getScenePlayId?: (sceneId: string) => string | undefined;
+}
+
+function rehearsalTouchesPlay(
+  rehearsal: Rehearsal,
+  playId: string,
+  getScenePlayId?: (sceneId: string) => string | undefined
+): boolean {
+  const sceneIds = getSceneIdsInRehearsal(rehearsal);
+  if (sceneIds.size > 0 && getScenePlayId) {
+    return [...sceneIds].some((sceneId) => getScenePlayId(sceneId) === playId);
+  }
+  return rehearsal.playId === playId;
 }
 
 /** sceneId → даты прошлых репетиций (отсортированы, без дубликатов) */
@@ -38,7 +51,12 @@ export function buildSceneRehearsalDatesMap(
 
   for (const rehearsal of rehearsals) {
     if (options.excludeRehearsalId && rehearsal.id === options.excludeRehearsalId) continue;
-    if (options.playId && rehearsal.playId !== options.playId) continue;
+    if (
+      options.playId &&
+      !rehearsalTouchesPlay(rehearsal, options.playId, options.getScenePlayId)
+    ) {
+      continue;
+    }
     if (!isRehearsalPast(rehearsal)) continue;
 
     for (const sceneId of getSceneIdsInRehearsal(rehearsal)) {

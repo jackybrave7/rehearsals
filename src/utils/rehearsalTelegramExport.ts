@@ -2,11 +2,14 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { AppState, Rehearsal, ScheduleBlock, Scene, Task } from '../types';
 import { resolveSceneScriptUrl } from './googleDocs';
-import { getTelegramSceneHeading, getTelegramSceneLocation, getSceneCharacterNames } from './sceneLabels';
+import { getTelegramSceneHeading, getTelegramSceneLocation, getSceneCharacterNames, getSceneShortLabel } from './sceneLabels';
 import { formatPerformanceLabel, getActorAssignments } from '../store/selectors';
 import { getParticipatingActorIds, resolveRehearsalPerformanceId } from './rehearsalActors';
+import { getRehearsalPlayTitles, getScenePlayId } from './rehearsalPlays';
 import { resolveRehearsalLocation } from './venue';
 import { addMinutes, formatDuration } from './time';
+import { getActorSceneNumbersInRehearsal, getActorScenesInRehearsal } from './actorProfile';
+import { groupActorScenesByPlay } from './actorMyPage';
 
 const blockTypeLabels: Record<ScheduleBlock['type'], string> = {
   scene: 'Сцена',
@@ -14,6 +17,7 @@ const blockTypeLabels: Record<ScheduleBlock['type'], string> = {
   break: 'Перерыв',
   warmup: 'Разминка',
   custom: 'Другое',
+  etude: 'Этюд',
 };
 
 export interface TelegramExport {
@@ -114,18 +118,29 @@ function formatSceneBlock(
   return { plainLines, htmlLines };
 }
 
+function formatEtudeActorList(state: AppState, block: ScheduleBlock): string {
+  const names = (block.actorIds ?? [])
+    .map((id) => state.actors.find((actor) => actor.id === id)?.name)
+    .filter((name): name is string => Boolean(name));
+  return names.length > 0 ? ` (${names.join(', ')})` : '';
+}
+
 function formatGenericBlock(
+  state: AppState,
   block: ScheduleBlock,
   blockNumber: number,
-  task?: Task
+  options?: { task?: Task; play?: AppState['plays'][number] }
 ): string[] {
   const typeLabel = blockTypeLabels[block.type];
+  const playSuffix =
+    block.type === 'etude' && options?.play ? ` · «${options.play.title}»` : '';
+  const etudeActors = block.type === 'etude' ? formatEtudeActorList(state, block) : '';
   const lines = [
-    `${formatBlockPrefix(blockNumber)}${formatBlockRange(block)} · ${typeLabel}: ${block.title} · ${formatDuration(block.durationMinutes)}`,
+    `${formatBlockPrefix(blockNumber)}${formatBlockRange(block)} · ${typeLabel}: ${block.title}${playSuffix}${etudeActors} · ${formatDuration(block.durationMinutes)}`,
   ];
 
-  if (task?.description?.trim()) {
-    lines.push(indent(`📄 ${task.description.trim()}`));
+  if (options?.task?.description?.trim()) {
+    lines.push(indent(`📄 ${options.task.description.trim()}`));
   }
 
   if (block.notes?.trim()) {
@@ -135,8 +150,43 @@ function formatGenericBlock(
   return lines;
 }
 
+function resolveBlockPlayId(state: AppState, block: ScheduleBlock): string | null {
+  if (block.type === 'scene' && block.sceneId) {
+    return getScenePlayId(state, block.sceneId) ?? null;
+  }
+  if (block.type === 'etude' && block.playId) {
+    return block.playId;
+  }
+  return null;
+}
+
+function countDistinctPlanPlays(state: AppState, schedule: ScheduleBlock[]): number {
+  const playIds = new Set<string>();
+  for (const block of schedule) {
+    const playId = resolveBlockPlayId(state, block);
+    if (playId) playIds.add(playId);
+  }
+  return playIds.size;
+}
+
+function formatRehearsalPlayHeader(state: AppState, rehearsal: Rehearsal): string {
+  const titles = getRehearsalPlayTitles(state, rehearsal);
+  if (titles.length === 0) return 'Без постановки';
+  if (titles.length === 1) return `«${titles[0]}»`;
+  return titles.map((title) => `«${title}»`).join(' · ');
+}
+
+function appendPlaySectionHeader(
+  play: AppState['plays'][number] | undefined,
+  plainLines: string[],
+  htmlLines: string[]
+): void {
+  const title = play ? `«${play.title}»` : 'Без постановки';
+  plainLines.push(title);
+  htmlLines.push(escapeHtml(title));
+}
+
 function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
-  const play = state.plays.find((p) => p.id === (rehearsal.playId ?? state.activePlayId));
   const performance = state.performances.find(
     (p) => p.id === resolveRehearsalPerformanceId(state, rehearsal)
   );
@@ -145,7 +195,7 @@ function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
 
   const plainLines: string[] = [
     '🎭 РЕПЕТИЦИЯ',
-    play ? `«${play.title}»` : 'Без постановки',
+    formatRehearsalPlayHeader(state, rehearsal),
     `📅 ${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`,
     `⏰ ${rehearsal.startTime} – ${rehearsal.endTime}`,
   ];
@@ -186,27 +236,44 @@ function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
   const sortedSchedule = [...rehearsal.schedule].sort((a, b) =>
     a.startTime.localeCompare(b.startTime)
   );
+  const groupPlanByPlay = countDistinctPlanPlays(state, sortedSchedule) > 1;
 
   if (sortedSchedule.length > 0) {
     plainLines.push(...section('📋 ПЛАН ПО ВРЕМЕНИ'));
     htmlLines.push(...section('📋 ПЛАН ПО ВРЕМЕНИ').map(escapeHtml));
 
+    let currentSectionPlayId: string | null = null;
+
     for (const [index, block] of sortedSchedule.entries()) {
       const blockNumber = index + 1;
+      const blockPlayId = resolveBlockPlayId(state, block);
+      const blockPlay = blockPlayId
+        ? state.plays.find((play) => play.id === blockPlayId)
+        : undefined;
+
+      if (groupPlanByPlay && blockPlayId && blockPlayId !== currentSectionPlayId) {
+        appendPlaySectionHeader(blockPlay, plainLines, htmlLines);
+        currentSectionPlayId = blockPlayId;
+      }
+
       if (block.type === 'scene') {
         const scene = block.sceneId ? state.scenes.find((s) => s.id === block.sceneId) : undefined;
         if (scene) {
-          const formatted = formatSceneBlock(state, block, scene, play, blockNumber);
+          const scenePlay = blockPlay ?? state.plays.find((p) => p.id === scene.playId);
+          const formatted = formatSceneBlock(state, block, scene, scenePlay, blockNumber);
           plainLines.push(...formatted.plainLines);
           htmlLines.push(...formatted.htmlLines);
         } else {
-          const generic = formatGenericBlock(block, blockNumber);
+          const generic = formatGenericBlock(state, block, blockNumber);
           plainLines.push(...generic);
           htmlLines.push(...generic.map(escapeHtml));
         }
       } else {
         const task = block.taskId ? state.tasks.find((t) => t.id === block.taskId) : undefined;
-        const generic = formatGenericBlock(block, blockNumber, task);
+        const generic = formatGenericBlock(state, block, blockNumber, {
+          task,
+          play: block.type === 'etude' ? blockPlay : undefined,
+        });
         plainLines.push(...generic);
         htmlLines.push(...generic.map(escapeHtml));
       }
@@ -281,7 +348,52 @@ export function buildActorReminderTelegramBotMessage(
   const greeting = actor
     ? `<b>${escapeHtml(actor.name)}</b>, напоминание о репетиции:\n\n`
     : `<b>Напоминание о репетиции</b>\n\n`;
-  return `${greeting}${body}`;
+
+  const sceneNumbers = getActorSceneNumbersInRehearsal(state, rehearsal, actorId);
+  const scenesLine =
+    sceneNumbers.length > 0 ? `\n\nТвои сцены: ${sceneNumbers.join(', ')}` : '';
+
+  return `${greeting}${body}${scenesLine}`;
+}
+
+export function buildActorPlanTelegramBotMessage(
+  state: AppState,
+  rehearsal: Rehearsal,
+  actorId: string
+): string {
+  const actor = state.actors.find((item) => item.id === actorId);
+  const location = resolveRehearsalLocation(rehearsal, state.venues);
+  const dateLabel = format(parseISO(rehearsal.date), 'EEEE, d MMMM yyyy', { locale: ru });
+  const playHeader = formatRehearsalPlayHeader(state, rehearsal);
+
+  const lines = [
+    actor ? `<b>${escapeHtml(actor.name)}</b>, ваш план:` : '<b>Ваш план</b>',
+    '',
+    `🎭 ${escapeHtml(playHeader)}`,
+    `📅 ${escapeHtml(dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1))}`,
+    `⏰ ${escapeHtml(`${rehearsal.startTime} – ${rehearsal.endTime}`)}`,
+  ];
+
+  if (location) {
+    lines.push(`📍 ${escapeHtml(location)}`);
+  }
+
+  const myScenes = getActorScenesInRehearsal(state, rehearsal, actorId);
+  if (myScenes.length > 0) {
+    lines.push('', '<b>Ваши сцены:</b>');
+    for (const { play, scenes } of groupActorScenesByPlay(state, myScenes)) {
+      if (play) {
+        lines.push(`<i>«${escapeHtml(play.title)}»</i>`);
+      }
+      for (const scene of scenes) {
+        lines.push(`• ${escapeHtml(getSceneShortLabel(scene))}`);
+      }
+    }
+  } else {
+    lines.push('', 'В плане пока нет ваших сцен.');
+  }
+
+  return lines.join('\n');
 }
 
 export async function copyRehearsalTelegramMessage(

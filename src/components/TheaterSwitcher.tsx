@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Building2, Check, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { getActiveTheater } from '../store/selectors';
 import { useCreateTheater } from '../hooks/useCreateTheater';
@@ -52,6 +53,7 @@ function TheaterListItem({
   onRename,
   onDelete,
   canDelete,
+  showMenu,
 }: {
   theater: Theater;
   selected: boolean;
@@ -62,6 +64,7 @@ function TheaterListItem({
   onRename: (theater: Theater) => void;
   onDelete: (theater: Theater) => void;
   canDelete: boolean;
+  showMenu: boolean;
 }) {
   const longPress = useTheaterRowLongPress(() => onMenuOpenChange(true));
 
@@ -102,12 +105,14 @@ function TheaterListItem({
         {selected ? <Check size={16} className="shrink-0 text-accent" /> : null}
       </button>
       <div className="pr-1">
-        <TheaterItemMenu
-          variant={variant}
-          actions={actions}
-          open={menuOpen}
-          onOpenChange={onMenuOpenChange}
-        />
+        {showMenu ? (
+          <TheaterItemMenu
+            variant={variant}
+            actions={actions}
+            open={menuOpen}
+            onOpenChange={onMenuOpenChange}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -117,6 +122,7 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
   const { state, dispatch } = useRehearsalStore();
   const { confirmDelete, prompt } = useConfirmDialog();
   const { createTheater } = useCreateTheater();
+  const { canCreateTheater, canManageTheater } = useAuth();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const canDelete = state.theaters.length > 1;
 
@@ -161,6 +167,7 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
           onRename={renameTheater}
           onDelete={deleteTheater}
           canDelete={canDelete}
+          showMenu={canManageTheater(theater.id)}
         />
       ))}
     </div>
@@ -174,39 +181,77 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
             <Building2 size={14} />
             Театр
           </div>
-          <button
-            type="button"
-            onClick={createTheater}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gold-light transition-colors hover:bg-gold/10"
-          >
-            <Plus size={13} />
-            Новый
-          </button>
+          {canCreateTheater ? (
+            <button
+              type="button"
+              onClick={createTheater}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gold-light transition-colors hover:bg-gold/10"
+            >
+              <Plus size={13} />
+              Новый
+            </button>
+          ) : null}
         </div>
         {theaterList}
       </div>
     );
   }
 
-  return (
-    <div className="border-b border-border/60 px-4 py-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted">
-          <Building2 size={14} />
-          Театр
+  if (variant === 'zen') {
+    const activeTheater = state.theaters.find((t) => t.id === state.activeTheaterId);
+    const activeActions = activeTheater
+      ? buildTheaterMenuActions(activeTheater, {
+          onRename: renameTheater,
+          onDelete: deleteTheater,
+          canDelete,
+        })
+      : [];
+
+    return (
+      <div className="border-b border-border/60 px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted">
+            <Building2 size={14} />
+            Театр
+          </div>
+          {canCreateTheater ? (
+            <button
+              type="button"
+              onClick={createTheater}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-muted transition-colors hover:bg-black/[0.04] hover:text-foreground"
+            >
+              <Plus size={13} />
+              Новый
+            </button>
+          ) : null}
         </div>
-        <button
-          type="button"
-          onClick={createTheater}
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-muted transition-colors hover:bg-black/[0.04] hover:text-foreground"
-        >
-          <Plus size={13} />
-          Новый
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={state.activeTheaterId ?? ''}
+            onChange={(e) => setActiveTheater(e.target.value)}
+            className="min-w-0 flex-1 rounded-2xl border border-border/60 bg-surface px-4 py-3 text-base font-medium text-foreground outline-none transition-colors focus:border-accent/40"
+            aria-label="Выберите театр"
+          >
+            {state.theaters.map((theater) => (
+              <option key={theater.id} value={theater.id}>
+                {theater.name}
+              </option>
+            ))}
+          </select>
+          {activeTheater && canManageTheater(activeTheater.id) ? (
+            <TheaterItemMenu
+              variant="zen"
+              actions={activeActions}
+              open={openMenuId === activeTheater.id}
+              onOpenChange={(open) => setOpenMenuId(open ? activeTheater.id : null)}
+            />
+          ) : null}
+        </div>
       </div>
-      {theaterList}
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
 export function ZenTheaterTrigger({

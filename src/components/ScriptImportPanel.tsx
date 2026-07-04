@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileText, Loader2, RefreshCw, Upload } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useDesign } from '../store/DesignContext';
 import { uploadFile } from '../api/files';
 import { parseScriptImport, resolveScriptImportError } from '../services/scriptImportClient';
 import {
@@ -17,6 +18,7 @@ import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
 import { Button } from './Button';
+import { Modal } from './Modal';
 
 interface ScriptImportPanelProps {
   play: Play;
@@ -38,7 +40,9 @@ function formatSyncDate(value: string | undefined): string | null {
 
 export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImportPanelProps) {
   const { state, dispatch } = useRehearsalStore();
+  const { isZen } = useDesign();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -240,15 +244,45 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
     }
   };
 
+  const triggerHint = play.scriptFileName
+    ? play.scriptFileName
+    : linkedCount > 0
+      ? `${linkedCount} из ${scenes.length} привязано`
+      : null;
+
   return (
-    <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <FileText size={16} className="text-gold" />
-            Импорт из файла (.txt / .docx)
-          </h2>
-          <p className="mt-1 text-xs text-muted">
+    <>
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+          isZen
+            ? 'border-border/60 text-muted hover:bg-black/[0.03] hover:text-foreground'
+            : 'border-gold/15 text-muted hover:bg-white/5 hover:text-white'
+        }`}
+      >
+        <FileText size={16} className={isZen ? 'text-accent' : 'text-gold'} />
+        Импорт из файла
+        {triggerHint ? (
+          <span className="max-w-[12rem] truncate text-xs font-normal opacity-80">· {triggerHint}</span>
+        ) : null}
+      </button>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Импорт из файла (.txt / .docx)"
+        wide
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>
+              Закрыть
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
             Без Google: скачайте пьесу из Google Docs как Word или текст и загрузите сюда.
             {linkedCount > 0
               ? ` Привязано ${linkedCount} из ${scenes.length} сцен`
@@ -259,11 +293,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
           {play.scriptFileName ? (
-            <p className="mt-1 text-xs text-muted">
+            <p className="text-sm text-muted">
               Файл: <span className="text-foreground">{play.scriptFileName}</span>
             </p>
           ) : (
-            <p className="mt-1 text-xs text-muted">
+            <p className="text-sm text-muted">
               Или загрузите сценарий в{' '}
               <Link to={appPaths.play} className="text-gold-light hover:underline">
                 карточке постановки
@@ -271,11 +305,9 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
               .
             </p>
           )}
-        </div>
 
-        <div className="flex flex-wrap gap-2">
           {!readOnly && (
-            <>
+            <div className="flex flex-wrap gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -302,26 +334,30 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
                 {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
                 {scenes.length === 0 ? 'Импортировать сцены' : 'Сопоставить сцены'}
               </Button>
-            </>
+            </div>
           )}
-        </div>
-      </div>
 
-      {(syncError || syncMessage) && (
-        <div className="mt-3 space-y-1 text-xs">
-          {syncError && <p className="text-red-300">{syncError}</p>}
-          {syncMessage && <p className="text-emerald-300">{syncMessage}</p>}
-        </div>
-      )}
+          {(syncError || syncMessage) && (
+            <div className="space-y-1 text-sm">
+              {syncError && <p className="text-red-300">{syncError}</p>}
+              {syncMessage && <p className="text-emerald-300">{syncMessage}</p>}
+            </div>
+          )}
 
-      <div className="mt-3 rounded-lg border border-gold/10 bg-black/20 p-3 text-xs text-muted">
-        <p className="font-medium text-foreground">Как подготовить файл</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-4">
-          <li>В Google Docs: Файл → Скачать → Microsoft Word (.docx) или Обычный текст (.txt).</li>
-          <li>Названия сцен — отдельными строками, как в списке сцен (лучше стиль «Заголовок 1–2» в Word).</li>
-          <li>Загрузите файл и нажмите «Импортировать сцены» — список сцен создастся из заголовков (или «Сопоставить», если сцены уже есть).</li>
-        </ol>
-      </div>
-    </section>
+          <div
+            className={`rounded-lg border p-3 text-sm text-muted ${
+              isZen ? 'border-border/60 bg-black/[0.02]' : 'border-gold/10 bg-black/20'
+            }`}
+          >
+            <p className="font-medium text-foreground">Как подготовить файл</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4">
+              <li>В Google Docs: Файл → Скачать → Microsoft Word (.docx) или Обычный текст (.txt).</li>
+              <li>Названия сцен — отдельными строками, как в списке сцен (лучше стиль «Заголовок 1–2» в Word).</li>
+              <li>Загрузите файл и нажмите «Импортировать сцены» — список сцен создастся из заголовков (или «Сопоставить», если сцены уже есть).</li>
+            </ol>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }

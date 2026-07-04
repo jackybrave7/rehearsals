@@ -2,6 +2,9 @@ export const APP_BASE = '/app';
 
 export const appPaths = {
   home: APP_BASE,
+  my: `${APP_BASE}/my`,
+  learnScene: (sceneId: string) => `${APP_BASE}/my/learn/${sceneId}`,
+  actorSettings: `${APP_BASE}/my/settings`,
   pricing: '/pricing',
   overview: `${APP_BASE}/overview`,
   play: `${APP_BASE}/play`,

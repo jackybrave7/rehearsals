@@ -67,10 +67,32 @@ export function heatLevelLabel(heat: SceneHeatLevel): string {
   return 'Недавно';
 }
 
-export function heatLevelColors(heat: SceneHeatLevel): string {
+export function heatLevelColors(
+  heat: SceneHeatLevel,
+  variant: 'theater' | 'zen' = 'theater'
+): string {
+  if (variant === 'zen') {
+    if (heat === 'never') return 'bg-rose-100 text-rose-950 border-rose-300';
+    if (heat === 'stale') return 'bg-amber-100 text-amber-950 border-amber-400';
+    return 'bg-emerald-100 text-emerald-900 border-emerald-400';
+  }
   if (heat === 'never') return 'bg-rose-500/20 text-rose-200 border-rose-500/30';
   if (heat === 'stale') return 'bg-amber-500/20 text-amber-200 border-amber-500/30';
   return 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30';
+}
+
+export function readinessStatusColors(
+  status: SceneStatus,
+  variant: 'theater' | 'zen' = 'theater'
+): string {
+  if (variant === 'zen') {
+    if (status === 'not_started') return 'bg-black/[0.06] text-foreground/70';
+    if (status === 'in_progress') return 'bg-amber-100 text-amber-950 border border-amber-300';
+    return 'bg-emerald-100 text-emerald-900 border border-emerald-300';
+  }
+  if (status === 'not_started') return 'bg-white/5 text-muted';
+  if (status === 'in_progress') return 'bg-amber-500/15 text-amber-200';
+  return 'bg-emerald-500/15 text-emerald-200';
 }
 
 function resolvePremierePerformance(state: AppState, playId: string): Performance | null {

@@ -1,16 +1,23 @@
 import type { AppState, Rehearsal, ScheduleBlock } from '../types';
 import { getDefaultPerformance, getSelectedPerformance } from '../store/selectors';
+import { getScenePlayId } from './rehearsalPlays';
+
+export function resolvePerformanceIdForPlay(
+  state: AppState,
+  playId: string | undefined
+): string | undefined {
+  if (!playId) return undefined;
+  return (
+    getSelectedPerformance(state, playId)?.id ?? getDefaultPerformance(state, playId)?.id
+  );
+}
 
 export function resolveRehearsalPerformanceId(
   state: AppState,
   rehearsal: Pick<Rehearsal, 'playId' | 'performanceId'>
 ): string | undefined {
   if (rehearsal.performanceId) return rehearsal.performanceId;
-  if (!rehearsal.playId) return undefined;
-  return (
-    getSelectedPerformance(state, rehearsal.playId)?.id ??
-    getDefaultPerformance(state, rehearsal.playId)?.id
-  );
+  return resolvePerformanceIdForPlay(state, rehearsal.playId);
 }
 
 export function getActorIdsForSceneIds(
@@ -37,6 +44,29 @@ export function getActorIdsForSceneIds(
   return [...actorIds];
 }
 
+/** Состав по сценам из разных постановок — без дублей актёров. */
+export function getActorIdsForSceneIdsMultiPlay(state: AppState, sceneIds: string[]): string[] {
+  const actorIds = new Set<string>();
+  const byPlay = new Map<string, string[]>();
+
+  for (const sceneId of sceneIds) {
+    const playId = getScenePlayId(state, sceneId);
+    if (!playId) continue;
+    const list = byPlay.get(playId) ?? [];
+    list.push(sceneId);
+    byPlay.set(playId, list);
+  }
+
+  for (const [playId, playSceneIds] of byPlay) {
+    const performanceId = resolvePerformanceIdForPlay(state, playId);
+    for (const actorId of getActorIdsForSceneIds(state, performanceId, playSceneIds)) {
+      actorIds.add(actorId);
+    }
+  }
+
+  return [...actorIds];
+}
+
 export function getActorIdsMapForSceneIds(
   state: AppState,
   performanceId: string | undefined,
@@ -44,7 +74,9 @@ export function getActorIdsMapForSceneIds(
 ): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const sceneId of sceneIds) {
-    map.set(sceneId, getActorIdsForSceneIds(state, performanceId, [sceneId]));
+    const playId = getScenePlayId(state, sceneId);
+    const perfId = playId ? resolvePerformanceIdForPlay(state, playId) : performanceId;
+    map.set(sceneId, getActorIdsForSceneIds(state, perfId, [sceneId]));
   }
   return map;
 }
@@ -58,8 +90,7 @@ export function mergeActorsForNewScenes(
   const newSceneIds = nextSceneIds.filter((id) => !previousSceneIds.includes(id));
   if (newSceneIds.length === 0) return rehearsal.actorIds;
 
-  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
-  const newActors = getActorIdsForSceneIds(state, performanceId, newSceneIds);
+  const newActors = getActorIdsForSceneIdsMultiPlay(state, newSceneIds);
   return [...new Set([...rehearsal.actorIds, ...newActors])];
 }
 
@@ -69,8 +100,7 @@ export function mergeActorsForSceneIds(
   sceneIds: string[]
 ): string[] {
   if (sceneIds.length === 0) return rehearsal.actorIds;
-  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
-  const newActors = getActorIdsForSceneIds(state, performanceId, sceneIds);
+  const newActors = getActorIdsForSceneIdsMultiPlay(state, sceneIds);
   return [...new Set([...rehearsal.actorIds, ...newActors])];
 }
 
@@ -110,11 +140,13 @@ export function syncParticipantOrder(
 
 export function resolveParticipantOrder(
   state: AppState,
-  rehearsal: Pick<Rehearsal, 'playId' | 'performanceId' | 'actorIds' | 'participantOrder' | 'sceneIds'>
+  rehearsal: Pick<Rehearsal, 'playId' | 'performanceId' | 'actorIds' | 'participantOrder' | 'sceneIds' | 'schedule'>
 ): string[] {
-  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
-  const fromScenes = getActorIdsForSceneIds(state, performanceId, rehearsal.sceneIds);
-  const allIds = [...new Set([...rehearsal.actorIds, ...fromScenes])];
+  const fromScenes = getActorIdsForSceneIdsMultiPlay(state, rehearsal.sceneIds);
+  const etudeActors = (rehearsal.schedule ?? [])
+    .filter((block) => block.type === 'etude')
+    .flatMap((block) => block.actorIds ?? []);
+  const allIds = [...new Set([...rehearsal.actorIds, ...fromScenes, ...etudeActors])];
 
   if (rehearsal.participantOrder?.length) {
     return syncParticipantOrder(rehearsal.participantOrder, allIds);

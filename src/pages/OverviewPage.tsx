@@ -5,9 +5,10 @@ import { CalendarDays, CheckSquare, Film } from 'lucide-react';
 import { useMemo } from 'react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getPlayOverviews, type PlayOverview } from '../store/playOverview';
-import { getPremiereBadgeTone } from '../utils/premiere';
+import { getPremiereBadgeTone, isPremierePerformance } from '../utils/premiere';
 import { appPaths } from '../navigation/appPaths';
 import { useDesign } from '../store/DesignContext';
+import { PlayIcon } from '../components/PlayIcon';
 
 function premiereBadgeClass(tone: ReturnType<typeof getPremiereBadgeTone>): string {
   if (tone === 'urgent') return 'bg-red-500/15 text-red-200 ring-1 ring-red-500/30';
@@ -39,9 +40,12 @@ function PlayOverviewCard({
       role="button"
       tabIndex={0}
     >
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-white">{play.title}</h2>
-        <p className="text-sm text-muted">{play.author}</p>
+      <div className="flex items-start gap-3">
+        <PlayIcon play={play} size="md" className="shrink-0" />
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-semibold text-white">{play.title}</h2>
+          <p className="text-sm text-muted">{play.author}</p>
+        </div>
       </div>
 
       {premiere ? (
@@ -50,7 +54,10 @@ function PlayOverviewCard({
             getPremiereBadgeTone(premiere.daysLeft)
           )}`}
         >
-          До премьеры {premiere.daysLeft} дн. · {format(parseISO(premiere.date), 'd MMMM yyyy', { locale: ru })}
+          {isPremierePerformance(premiere.performance)
+            ? `До премьеры ${premiere.daysLeft} дн.`
+            : `${premiere.performance.name} через ${premiere.daysLeft} дн.`}{' '}
+          · {format(parseISO(premiere.date), 'd MMMM yyyy', { locale: ru })}
         </span>
       ) : (
         <Link
@@ -58,7 +65,7 @@ function PlayOverviewCard({
           onClick={(event) => event.stopPropagation()}
           className="text-xs text-gold-light hover:underline"
         >
-          Дата премьеры не задана — указать в показе
+          Дата показа не задана — указать в расписании
         </Link>
       )}
 
@@ -146,10 +153,17 @@ export function PlayOverviewMini() {
       <ul className="space-y-2 text-sm">
         {overviews.map((overview) => (
           <li key={overview.play.id} className="flex items-center justify-between gap-3">
-            <span className="truncate font-medium text-white">{overview.play.title}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <PlayIcon play={overview.play} size="sm" className="shrink-0" />
+              <span className="truncate font-medium text-white">{overview.play.title}</span>
+            </span>
             <span className="shrink-0 text-muted">
-              {overview.premiere ? `до премьеры ${overview.premiere.daysLeft} дн.` : 'без даты'} ·{' '}
-              {overview.scenes.readyPercent}%
+              {overview.premiere
+                ? isPremierePerformance(overview.premiere.performance)
+                  ? `до премьеры ${overview.premiere.daysLeft} дн.`
+                  : `${overview.premiere.performance.name} через ${overview.premiere.daysLeft} дн.`
+                : 'без даты'}{' '}
+              · {overview.scenes.readyPercent}%
             </span>
           </li>
         ))}

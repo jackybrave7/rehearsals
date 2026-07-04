@@ -65,7 +65,7 @@ export function suggestRehearsalDates(
     for (const actorId of expectedIds) {
       const actor = state.actors.find((item) => item.id === actorId);
       if (!actor) continue;
-      if (isActorUnavailable(actor, dateStr)) {
+      if (isActorUnavailable(actor, dateStr, { startTime: draft.startTime, endTime: draft.endTime })) {
         allAvailable = false;
         break;
       }

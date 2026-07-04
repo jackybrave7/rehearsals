@@ -15,6 +15,7 @@ export function createEmptyAppState(appMeta: AppState['appMeta'] = {}): AppState
     tasks: [],
     venues: [],
     rehearsals: [],
+    rehearsalActorNotes: [],
     appMeta,
   };
 }
@@ -50,6 +51,7 @@ export function filterAppStateByTheaterIds(state: AppState, theaterIds: Set<stri
       tasks: [],
       venues: [],
       rehearsals: [],
+      rehearsalActorNotes: [],
       appMeta: state.appMeta,
     };
   }
@@ -81,6 +83,9 @@ export function filterAppStateByTheaterIds(state: AppState, theaterIds: Set<stri
     rehearsals: state.rehearsals
       .filter((rehearsal) => rehearsal.theaterId && theaterIds.has(rehearsal.theaterId))
       .map((rehearsal) => ({ ...rehearsal, schedule: rehearsal.schedule ?? [] })),
+    rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+      (note) => note.theaterId && theaterIds.has(note.theaterId)
+    ),
     appMeta: state.appMeta,
   };
 }

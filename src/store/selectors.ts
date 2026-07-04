@@ -1,5 +1,6 @@
 import type { AppState, Performance, PlayRole, RehearsalTemplate, Scene } from '../types';
 import { normalizeTask, getOverdueTasks, getTasksByPlay } from '../utils/tasks';
+import { rehearsalInvolvesPlay } from '../utils/rehearsalPlays';
 
 export function getActivePlay(state: AppState) {
   if (!state.activePlayId) return null;
@@ -13,6 +14,14 @@ export function getActiveTheater(state: AppState) {
 
 export function getTheaterPlays(state: AppState) {
   return state.plays.filter((play) => play.theaterId === state.activeTheaterId);
+}
+
+export function getActiveTheaterPlays(state: AppState) {
+  return getTheaterPlays(state).filter((play) => !play.archivedAt);
+}
+
+export function getArchivedTheaterPlays(state: AppState) {
+  return getTheaterPlays(state).filter((play) => Boolean(play.archivedAt));
 }
 
 export function getTheaterTasks(state: AppState) {
@@ -31,11 +40,11 @@ export function getTheaterRehearsals(state: AppState) {
   return state.rehearsals.filter((rehearsal) => rehearsal.theaterId === state.activeTheaterId);
 }
 
-/** Репетиции выбранной постановки; без playId — все репетиции театра. */
+/** Репетиции выбранной постановки (есть хотя бы одна её сцена); без playId — все репетиции театра. */
 export function getPlayRehearsals(state: AppState, playId?: string | null) {
   const theaterRehearsals = getTheaterRehearsals(state);
   if (!playId) return theaterRehearsals;
-  return theaterRehearsals.filter((rehearsal) => rehearsal.playId === playId);
+  return theaterRehearsals.filter((rehearsal) => rehearsalInvolvesPlay(state, rehearsal, playId));
 }
 
 export function getRehearsalTemplates(

@@ -6,10 +6,29 @@ import {
   removeTheaterMember,
 } from '../api/auth';
 import { Button } from './Button';
+import { ActorAvatar } from './ActorAvatar';
 import { useAuth } from '../store/AuthContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import type { TheaterAccessRole } from '../types/auth';
+import type { AppState } from '../types';
+import type { TheaterMember } from '../types/auth';
 import { THEATER_ROLE_LABELS } from '../types/auth';
+import { findLinkedActor, normalizeActorEmail } from '../utils/actorProfile';
+
+function resolveMemberDisplay(
+  state: AppState,
+  theaterId: string,
+  member: TheaterMember
+): { displayName: string; photoUrl?: string; showEmail: boolean } {
+  const actor = findLinkedActor(state, member.email, theaterId);
+  const displayName =
+    actor?.name?.trim() ||
+    member.actorName?.trim() ||
+    member.name?.trim() ||
+    member.email;
+  const photoUrl = actor?.photoUrl ?? member.photoUrl;
+  const showEmail = normalizeActorEmail(displayName) !== normalizeActorEmail(member.email);
+  return { displayName, photoUrl, showEmail };
+}
 
 export function TheaterMembersPanel() {
   const { state } = useRehearsalStore();
@@ -17,11 +36,9 @@ export function TheaterMembersPanel() {
   const theaterId = state.activeTheaterId;
   const canManage = canManageMembers(theaterId);
 
-  const [members, setMembers] = useState<
-    Array<{ userId: string; email: string; name: string; role: TheaterAccessRole }>
-  >([]);
+  const [members, setMembers] = useState<TheaterMember[]>([]);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'editor' | 'observer'>('editor');
+  const [role, setRole] = useState<'editor' | 'observer' | 'actor'>('editor');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -96,7 +113,7 @@ export function TheaterMembersPanel() {
       <div className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
         <p className="text-sm leading-relaxed text-muted">
           Пригласите коллег по email. Редактор может изменять данные театра, наблюдатель — только
-          просматривать.
+          просматривать, актёр — личный кабинет с RSVP и доступностью.
         </p>
 
         {success && (
@@ -121,14 +138,23 @@ export function TheaterMembersPanel() {
           {loading ? (
             <li className="text-sm text-muted">Загрузка…</li>
           ) : (
-            members.map((member) => (
+            members.map((member) => {
+              const { displayName, photoUrl, showEmail } = resolveMemberDisplay(
+                state,
+                theaterId,
+                member
+              );
+              return (
               <li
                 key={member.userId}
                 className="flex items-center gap-3 rounded-xl border border-gold/10 bg-black/20 px-4 py-3"
               >
+                <ActorAvatar name={displayName} photoUrl={photoUrl} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-white">{member.name || member.email}</div>
-                  <div className="truncate text-sm text-muted">{member.email}</div>
+                  <div className="truncate font-medium text-white">{displayName}</div>
+                  {showEmail && (
+                    <div className="truncate text-sm text-muted">{member.email}</div>
+                  )}
                 </div>
                 <span className="rounded-full bg-gold/10 px-3 py-1 text-xs text-gold-light">
                   {THEATER_ROLE_LABELS[member.role]}
@@ -144,7 +170,8 @@ export function TheaterMembersPanel() {
                   </button>
                 )}
               </li>
-            ))
+              );
+            })
           )}
         </ul>
 
@@ -159,11 +186,12 @@ export function TheaterMembersPanel() {
           />
           <select
             value={role}
-            onChange={(event) => setRole(event.target.value as 'editor' | 'observer')}
+            onChange={(event) => setRole(event.target.value as 'editor' | 'observer' | 'actor')}
             className="rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
           >
             <option value="editor">Редактор</option>
             <option value="observer">Наблюдатель</option>
+            <option value="actor">Актёр</option>
           </select>
           <Button type="submit" className="shrink-0">
             <UserPlus size={16} className="mr-2 inline" />

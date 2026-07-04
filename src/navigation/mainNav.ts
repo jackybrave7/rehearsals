@@ -12,6 +12,7 @@ import {
   Settings,
   Users,
   LifeBuoy,
+  UserCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { appPaths } from './appPaths';
@@ -48,14 +49,29 @@ export const mainNavItems: MainNavItem[] = [
   { to: appPaths.settings, icon: Settings, label: 'Настройки' },
 ];
 
+export const actorNavItems: MainNavItem[] = [
+  { to: appPaths.my, icon: UserCircle, label: 'Моё', zenLabel: 'Моё' },
+  { to: appPaths.actorSettings, icon: Settings, label: 'Настройки' },
+  { to: appPaths.support, icon: LifeBuoy, label: 'Поддержка' },
+];
+
+export function getNavItemsForUser(playCount: number, actorOnly: boolean): MainNavItem[] {
+  if (actorOnly) return actorNavItems;
+  return getVisibleMainNavItems(playCount);
+}
+
 export function resolveMainNavTitle(pathname: string, variant: 'theater' | 'zen' = 'zen'): string {
+  if (pathname === appPaths.my) return 'Моё';
+  if (pathname === appPaths.actorSettings) return 'Настройки';
   if (pathname.startsWith(`${appPaths.rehearsals}/`)) return 'Репетиция';
   if (pathname.startsWith(`${appPaths.adminUsers}/`)) return 'Пользователь';
   if (pathname === appPaths.adminUsers) return 'Пользователи';
   if (pathname === appPaths.admin) return 'Админка';
   if (pathname === appPaths.guide) return 'Руководство';
   if (pathname === appPaths.support) return 'Поддержка';
-  const item = mainNavItems.find((entry) => entry.to === pathname);
+  const item =
+    mainNavItems.find((entry) => entry.to === pathname) ??
+    actorNavItems.find((entry) => entry.to === pathname);
   if (!item) return 'Репетиции';
   return getMainNavLabel(item, variant);
 }

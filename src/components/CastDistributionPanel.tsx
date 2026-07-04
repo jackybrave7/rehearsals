@@ -11,6 +11,9 @@ import { Modal } from './Modal';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { Input, Textarea, Select } from './FormFields';
 import { ActorAvatar } from './ActorAvatar';
+import { fetchTheaterMembers } from '../api/auth';
+import { normalizeActorEmail, normalizeActorName } from '../utils/actorProfile';
+import { formatScriptAliasesInput, parseScriptAliasesInput } from '../utils/sceneRoleAssignment';
 
 interface CastDistributionPanelProps {
   playId: string;
@@ -40,6 +43,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
   const [editingRole, setEditingRole] = useState<PlayRole | null>(null);
   const [editingPerformance, setEditingPerformance] = useState<Performance | null>(null);
   const [roleForm, setRoleForm] = useState(emptyRole(playId, 'character', 1));
+  const [roleAliasesText, setRoleAliasesText] = useState('');
   const [performanceForm, setPerformanceForm] = useState<Omit<Performance, 'id'>>({
     playId,
     name: '',
@@ -99,6 +103,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
     const roles = rolesByKind[kind];
     setEditingRole(null);
     setRoleForm(emptyRole(playId, kind, roles.length + 1));
+    setRoleAliasesText('');
     setRoleModalOpen(true);
   };
 
@@ -106,6 +111,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
     if (readOnly) return;
     setEditingRole(role);
     setRoleForm({ ...role });
+    setRoleAliasesText(formatScriptAliasesInput(role.scriptAliases));
     setRoleModalOpen(true);
   };
 
@@ -121,6 +127,8 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
         kind: roleForm.kind,
         order: Number(roleForm.order) || 1,
         description: roleForm.description?.trim() || undefined,
+        scriptAliases:
+          roleForm.kind === 'character' ? parseScriptAliasesInput(roleAliasesText) : undefined,
       },
     });
     setRoleModalOpen(false);
@@ -189,9 +197,28 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }, [assignRole, activePerformance, activeActors, assignSearch, state]);
 
-  const handleAssignFromModal = (actorId: string) => {
+  const handleAssignFromModal = async (actorId: string) => {
     if (!assignRole) return;
     assignActor(assignRole.id, actorId);
+
+    const actor = state.actors.find((item) => item.id === actorId);
+    const theaterId = state.activeTheaterId;
+    if (actor && theaterId && !normalizeActorEmail(actor.email)) {
+      try {
+        const members = await fetchTheaterMembers(theaterId);
+        const member = members.find(
+          (entry) =>
+            entry.role === 'actor' &&
+            normalizeActorName(entry.name) === normalizeActorName(actor.name)
+        );
+        if (member?.email) {
+          dispatch({ type: 'UPDATE_ACTOR', payload: { ...actor, email: member.email } });
+        }
+      } catch {
+        // ignore — режиссёр может указать email вручную
+      }
+    }
+
     closeAssignModal();
   };
 
@@ -320,6 +347,11 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
                     <tr key={role.id} className="border-t border-gold/10 align-top">
                       <td className="px-4 py-3">
                         <p className="font-medium text-white">{role.name}</p>
+                        {role.kind === 'character' && role.scriptAliases && role.scriptAliases.length > 0 && (
+                          <p className="mt-1 text-xs text-muted">
+                            В тексте: {role.scriptAliases.join(', ')}
+                          </p>
+                        )}
                         {role.description && (
                           <p className="mt-1 text-xs text-muted">{role.description}</p>
                         )}
@@ -565,6 +597,19 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
             value={roleForm.description ?? ''}
             onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
           />
+          {roleForm.kind === 'character' && (
+            <div className="space-y-1.5">
+              <Input
+                label="Имена в тексте пьесы"
+                value={roleAliasesText}
+                onChange={(e) => setRoleAliasesText(e.target.value)}
+                placeholder="Михель"
+              />
+              <p className="text-xs text-muted">
+                Через запятую — если в сценарии персонаж подписан иначе, чем в списке ролей
+              </p>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -640,7 +685,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
                 <li key={actor.id}>
                   <button
                     type="button"
-                    onClick={() => handleAssignFromModal(actor.id)}
+                    onClick={() => void handleAssignFromModal(actor.id)}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-gold/10"
                   >
                     <ActorAvatar name={actor.name} photoUrl={actor.photoUrl} size="sm" />
@@ -651,6 +696,11 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
                       {actor.telegramUsername && (
                         <span className="block truncate text-xs text-muted">
                           @{actor.telegramUsername.replace(/^@+/, '')}
+                        </span>
+                      )}
+                      {!normalizeActorEmail(actor.email) && (
+                        <span className="mt-0.5 inline-block rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-200">
+                          нет email — личный кабинет не откроется
                         </span>
                       )}
                     </span>

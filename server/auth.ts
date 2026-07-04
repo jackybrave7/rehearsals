@@ -12,6 +12,8 @@ import {
   verifyEmailByToken,
 } from './emailVerification.js';
 import { getRegistrationMode, isRegistrationApproved } from './platformSettings.js';
+import { normalizeActorEmail, normalizeActorName } from '../src/utils/actorProfile.js';
+import { deleteUserCompletely } from './adminDeleteUser.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
@@ -46,6 +48,45 @@ function generateOneTimePassword(): string {
   const part = () =>
     Array.from({ length: 4 }, () => chars[randomBytes(1)[0] % chars.length]).join('');
   return `${part()}-${part()}-${part()}`;
+}
+
+/** Связывает приглашённого актёра с карточкой участника театра (по email или имени). */
+function ensureActorParticipantCard(
+  db: AppDatabase,
+  theaterId: string,
+  user: Pick<AuthUser, 'email' | 'name'>
+) {
+  const email = normalizeActorEmail(user.email);
+  if (!email) return;
+
+  const displayName = user.name?.trim() || user.email;
+
+  const byEmail = db
+    .prepare(
+      `SELECT id, email FROM actors
+       WHERE theater_id = ? AND LOWER(TRIM(COALESCE(email, ''))) = ?`
+    )
+    .get(theaterId, email) as { id: string; email: string | null } | undefined;
+  if (byEmail) return;
+
+  const rows = db
+    .prepare(`SELECT id, email, name FROM actors WHERE theater_id = ? AND status = 'active'`)
+    .all(theaterId) as Array<{ id: string; email: string | null; name: string }>;
+
+  const byName = rows.filter((row) => normalizeActorName(row.name) === normalizeActorName(displayName));
+  if (byName.length === 1) {
+    if (!normalizeActorEmail(byName[0].email)) {
+      db.prepare(`UPDATE actors SET email = ? WHERE id = ?`).run(email, byName[0].id);
+    }
+    return;
+  }
+  if (byName.length > 1) return;
+
+  db.prepare(
+    `INSERT INTO actors (
+      id, theater_id, name, status, email, unavailability
+    ) VALUES (?, ?, ?, 'active', ?, '[]')`
+  ).run(uuidv4(), theaterId, displayName, email);
 }
 
 type UserRow = {
@@ -238,6 +279,44 @@ export function registerAuthRoutes(app: import('express').Express) {
     const token = readSessionToken(req);
     if (token) {
       getDb().prepare(`DELETE FROM sessions WHERE token_hash = ?`).run(hashToken(token));
+    }
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/auth/delete-account', (req, res) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT id, password_hash FROM users WHERE id = ?`)
+      .get(session.user.id) as { id: string; password_hash: string | null } | undefined;
+
+    if (!row) {
+      res.status(404).json({ error: 'USER_NOT_FOUND' });
+      return;
+    }
+
+    if (row.password_hash) {
+      if (!password || !verifyPassword(password, row.password_hash)) {
+        res.status(401).json({ error: 'WRONG_PASSWORD' });
+        return;
+      }
+    }
+
+    const token = readSessionToken(req);
+    try {
+      deleteUserCompletely(row.id, db);
+    } catch (error) {
+      console.error('[auth] delete account failed', error);
+      res.status(500).json({ error: 'DELETE_ACCOUNT_FAILED' });
+      return;
+    }
+
+    if (token) {
+      db.prepare(`DELETE FROM sessions WHERE token_hash = ?`).run(hashToken(token));
     }
     clearSessionCookie(res);
     res.json({ ok: true });
@@ -517,13 +596,24 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     const rows = getDb()
       .prepare(
-        `SELECT u.id, u.email, u.name, tm.role
+        `SELECT u.id, u.email, u.name, tm.role, a.name AS actor_name, a.photo_url AS actor_photo_url
          FROM theater_members tm
          JOIN users u ON u.id = tm.user_id
+         LEFT JOIN actors a ON a.theater_id = tm.theater_id
+           AND a.status = 'active'
+           AND LOWER(TRIM(COALESCE(a.email, ''))) = LOWER(TRIM(u.email))
+           AND TRIM(COALESCE(a.email, '')) != ''
          WHERE tm.theater_id = ?
          ORDER BY CASE tm.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, u.name`
       )
-      .all(theaterId) as Array<{ id: string; email: string; name: string; role: TheaterAccessRole }>;
+      .all(theaterId) as Array<{
+        id: string;
+        email: string;
+        name: string;
+        role: TheaterAccessRole;
+        actor_name: string | null;
+        actor_photo_url: string | null;
+      }>;
 
     res.json({
       members: rows.map((row) => ({
@@ -531,6 +621,8 @@ export function registerAuthRoutes(app: import('express').Express) {
         email: row.email,
         name: row.name,
         role: row.role,
+        actorName: row.actor_name ?? undefined,
+        photoUrl: row.actor_photo_url ?? undefined,
       })),
     });
   });
@@ -546,7 +638,7 @@ export function registerAuthRoutes(app: import('express').Express) {
 
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const role = req.body?.role as TheaterAccessRole;
-    if (!email || (role !== 'editor' && role !== 'observer')) {
+    if (!email || (role !== 'editor' && role !== 'observer' && role !== 'actor')) {
       res.status(400).json({ error: 'INVALID_BODY' });
       return;
     }
@@ -564,6 +656,10 @@ export function registerAuthRoutes(app: import('express').Express) {
       `INSERT INTO theater_members (theater_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(theater_id, user_id) DO UPDATE SET role = excluded.role`
     ).run(theaterId, user.id, role, new Date().toISOString());
+
+    if (role === 'actor') {
+      ensureActorParticipantCard(db, theaterId, user);
+    }
 
     res.json({ ok: true });
   });

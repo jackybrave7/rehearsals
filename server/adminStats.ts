@@ -75,7 +75,7 @@ export interface PlatformStats {
   };
   theaters: {
     total: number;
-    membersByRole: { owner: number; editor: number; observer: number };
+    membersByRole: { owner: number; editor: number; observer: number; actor: number };
   };
   content: {
     plays: number;
@@ -425,12 +425,17 @@ export function collectPlatformStats(db: AppDatabase = getDb()): PlatformStats {
   const since30Days = isoDateDaysAgo(30);
   const since30DaysUsers = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const membersByRole = { owner: 0, editor: 0, observer: 0 };
+  const membersByRole = { owner: 0, editor: 0, observer: 0, actor: 0 };
   const roleRows = db
     .prepare(`SELECT role, COUNT(*) AS count FROM theater_members GROUP BY role`)
     .all() as Array<{ role: string; count: number }>;
   for (const row of roleRows) {
-    if (row.role === 'owner' || row.role === 'editor' || row.role === 'observer') {
+    if (
+      row.role === 'owner' ||
+      row.role === 'editor' ||
+      row.role === 'observer' ||
+      row.role === 'actor'
+    ) {
       membersByRole[row.role] = Number(row.count);
     }
   }

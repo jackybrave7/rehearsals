@@ -8,7 +8,7 @@ import {
   getActivePlay,
   getActiveTheater,
   getSelectedPerformance,
-  getTheaterPlays,
+  getActiveTheaterPlays,
 } from '../store/selectors';
 import { workContextLinks } from '../navigation/workContextLinks';
 import { PlaySwitcherLabel } from './PlaySwitcher';
@@ -43,7 +43,7 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
   const activeTheater = getActiveTheater(state);
   const activePlay = getActivePlay(state);
   const performance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
-  const playCount = getTheaterPlays(state).length;
+  const playCount = getActiveTheaterPlays(state).length;
 
   const theaterValue = activeTheater?.name ?? 'Не выбран';
   const performanceValue = performance ? formatPerformanceLabel(performance) : 'Не выбран';

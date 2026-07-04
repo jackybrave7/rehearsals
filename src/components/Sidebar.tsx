@@ -3,9 +3,10 @@ import { NavLink } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useActorNavMode } from '../hooks/useActorNavMode';
 import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
-import { getMainNavLabel, getVisibleMainNavItems } from '../navigation/mainNav';
+import { getMainNavLabel, getNavItemsForUser } from '../navigation/mainNav';
 import { appPaths } from '../navigation/appPaths';
 
 const SIDEBAR_COLLAPSED_KEY = 'rehearsals-sidebar-collapsed';
@@ -27,8 +28,9 @@ type SidebarProps = {
 
 export function Sidebar({ className = '', drawer = false, onNavigate }: SidebarProps) {
   const { state } = useRehearsalStore();
+  const actorOnly = useActorNavMode();
   const activePlay = getActivePlay(state);
-  const visibleNavItems = getVisibleMainNavItems(getTheaterPlays(state).length);
+  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly);
   const [collapsed, setCollapsed] = useState(() => (drawer ? false : readCollapsedPreference()));
   const isCollapsed = drawer ? false : collapsed;
 
@@ -86,7 +88,7 @@ export function Sidebar({ className = '', drawer = false, onNavigate }: SidebarP
           <NavLink
             key={to}
             to={to}
-            end={to === appPaths.home}
+            end={to === appPaths.home || to === appPaths.my}
             title={isCollapsed ? navLabel : undefined}
             onClick={onNavigate}
             className={({ isActive }) =>

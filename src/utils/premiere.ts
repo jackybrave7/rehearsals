@@ -1,6 +1,31 @@
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns';
 import type { AppState, Performance } from '../types';
 
+/** Базовый или явно названный премьерный показ — иначе это отдельный показ в афише. */
+export function isPremierePerformance(performance: Performance): boolean {
+  if (performance.isDefault) return true;
+  return /премьер/i.test(performance.name);
+}
+
+/** «Премьера «Каменное сердце»» или ««Каменное сердце» · 2 показ». */
+export function formatUpcomingPerformanceEventLabel(
+  playTitle: string,
+  performance: Performance
+): string {
+  if (isPremierePerformance(performance)) {
+    return `Премьера «${playTitle}»`;
+  }
+  return `«${playTitle}» · ${performance.name}`;
+}
+
+export function formatUpcomingPerformanceCountdown(
+  playTitle: string,
+  performance: Performance,
+  daysLeft: number
+): string {
+  return `${formatUpcomingPerformanceEventLabel(playTitle, performance)} ${formatPremiereCountdown(daysLeft)}`;
+}
+
 export interface UpcomingPremiere {
   performance: Performance;
   date: string;

@@ -50,5 +50,6 @@ export function createSeedState(): AppState {
     tasks: [],
     venues: [{ ...createDefaultVenue(), theaterId: theater.id }],
     rehearsals: [],
+    rehearsalActorNotes: [],
   };
 }

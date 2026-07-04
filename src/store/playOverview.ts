@@ -2,6 +2,7 @@ import { differenceInCalendarDays, isAfter, parseISO, startOfDay } from 'date-fn
 import type { AppState, Play, Performance, Rehearsal } from '../types';
 import { countOpenTasksByPlay } from '../utils/tasks';
 import { getUpcomingPremiere } from '../utils/premiere';
+import { rehearsalInvolvesPlay } from '../utils/rehearsalPlays';
 import { getTheaterPlays } from './selectors';
 
 export interface PlayOverview {
@@ -34,7 +35,7 @@ function countStaleScenes(
   for (const scene of playScenes) {
     let latest: string | null = null;
     for (const rehearsal of state.rehearsals) {
-      if (rehearsal.playId !== playId) continue;
+      if (!rehearsalInvolvesPlay(state, rehearsal, playId)) continue;
       const hasScene =
         rehearsal.sceneIds.includes(scene.id) ||
         rehearsal.schedule.some((block) => block.sceneId === scene.id);
@@ -62,7 +63,9 @@ export function getPlayOverviews(state: AppState): PlayOverview[] {
     const inProgress = scenes.filter((scene) => scene.status === 'in_progress').length;
     const notStarted = scenes.filter((scene) => scene.status === 'not_started').length;
     const total = scenes.length;
-    const playRehearsals = state.rehearsals.filter((rehearsal) => rehearsal.playId === play.id);
+    const playRehearsals = state.rehearsals.filter((rehearsal) =>
+      rehearsalInvolvesPlay(state, rehearsal, play.id)
+    );
     const nextRehearsal = playRehearsals
       .filter((rehearsal) => !isAfter(today, parseISO(rehearsal.date)))
       .sort(

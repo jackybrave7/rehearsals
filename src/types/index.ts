@@ -27,12 +27,22 @@ export interface RehearsalReminderSent {
 
 export type RsvpStatus = 'confirmed' | 'declined' | 'late';
 
+export type ActorUnavailabilityRecurrence = 'none' | 'weekly';
+
 export interface ActorUnavailability {
   id: string;
   from: string;
   to: string;
   reason?: string;
+  recurrence?: ActorUnavailabilityRecurrence;
+  /** 0=вс … 6=сб; для «будни» — 1–5 */
+  weekdays?: number[];
+  /** Если оба пусты — недоступен весь день. Иначе интервал «не могу» в эти часы (HH:mm). */
+  startTime?: string;
+  endTime?: string;
 }
+
+export type MemorizationStatus = 'not_started' | 'learning' | 'known';
 
 export interface Actor {
   id: string;
@@ -48,6 +58,8 @@ export interface Actor {
   telegramChatId?: string;
   notes?: string;
   unavailability?: ActorUnavailability[];
+  /** Прогресс заучивания по сценам (sceneId → статус) */
+  memorizationByScene?: Record<string, MemorizationStatus>;
 }
 
 export type PlayRoleKind = 'character' | 'crew' | 'technical';
@@ -59,6 +71,8 @@ export interface PlayRole {
   kind: PlayRoleKind;
   order: number;
   description?: string;
+  /** Имена персонажа в тексте пьесы, если отличаются от названия роли */
+  scriptAliases?: string[];
 }
 
 export interface Performance {
@@ -87,6 +101,12 @@ export interface Play {
   title: string;
   author: string;
   description?: string;
+  /** Обложка постановки (URL) */
+  coverUrl?: string;
+  /** Круглая иконка постановки (URL); если нет — буква на iconColor */
+  iconUrl?: string;
+  /** Цвет фона иконки-заглушки (#hex) */
+  iconColor?: string;
   year?: number;
   documentUrl?: string;
   /** ID Google Docs, извлекается из documentUrl */
@@ -157,7 +177,7 @@ export interface Task {
   sceneId?: string;
 }
 
-export type ScheduleBlockType = 'scene' | 'task' | 'break' | 'warmup' | 'custom';
+export type ScheduleBlockType = 'scene' | 'task' | 'break' | 'warmup' | 'custom' | 'etude';
 
 export interface ScheduleBlock {
   id: string;
@@ -167,9 +187,15 @@ export interface ScheduleBlock {
   title: string;
   sceneId?: string;
   taskId?: string;
+  /** Для этюда: необязательная привязка к постановке */
+  playId?: string;
+  /** Для этюда: участники */
+  actorIds?: string[];
   notes?: string;
-  /** Что решили на репетиции, внутренне для истории работы */
+  /** Решения и корректировки по сцене (с @-упоминаниями актёров/ролей) */
   decidedNotes?: string;
+  /** Для этюда: итог — что получилось, что взять в спектакль */
+  outcomeNotes?: string;
   /** Что осталось сделать, внутренне для истории работы */
   remainingNotes?: string;
   /** Отметка после репетиции: выполнен пункт плана или нет (не для перерывов) */
@@ -212,9 +238,24 @@ export interface Rehearsal {
   remindersSent?: RehearsalReminderSent[];
   /** Не отправлять авто-напоминания по этой репетиции */
   reminderOptOut?: boolean;
+  /** Когда план последний раз отправляли в чат театра Telegram */
+  telegramPlanSentAt?: string;
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'substitute';
+
+export interface RehearsalActorNote {
+  id: string;
+  theaterId: string;
+  rehearsalId: string;
+  actorId: string;
+  sceneId?: string;
+  scheduleBlockId?: string;
+  text: string;
+  createdAt: string;
+  sentAt?: string;
+  acknowledgedAt?: string;
+}
 
 export interface RehearsalTemplateBlock {
   durationMinutes: number;
@@ -271,6 +312,7 @@ export interface AppState {
   tasks: Task[];
   venues: Venue[];
   rehearsals: Rehearsal[];
+  rehearsalActorNotes: RehearsalActorNote[];
   /** Метки применённых миграций — хранятся вместе с данными пользователя */
   appMeta?: {
     stoneHeartCastVersion?: string;
@@ -290,6 +332,8 @@ export interface AppState {
     };
     /** Миграция встроенных data-URL в файловое хранилище */
     filesMigratedVersion?: string;
+    /** Отмечено при экспорте плана (ics / Google / Telegram) для чеклиста настройки */
+    guideOnboardingPlanSent?: boolean;
   };
 }
 

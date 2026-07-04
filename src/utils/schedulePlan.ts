@@ -94,11 +94,31 @@ export function createBlockFromTask(task: Task): ScheduleBlock {
   };
 }
 
-export type PlanGenerationMode = 'chronology' | 'by-actors';
+export function createBlockFromEtude(options: {
+  title: string;
+  durationMinutes?: number;
+  playId?: string;
+  actorIds?: string[];
+  notes?: string;
+}): ScheduleBlock {
+  return {
+    id: generateId(),
+    startTime: '00:00',
+    durationMinutes: options.durationMinutes ?? 30,
+    type: 'etude',
+    title: options.title,
+    playId: options.playId,
+    actorIds: options.actorIds,
+    notes: options.notes,
+  };
+}
+
+export type PlanGenerationMode = 'chronology' | 'by-actors' | 'by-productions';
 
 export const PLAN_GENERATION_MODE_LABELS: Record<PlanGenerationMode, string> = {
   chronology: 'Хронология сцен',
   'by-actors': 'Группировка по актёрам',
+  'by-productions': 'Группировка по постановкам',
 };
 
 function compareSceneChronology(
@@ -121,6 +141,18 @@ function countActorOverlap(
   return actorsB.filter((actorId) => actorsA.has(actorId)).length;
 }
 
+function compareSceneByProductionThenChronology(
+  sceneById: Map<string, Scene>,
+  sceneIdA: string,
+  sceneIdB: string
+): number {
+  const sceneA = sceneById.get(sceneIdA);
+  const sceneB = sceneById.get(sceneIdB);
+  const playCmp = (sceneA?.playId ?? '').localeCompare(sceneB?.playId ?? '');
+  if (playCmp !== 0) return playCmp;
+  return (sceneA?.number ?? 0) - (sceneB?.number ?? 0);
+}
+
 export function orderSceneIdsForPlan(
   sceneIds: string[],
   scenes: Scene[],
@@ -129,8 +161,16 @@ export function orderSceneIdsForPlan(
 ): string[] {
   const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
   const knownIds = sceneIds.filter((sceneId) => sceneById.has(sceneId));
-  if (knownIds.length <= 1 || mode === 'chronology') {
+  if (knownIds.length <= 1) {
     return [...knownIds].sort((a, b) => compareSceneChronology(sceneById, a, b));
+  }
+  if (mode === 'chronology') {
+    return [...knownIds].sort((a, b) => compareSceneChronology(sceneById, a, b));
+  }
+  if (mode === 'by-productions') {
+    return [...knownIds].sort((a, b) =>
+      compareSceneByProductionThenChronology(sceneById, a, b)
+    );
   }
 
   const remaining = new Set(knownIds);
@@ -196,6 +236,44 @@ export function buildScheduleFromRehearsalItems(
   }
 
   return recalculateScheduleStartTimes(blocks, startTime);
+}
+
+export function appendScheduleFromRehearsalItems(
+  existingBlocks: ScheduleBlock[],
+  startTime: string,
+  sceneIds: string[],
+  taskIds: string[],
+  scenes: Scene[],
+  tasks: Task[],
+  options?: {
+    mode?: PlanGenerationMode;
+    actorIdsBySceneId?: Map<string, string[]>;
+  }
+): ScheduleBlock[] {
+  const existingSceneIds = new Set(
+    existingBlocks.map((block) => block.sceneId).filter((id): id is string => Boolean(id))
+  );
+  const existingTaskIds = new Set(
+    existingBlocks.map((block) => block.taskId).filter((id): id is string => Boolean(id))
+  );
+
+  const newSceneIds = sceneIds.filter((sceneId) => !existingSceneIds.has(sceneId));
+  const newTaskIds = taskIds.filter((taskId) => !existingTaskIds.has(taskId));
+
+  const newBlocks = buildScheduleFromRehearsalItems(
+    startTime,
+    newSceneIds,
+    newTaskIds,
+    scenes,
+    tasks,
+    options
+  );
+
+  if (newBlocks.length === 0) {
+    return existingBlocks;
+  }
+
+  return recalculateScheduleStartTimes([...existingBlocks, ...newBlocks], startTime);
 }
 
 export function insertScheduleBlockAt(

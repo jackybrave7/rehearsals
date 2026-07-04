@@ -60,6 +60,25 @@ export function getDb(): AppDatabase {
   } catch {
     // column already exists
   }
+
+  const tmSchemaRow = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'theater_members'`)
+    .get() as { sql: string } | undefined;
+  if (tmSchemaRow?.sql && !tmSchemaRow.sql.includes("'actor'")) {
+    db.exec(`
+      CREATE TABLE theater_members_new (
+        theater_id TEXT NOT NULL REFERENCES theaters(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'observer', 'actor')),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (theater_id, user_id)
+      );
+      INSERT INTO theater_members_new SELECT * FROM theater_members;
+      DROP TABLE theater_members;
+      ALTER TABLE theater_members_new RENAME TO theater_members;
+    `);
+  }
+
   for (const migration of [
     `ALTER TABLE app_settings ADD COLUMN active_theater_id TEXT`,
     `ALTER TABLE plays ADD COLUMN theater_id TEXT`,
@@ -107,6 +126,27 @@ export function getDb(): AppDatabase {
     )`,
     `ALTER TABLE platform_settings ADD COLUMN legacy_registration_backfill_at TEXT`,
     `ALTER TABLE rehearsals ADD COLUMN rsvp TEXT DEFAULT '{}'`,
+    `ALTER TABLE schedule_blocks ADD COLUMN play_id TEXT`,
+    `ALTER TABLE schedule_blocks ADD COLUMN actor_ids TEXT`,
+    `ALTER TABLE schedule_blocks ADD COLUMN outcome_notes TEXT`,
+    `ALTER TABLE rehearsals ADD COLUMN telegram_plan_sent_at TEXT`,
+    `ALTER TABLE actors ADD COLUMN memorization_by_scene TEXT NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE plays ADD COLUMN cover_url TEXT`,
+    `ALTER TABLE plays ADD COLUMN icon_url TEXT`,
+    `ALTER TABLE plays ADD COLUMN icon_color TEXT`,
+    `ALTER TABLE play_roles ADD COLUMN script_aliases TEXT`,
+    `CREATE TABLE IF NOT EXISTS rehearsal_actor_notes (
+      id TEXT PRIMARY KEY,
+      theater_id TEXT NOT NULL,
+      rehearsal_id TEXT NOT NULL,
+      actor_id TEXT NOT NULL,
+      scene_id TEXT,
+      schedule_block_id TEXT,
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      sent_at TEXT,
+      acknowledged_at TEXT
+    )`,
   ]) {
     try {
       db.exec(migration);

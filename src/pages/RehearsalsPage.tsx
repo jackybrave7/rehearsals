@@ -2,19 +2,16 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Plus, MapPin, Clock, Sparkles } from 'lucide-react';
+import { Plus, MapPin, Clock, Sparkles, AlertTriangle } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import {
-  getPlayScenes,
   getActiveActors,
-  getPlayPerformances,
-  formatPerformanceLabel,
-  getPlayRoles,
+  getActivePlay,
   getTheaterPlays,
-  getPlayRehearsals,
+  getTheaterRehearsals,
   getTheaterTasks,
   getTheaterVenues,
-  getActivePlay,
+  getActiveTheater,
 } from '../store/selectors';
 import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
@@ -26,33 +23,29 @@ import { Input, Textarea, Select } from '../components/FormFields';
 import { Calendar } from '../components/Calendar';
 import { WeekCalendar, getWeekStart } from '../components/WeekCalendar';
 import { VenueSelect } from '../components/VenueSelect';
-import { ScenePicker } from '../components/ScenePicker';
+import { TheaterScenePicker } from '../components/TheaterScenePicker';
 import { resolveRehearsalLocation } from '../utils/venue';
-import { mergeActorsForNewScenes, resolveRehearsalPerformanceId } from '../utils/rehearsalActors';
+import { mergeActorsForNewScenes } from '../utils/rehearsalActors';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import {
   getRehearsalWarnings,
   getActorScheduleConflicts,
+  getVenueScheduleConflicts,
 } from '../utils/rehearsalInsights';
 import { suggestRehearsalDates } from '../utils/suggestRehearsalDates';
 import { getUpcomingRehearsals } from '../utils/rehearsalSort';
 import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
-import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
+import { getArchivedPlaysInRehearsal, rehearsalInvolvesActor, rehearsalInvolvesPlay } from '../utils/rehearsalPlays';
+import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
+import { getRehearsalEventLabel, getRehearsalPlayMarkers } from '../utils/rehearsalCalendarMarkers';
 
-const emptyRehearsal = (
-  date: string,
-  theaterId?: string,
-  playId?: string,
-  performanceId?: string
-): Omit<Rehearsal, 'id'> => ({
+const emptyRehearsal = (date: string, theaterId?: string): Omit<Rehearsal, 'id'> => ({
   theaterId,
   date,
   startTime: '18:00',
   endTime: '21:00',
   location: '',
   notes: '',
-  playId,
-  performanceId,
   sceneIds: [],
   taskIds: [],
   schedule: [],
@@ -68,10 +61,34 @@ export function RehearsalsPage() {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [modalOpen, setModalOpen] = useState(false);
+  const [filterPlayId, setFilterPlayId] = useState('');
+  const [filterActorId, setFilterActorId] = useState('');
   const [form, setForm] = useState(emptyRehearsal(format(new Date(), 'yyyy-MM-dd')));
   const theaterPlays = getTheaterPlays(state);
   const activePlay = getActivePlay(state);
-  const visibleRehearsals = getPlayRehearsals(state, state.activePlayId);
+  const activeTheater = getActiveTheater(state);
+  const allTheaterRehearsals = getTheaterRehearsals(state);
+  const visibleRehearsals = useMemo(() => {
+    let list = allTheaterRehearsals;
+    if (filterPlayId) {
+      list = list.filter((rehearsal) => rehearsalInvolvesPlay(state, rehearsal, filterPlayId));
+    }
+    if (filterActorId) {
+      list = list.filter((rehearsal) => rehearsalInvolvesActor(state, rehearsal, filterActorId));
+    }
+    return list;
+  }, [allTheaterRehearsals, filterPlayId, filterActorId, state]);
+  const theaterScenes = useMemo(
+    () =>
+      state.scenes.filter((scene) =>
+        theaterPlays.some((play) => play.id === scene.playId)
+      ),
+    [state.scenes, theaterPlays]
+  );
+  const getPlayMarkers = useMemo(
+    () => (rehearsal: Rehearsal) => getRehearsalPlayMarkers(state, rehearsal),
+    [state]
+  );
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
   const activeActors = getActiveActors(state);
@@ -85,9 +102,7 @@ export function RehearsalsPage() {
     [visibleRehearsals]
   );
 
-  const rehearsalScenes = getPlayScenes(state, form.playId ?? state.activePlayId);
-  const rehearsalPerformances = getPlayPerformances(state, form.playId ?? state.activePlayId ?? '');
-  const pickerCharacterRoles = getPlayRoles(state, form.playId ?? state.activePlayId ?? '', 'character');
+  const rehearsalScenes = theaterScenes;
 
   const draftRehearsal = useMemo<Rehearsal>(
     () => ({
@@ -108,6 +123,21 @@ export function RehearsalsPage() {
     [state, draftRehearsal]
   );
 
+  const createVenueConflicts = useMemo(
+    () => getVenueScheduleConflicts(state, draftRehearsal),
+    [state, draftRehearsal]
+  );
+
+  const venueConflictRehearsalIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const rehearsal of visibleRehearsals) {
+      if (getVenueScheduleConflicts(state, rehearsal).length > 0) {
+        ids.add(rehearsal.id);
+      }
+    }
+    return ids;
+  }, [state, visibleRehearsals]);
+
   const suggestedSlots = useMemo(
     () =>
       suggestRehearsalDates(state, draftRehearsal, {
@@ -124,14 +154,10 @@ export function RehearsalsPage() {
 
   const openCreate = () => {
     if (readOnly) return;
-    const playId = state.activePlayId ?? undefined;
-    const performanceId = playId ? resolveRehearsalPerformanceId(state, { playId }) : undefined;
     setForm(
       emptyRehearsal(
         selectedDateStr ?? format(new Date(), 'yyyy-MM-dd'),
-        state.activeTheaterId ?? undefined,
-        playId,
-        performanceId
+        state.activeTheaterId ?? undefined
       )
     );
     setModalOpen(true);
@@ -181,8 +207,8 @@ export function RehearsalsPage() {
         <div>
           <h1 className={pageTitleClass}>Репетиции</h1>
           <p className="mt-1 text-muted">
-            {activePlay && theaterPlays.length > 1
-              ? `«${activePlay.title}» — календарь и расписание`
+            {activeTheater
+              ? `${activeTheater.name} — календарь и расписание`
               : 'Календарь и расписание'}
           </p>
         </div>
@@ -193,6 +219,31 @@ export function RehearsalsPage() {
           </Button>
         )}
       </header>
+
+      <div className="flex flex-wrap items-center gap-3">
+        {theaterPlays.length > 1 && (
+          <Select
+            label="Постановка"
+            value={filterPlayId}
+            onChange={(e) => setFilterPlayId(e.target.value)}
+            options={[
+              { value: '', label: 'Все постановки' },
+              ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
+            ]}
+          />
+        )}
+        {activeActors.length > 0 && (
+          <Select
+            label="Участник"
+            value={filterActorId}
+            onChange={(e) => setFilterActorId(e.target.value)}
+            options={[
+              { value: '', label: 'Все участники' },
+              ...activeActors.map((actor) => ({ value: actor.id, label: actor.name })),
+            ]}
+          />
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-2">
@@ -234,6 +285,7 @@ export function RehearsalsPage() {
               rehearsals={visibleRehearsals}
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
+              getPlayMarkers={getPlayMarkers}
             />
           ) : (
             <WeekCalendar
@@ -253,10 +305,7 @@ export function RehearsalsPage() {
               <div className="space-y-2">
                 {upcomingRehearsals.map((rehearsal) => {
                   const location = resolveRehearsalLocation(rehearsal, theaterVenues);
-                  const play = theaterPlays.find((item) => item.id === rehearsal.playId);
-                  const performance = state.performances.find(
-                    (item) => item.id === resolveRehearsalPerformanceId(state, rehearsal)
-                  );
+                  const playLabel = getRehearsalEventLabel(state, rehearsal);
                   const isSelectedDay = rehearsal.date === selectedDateStr;
 
                   return (
@@ -270,6 +319,13 @@ export function RehearsalsPage() {
                           : 'border-gold/10 bg-background/30'
                       }`}
                     >
+                      <div className="flex items-start gap-2">
+                        <CalendarPlayMarkers
+                          markers={getPlayMarkers(rehearsal)}
+                          size="sm"
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
                       <p className="font-medium capitalize text-white">
                         {format(parseISO(rehearsal.date), 'EEE, d MMM', { locale: ru })}
                       </p>
@@ -278,14 +334,18 @@ export function RehearsalsPage() {
                         <span>
                           {rehearsal.startTime} – {rehearsal.endTime}
                         </span>
+                        {venueConflictRehearsalIds.has(rehearsal.id) && (
+                          <span
+                            className="warning-badge inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                            title="Площадка занята в это же время"
+                          >
+                            <AlertTriangle size={10} />
+                            Площадка
+                          </span>
+                        )}
                       </div>
-                      {play && theaterPlays.length > 1 && (
-                        <p className="mt-1 text-xs text-muted">«{play.title}»</p>
-                      )}
-                      {performance && (
-                        <p className="mt-0.5 text-xs text-muted">
-                          {formatPerformanceLabel(performance)}
-                        </p>
+                      {theaterPlays.length > 0 && (
+                        <p className="mt-1 text-xs text-muted">{playLabel}</p>
                       )}
                       {location && (
                         <p className="mt-1 flex items-start gap-1 text-xs text-muted">
@@ -293,6 +353,8 @@ export function RehearsalsPage() {
                           <span className="line-clamp-2">{location}</span>
                         </p>
                       )}
+                        </div>
+                      </div>
                     </Link>
                   );
                 })}
@@ -322,8 +384,7 @@ export function RehearsalsPage() {
               <div className="space-y-3">
                 {dayRehearsals.map((r) => {
                   const location = resolveRehearsalLocation(r, theaterVenues);
-                  const play = theaterPlays.find((item) => item.id === r.playId);
-                  const calendarTitle = getRehearsalEventTitle(play?.title);
+                  const calendarTitle = getRehearsalEventLabel(state, r);
                   return (
                   <div
                     key={r.id}
@@ -333,11 +394,27 @@ export function RehearsalsPage() {
                       to={appPaths.rehearsal(r.id)}
                       className="block"
                     >
+                      <div className="flex items-start gap-2">
+                        <CalendarPlayMarkers
+                          markers={getPlayMarkers(r)}
+                          size="sm"
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 text-gold-light">
                         <Clock size={16} />
                         <span className="font-medium">
                           {r.startTime} – {r.endTime}
                         </span>
+                        {venueConflictRehearsalIds.has(r.id) && (
+                          <span
+                            className="warning-badge inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                            title="Площадка занята в это же время"
+                          >
+                            <AlertTriangle size={10} />
+                            Площадка
+                          </span>
+                        )}
                       </div>
                       {location && (
                         <p className="mt-1 flex items-center gap-1 text-sm text-muted">
@@ -348,6 +425,8 @@ export function RehearsalsPage() {
                         {r.sceneIds.length > 0 && <span>{r.sceneIds.length} сцен</span>}
                         {r.taskIds.length > 0 && <span>{r.taskIds.length} задач</span>}
                         {r.schedule.length > 0 && <span>{r.schedule.length} блоков в плане</span>}
+                      </div>
+                        </div>
                       </div>
                     </Link>
                     <div className="mt-3 flex justify-end border-t border-gold/10 pt-3">
@@ -388,7 +467,9 @@ export function RehearsalsPage() {
             onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
 
-          {(createWarnings.length > 0 || createConflicts.length > 0) && (
+          {(createWarnings.length > 0 ||
+            createConflicts.length > 0 ||
+            createVenueConflicts.length > 0) && (
             <div className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm">
               {createWarnings.map((warning) => (
                 <p key={warning.id} className="text-amber-100">
@@ -398,6 +479,16 @@ export function RehearsalsPage() {
               {createConflicts.map((conflict) => (
                 <p key={`${conflict.actor.id}-${conflict.otherRehearsal.id}`} className="text-amber-100">
                   {conflict.actor.name} уже в репетиции «{conflict.otherPlayTitle}» в это время (
+                  {conflict.otherRehearsal.startTime}–{conflict.otherRehearsal.endTime}).
+                </p>
+              ))}
+              {createVenueConflicts.map((conflict) => (
+                <p
+                  key={`${conflict.venue.id}-${conflict.otherRehearsal.id}`}
+                  className="text-amber-100"
+                >
+                  Площадка «{conflict.venue.name}» уже занята репетицией «
+                  {conflict.otherPlayTitle}» в это время (
                   {conflict.otherRehearsal.startTime}–{conflict.otherRehearsal.endTime}).
                 </p>
               ))}
@@ -459,53 +550,22 @@ export function RehearsalsPage() {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
 
-          {theaterPlays.length > 1 && (
-            <Select
-              label="Постановка"
-              value={form.playId ?? ''}
-              onChange={(e) => {
-                const playId = e.target.value || undefined;
-                const performanceId = playId
-                  ? resolveRehearsalPerformanceId(state, { playId })
-                  : undefined;
-                setForm({
-                  ...form,
-                  playId,
-                  performanceId,
-                  sceneIds: [],
-                });
-              }}
-              options={[
-                { value: '', label: 'Без привязки' },
-                ...theaterPlays.map((p) => ({ value: p.id, label: p.title })),
-              ]}
-            />
-          )}
-
-          {rehearsalPerformances.length > 0 && form.playId && (
-            <Select
-              label="Показ"
-              value={form.performanceId ?? ''}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  performanceId: e.target.value || undefined,
-                })
-              }
-              options={rehearsalPerformances.map((performance) => ({
-                value: performance.id,
-                label: formatPerformanceLabel(performance),
-              }))}
-            />
+          {getArchivedPlaysInRehearsal(state, draftRehearsal).length > 0 && (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              В плане есть сцены из архивных постановок:{' '}
+              {getArchivedPlaysInRehearsal(state, draftRehearsal)
+                .map((play) => `«${play.title}»`)
+                .join(', ')}
+            </div>
           )}
 
           {rehearsalScenes.length > 0 && (
-            <ScenePicker
-              scenes={[...rehearsalScenes].sort((a, b) => a.number - b.number)}
+            <TheaterScenePicker
+              plays={theaterPlays}
+              scenes={rehearsalScenes}
               selectedIds={form.sceneIds}
               onChange={toggleScene}
-              characterRoles={pickerCharacterRoles}
-              playId={form.playId ?? state.activePlayId ?? undefined}
+              defaultPlayId={activePlay?.id ?? state.activePlayId}
             />
           )}
 
@@ -541,9 +601,15 @@ export function RehearsalsPage() {
               <div className="max-h-32 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-2">
                 <div className="flex flex-wrap gap-2">
                 {activeActors.map((actor) => {
-                  const unavailable = isActorUnavailable(actor, form.date);
+                  const unavailable = isActorUnavailable(actor, form.date, {
+                    startTime: form.startTime,
+                    endTime: form.endTime,
+                  });
                   const reason = unavailable
-                    ? getActorUnavailabilityReason(actor, form.date)
+                    ? getActorUnavailabilityReason(actor, form.date, {
+                        startTime: form.startTime,
+                        endTime: form.endTime,
+                      })
                     : undefined;
                   return (
                     <button

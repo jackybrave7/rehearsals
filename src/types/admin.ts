@@ -16,7 +16,7 @@ export interface PlatformStats {
   };
   theaters: {
     total: number;
-    membersByRole: { owner: number; editor: number; observer: number };
+    membersByRole: { owner: number; editor: number; observer: number; actor: number };
   };
   content: {
     plays: number;

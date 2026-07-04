@@ -1,12 +1,17 @@
 import { NavLink } from 'react-router-dom';
-import { CalendarDays, Film, LayoutDashboard, MoreHorizontal, Users } from 'lucide-react';
+import { CalendarDays, Film, LayoutDashboard, MoreHorizontal, UserCircle, Users } from 'lucide-react';
 import { appPaths } from '../navigation/appPaths';
+import { useActorNavMode } from '../hooks/useActorNavMode';
 
-const items = [
-  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор' },
-  { to: appPaths.scenes, icon: Film, label: 'Сцены' },
-  { to: appPaths.actors, icon: Users, label: 'Участники' },
-  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции' },
+const directorItems = [
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', end: true },
+  { to: appPaths.scenes, icon: Film, label: 'Сцены', end: false },
+  { to: appPaths.actors, icon: Users, label: 'Участники', end: false },
+  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', end: false },
+] as const;
+
+const actorItems = [
+  { to: appPaths.my, icon: UserCircle, label: 'Моё', end: true },
 ] as const;
 
 interface MobileBottomNavProps {
@@ -16,6 +21,8 @@ interface MobileBottomNavProps {
 
 export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBottomNavProps) {
   const isZen = variant === 'zen';
+  const actorOnly = useActorNavMode();
+  const items = actorOnly ? actorItems : directorItems;
 
   return (
     <nav
@@ -28,11 +35,11 @@ export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBott
       aria-label="Основная навигация"
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around">
-        {items.map(({ to, icon: Icon, label }) => (
+        {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}
-            end={to === appPaths.home}
+            end={end}
             className={({ isActive }) =>
               `flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] transition-colors ${
                 isActive

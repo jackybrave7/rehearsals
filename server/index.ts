@@ -23,9 +23,11 @@ import {
   loadLatestBackupState,
 } from './backup.js';
 import { handleFetchGoogleDocument } from './googleDocs.js';
-import { handleParseScriptImport } from './scriptImport.js';
+import { handleParseScriptImport, handleSceneBodyText } from './scriptImport.js';
 import { startReminderScheduler } from './reminderScheduler.js';
 import { startTelegramLinkPoller } from './telegramLinkPoller.js';
+import { registerActorSelfRoutes } from './actorSelfRoutes.js';
+import { registerRehearsalNotesRoutes } from './rehearsalNotesRoutes.js';
 
 // Docker на VPS часто резолвит api.telegram.org в IPv6 без маршрута — fetch таймаутится.
 dns.setDefaultResultOrder('ipv4first');
@@ -48,6 +50,8 @@ registerAdminEmailVerificationRoutes(app);
 registerSupportTicketRoutes(app);
 registerAdminSupportTicketRoutes(app);
 registerTelegramRoutes(app);
+registerActorSelfRoutes(app);
+registerRehearsalNotesRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });
@@ -110,6 +114,10 @@ app.get('/api/google-docs/documents/:documentId', (req, res) => {
 
 app.post('/api/script-import/parse', (req, res) => {
   void handleParseScriptImport(req, res);
+});
+
+app.post('/api/script-import/scene-body', (req, res) => {
+  void handleSceneBodyText(req, res);
 });
 
 app.put('/api/state', (req, res) => {

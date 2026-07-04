@@ -9,10 +9,11 @@ import {
 } from '../src/utils/scriptDocument.js';
 import { buildSceneRoleIdsFromTexts } from '../src/utils/sceneRoleAssignment.js';
 import { extractSceneBodyTextsFromPlainText } from '../src/utils/sceneDescription.js';
-import type { DocTextAnchor } from '../src/utils/googleDocs.js';
+import { matchScenesToDocAnchors, type DocTextAnchor } from '../src/utils/googleDocs.js';
 import { getDb } from './db.js';
 import { getFileRecord, getFileStoragePath } from './fileStorage.js';
 import { requireAuth } from './auth.js';
+import { resolveSceneBodyFromScriptFile } from './sceneLearnText.js';
 import type { Request, Response } from 'express';
 
 async function extractDocxHeadingAnchors(buffer: Buffer): Promise<DocTextAnchor[]> {
@@ -62,6 +63,44 @@ export async function parseScriptFileBuffer(
 
   const text = buffer.toString('utf-8').replace(/\r\n/g, '\n');
   return { text, anchors: extractSectionsFromPlainText(text) };
+}
+
+export async function handleSceneBodyText(req: Request, res: Response): Promise<void> {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
+  const scene = req.body?.scene as Scene | undefined;
+
+  if (!fileId || !scene?.id) {
+    res.status(400).json({ error: 'INVALID_BODY' });
+    return;
+  }
+
+  const record = getFileRecord(getDb(), fileId);
+  if (!record) {
+    res.status(404).json({ error: 'NOT_FOUND' });
+    return;
+  }
+
+  if (!fs.existsSync(getFileStoragePath(fileId))) {
+    res.status(404).json({ error: 'NOT_FOUND' });
+    return;
+  }
+
+  try {
+    const play = { scriptFileUrl: `/api/files/${fileId}` } as import('../src/types/index.js').Play;
+    const body = await resolveSceneBodyFromScriptFile(play, scene);
+    res.json({ text: body ?? '' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'PARSE_FAILED';
+    if (message === 'UNSUPPORTED_FORMAT') {
+      res.status(400).json({ error: message });
+      return;
+    }
+    console.error('[api] scene body text failed', message);
+    res.status(500).json({ error: 'PARSE_FAILED' });
+  }
 }
 
 export async function handleParseScriptImport(req: Request, res: Response): Promise<void> {

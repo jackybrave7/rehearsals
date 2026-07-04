@@ -15,6 +15,7 @@ import {
 } from './stateRepository.js';
 import { migrateEmbeddedFilesIfNeeded } from './fileMigration.js';
 import { validateSubscriptionLimits } from './subscription.js';
+import { syncDecidedNotesToActorNotes } from '../src/utils/decidedNotesMentions.js';
 
 function getEditableTheaterIds(session: AuthSessionPayload): Set<string> {
   return new Set(
@@ -135,6 +136,7 @@ export function saveStateForUser(
       tasks: [],
       venues: [],
       rehearsals: [],
+      rehearsalActorNotes: [],
       appMeta: {},
     } satisfies AppState);
 
@@ -165,8 +167,9 @@ export function saveStateForUser(
     backupState(dbState);
   }
 
-  const clientTheaterIds = new Set(clientState.theaters.map((t) => t.id));
-  const editablePayload = filterStateByTheaters(clientState, editableIds);
+  const syncedClientState = syncDecidedNotesToActorNotes(clientState);
+  const clientTheaterIds = new Set(syncedClientState.theaters.map((t) => t.id));
+  const editablePayload = filterStateByTheaters(syncedClientState, editableIds);
 
   const ownerByTheaterId = new Map<string, string | null>();
   const addOwnerMembershipFor = new Set<string>();
@@ -208,10 +211,10 @@ export function saveStateForUser(
          app_meta = excluded.app_meta`
     ).run(
       session.user.id,
-      clientState.activeTheaterId,
-      clientState.activePlayId,
-      JSON.stringify(clientState.selectedPerformanceByPlayId ?? {}),
-      JSON.stringify(clientState.appMeta ?? {})
+      syncedClientState.activeTheaterId,
+      syncedClientState.activePlayId,
+      JSON.stringify(syncedClientState.selectedPerformanceByPlayId ?? {}),
+      JSON.stringify(syncedClientState.appMeta ?? {})
     );
   });
 

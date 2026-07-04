@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .env
 .env.local
+.guide-session-token
 data/*.db
 data/*.db-*
 data/backups/

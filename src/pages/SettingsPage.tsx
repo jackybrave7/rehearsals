@@ -10,6 +10,7 @@ import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
 import { supportMailto } from '../content/pricing';
 import { getShowRehearsalWarnings, getActiveTheater } from '../store/selectors';
 import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
+import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { Input } from '../components/FormFields';
 import { Button } from '../components/Button';
 import {
@@ -511,6 +512,7 @@ export function SettingsPage() {
             <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
               <Send size={16} />
               Telegram чат театра
+              <GuideContextHelp anchor="доступ-роли-telegram" label="Справка: доступ и Telegram" />
             </div>
 
             {!telegramStatus?.botConfigured ? (

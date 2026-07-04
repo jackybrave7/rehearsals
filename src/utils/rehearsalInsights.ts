@@ -1,12 +1,13 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import type { AppState, Actor, Rehearsal, Scene } from '../types';
-import { getActorIdsForSceneIds, resolveRehearsalPerformanceId } from './rehearsalActors';
+import type { AppState, Actor, Rehearsal, Scene, Venue } from '../types';
+import { getActorIdsForSceneIdsMultiPlay, resolvePerformanceIdForPlay } from './rehearsalActors';
+import { getRehearsalPlayIds, getRehearsalPlayTitles } from './rehearsalPlays';
 import { getScheduleEndTime, getScheduleTotalMinutes } from './schedulePlan';
 import { getSceneIdsFromSchedule } from './scheduleSync';
 import { timeToMinutes } from './time';
 import { isRehearsalPast } from './rehearsalSort';
 import { getSceneShortLabel } from './sceneLabels';
-import { getUpcomingPremiere } from './premiere';
+import { getUpcomingPremiere, isPremierePerformance } from './premiere';
 import { isTaskOverdue } from './tasks';
 import {
   getActorUnavailabilityReason,
@@ -34,6 +35,12 @@ export interface ActorScheduleConflict {
   otherPlayTitle: string;
 }
 
+export interface VenueScheduleConflict {
+  venue: Venue;
+  otherRehearsal: Rehearsal;
+  otherPlayTitle: string;
+}
+
 function rehearsalsOverlap(a: Rehearsal, b: Rehearsal): boolean {
   if (a.date !== b.date) return false;
   const aStart = timeToMinutes(a.startTime);
@@ -44,7 +51,6 @@ function rehearsalsOverlap(a: Rehearsal, b: Rehearsal): boolean {
 }
 
 export function getExpectedActorIds(state: AppState, rehearsal: Rehearsal): string[] {
-  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
   const sceneIds = new Set<string>([
     ...rehearsal.sceneIds,
     ...getSceneIdsFromSchedule(rehearsal.schedule),
@@ -53,7 +59,12 @@ export function getExpectedActorIds(state: AppState, rehearsal: Rehearsal): stri
     if (block.sceneId) sceneIds.add(block.sceneId);
   }
 
-  const actorIds = new Set(getActorIdsForSceneIds(state, performanceId, [...sceneIds]));
+  const actorIds = new Set(getActorIdsForSceneIdsMultiPlay(state, [...sceneIds]));
+  for (const block of rehearsal.schedule) {
+    if (block.type === 'etude') {
+      block.actorIds?.forEach((id) => actorIds.add(id));
+    }
+  }
 
   const taskIds = new Set(rehearsal.taskIds);
   for (const block of rehearsal.schedule) {
@@ -71,22 +82,34 @@ export function getExpectedActorIds(state: AppState, rehearsal: Rehearsal): stri
 }
 
 export function getExpectedAttendees(state: AppState, rehearsal: Rehearsal): ExpectedAttendee[] {
-  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
   const byActor = new Map<string, Set<string>>();
+
+  const addSceneActors = (scene: Scene) => {
+    if (!scene.roleIds?.length) return;
+    const performanceId = resolvePerformanceIdForPlay(state, scene.playId);
+    if (!performanceId) return;
+    for (const roleId of scene.roleIds) {
+      for (const assignment of state.castAssignments) {
+        if (assignment.performanceId === performanceId && assignment.roleId === roleId) {
+          const sources = byActor.get(assignment.actorId) ?? new Set<string>();
+          sources.add(getSceneShortLabel(scene));
+          byActor.set(assignment.actorId, sources);
+        }
+      }
+    }
+  };
 
   for (const block of rehearsal.schedule) {
     if (block.sceneId) {
       const scene = state.scenes.find((item) => item.id === block.sceneId);
-      if (!scene?.roleIds?.length) continue;
-      for (const roleId of scene.roleIds) {
-        for (const assignment of state.castAssignments) {
-          if (assignment.performanceId === performanceId && assignment.roleId === roleId) {
-            const sources = byActor.get(assignment.actorId) ?? new Set<string>();
-            sources.add(getSceneShortLabel(scene));
-            byActor.set(assignment.actorId, sources);
-          }
-        }
-      }
+      if (scene) addSceneActors(scene);
+    }
+    if (block.type === 'etude') {
+      block.actorIds?.forEach((actorId) => {
+        const sources = byActor.get(actorId) ?? new Set<string>();
+        sources.add(block.title || 'Этюд');
+        byActor.set(actorId, sources);
+      });
     }
     if (block.taskId) {
       const task = state.tasks.find((item) => item.id === block.taskId);
@@ -100,16 +123,7 @@ export function getExpectedAttendees(state: AppState, rehearsal: Rehearsal): Exp
 
   for (const sceneId of rehearsal.sceneIds) {
     const scene = state.scenes.find((item) => item.id === sceneId);
-    if (!scene?.roleIds?.length) continue;
-    for (const roleId of scene.roleIds) {
-      for (const assignment of state.castAssignments) {
-        if (assignment.performanceId === performanceId && assignment.roleId === roleId) {
-          const sources = byActor.get(assignment.actorId) ?? new Set<string>();
-          sources.add(getSceneShortLabel(scene));
-          byActor.set(assignment.actorId, sources);
-        }
-      }
-    }
+    if (scene) addSceneActors(scene);
   }
 
   return [...byActor.entries()]
@@ -228,33 +242,53 @@ export function getRehearsalWarnings(state: AppState, rehearsal: Rehearsal): Reh
     });
   }
 
-  if (rehearsal.playId) {
-    const premiere = getUpcomingPremiere(state, rehearsal.playId);
-    if (premiere && premiere.daysLeft <= 14) {
-      const notReady = state.scenes.filter(
-        (scene) => scene.playId === rehearsal.playId && scene.status !== 'ready'
-      );
-      if (notReady.length > 0) {
-        warnings.push({
-          id: 'premiere-not-ready',
-          severity: 'info',
-          message: `До премьеры ${premiere.daysLeft} дн., сцены ещё не готовы: ${notReady
-            .slice(0, 5)
-            .map((scene) => getSceneShortLabel(scene))
-            .join(', ')}${notReady.length > 5 ? '…' : ''}.`,
-        });
-      }
-    }
+  for (const playId of getRehearsalPlayIds(state, rehearsal)) {
+    const premiere = getUpcomingPremiere(state, playId);
+    if (!premiere || premiere.daysLeft > 14) continue;
+    const notReady = state.scenes.filter(
+      (scene) => scene.playId === playId && scene.status !== 'ready'
+    );
+    if (notReady.length === 0) continue;
+    const playTitle = state.plays.find((play) => play.id === playId)?.title ?? 'постановка';
+    const deadlineLabel = isPremierePerformance(premiere.performance)
+      ? `до премьеры ${premiere.daysLeft} дн.`
+      : `до показа «${premiere.performance.name}» ${premiere.daysLeft} дн.`;
+    warnings.push({
+      id: `premiere-not-ready-${playId}`,
+      severity: 'info',
+      message: `«${playTitle}»: ${deadlineLabel}, сцены ещё не готовы: ${notReady
+        .slice(0, 5)
+        .map((scene) => getSceneShortLabel(scene))
+        .join(', ')}${notReady.length > 5 ? '…' : ''}.`,
+    });
   }
 
   for (const actorId of getExpectedActorIds(state, rehearsal)) {
     const actor = state.actors.find((item) => item.id === actorId);
-    if (!actor || !isActorUnavailable(actor, rehearsal.date)) continue;
-    const reason = getActorUnavailabilityReason(actor, rehearsal.date);
+    if (!actor || !isActorUnavailable(actor, rehearsal.date, {
+      startTime: rehearsal.startTime,
+      endTime: rehearsal.endTime,
+    })) continue;
+    const reason = getActorUnavailabilityReason(actor, rehearsal.date, {
+      startTime: rehearsal.startTime,
+      endTime: rehearsal.endTime,
+    });
     warnings.push({
       id: getUnavailableWarningId(actorId),
       severity: 'warn',
       message: `Ожидается ${actor.name}, но он(а) недоступен(а) на эту дату${reason ? `: ${reason}` : ''}.`,
+    });
+  }
+
+  for (const attendee of expected) {
+    if (rehearsal.rsvp?.[attendee.actor.id] !== 'declined') continue;
+    const sceneLabels = attendee.sources.filter((source) => source !== 'Этюд');
+    if (sceneLabels.length === 0) continue;
+    const firstName = attendee.actor.name.split(' ')[0];
+    warnings.push({
+      id: `rsvp-declined-${attendee.actor.id}`,
+      severity: 'warn',
+      message: `${firstName} не придёт — в плане сцены: ${sceneLabels.join(', ')}. Заменить в плане?`,
     });
   }
 
@@ -270,11 +304,12 @@ export function getActorScheduleConflicts(
 
   for (const other of state.rehearsals) {
     if (other.id === rehearsal.id) continue;
+    if (rehearsal.theaterId && other.theaterId && other.theaterId !== rehearsal.theaterId) continue;
     if (!rehearsalsOverlap(rehearsal, other)) continue;
 
     const otherExpected = new Set(getExpectedActorIds(state, other));
-    const otherPlayTitle =
-      state.plays.find((play) => play.id === other.playId)?.title ?? 'другой постановки';
+    const otherTitles = getRehearsalPlayTitles(state, other);
+    const otherPlayTitle = otherTitles.length > 0 ? otherTitles.join(', ') : 'другой репетиции';
     for (const actorId of expectedIds) {
       if (!otherExpected.has(actorId)) continue;
       const actor = state.actors.find((item) => item.id === actorId);
@@ -286,21 +321,61 @@ export function getActorScheduleConflicts(
   return conflicts.sort((a, b) => a.actor.name.localeCompare(b.actor.name, 'ru'));
 }
 
+export function getVenueScheduleConflicts(
+  state: AppState,
+  rehearsal: Rehearsal
+): VenueScheduleConflict[] {
+  if (!rehearsal.venueId) return [];
+
+  const venue = state.venues.find((item) => item.id === rehearsal.venueId);
+  if (!venue) return [];
+
+  const conflicts: VenueScheduleConflict[] = [];
+
+  for (const other of state.rehearsals) {
+    if (other.id === rehearsal.id) continue;
+    if (other.venueId !== rehearsal.venueId) continue;
+    if (rehearsal.theaterId && other.theaterId && other.theaterId !== rehearsal.theaterId) continue;
+    if (!rehearsalsOverlap(rehearsal, other)) continue;
+
+    const otherTitles = getRehearsalPlayTitles(state, other);
+    const otherPlayTitle = otherTitles.length > 0 ? otherTitles.join(', ') : 'другой репетиции';
+    conflicts.push({ venue, otherRehearsal: other, otherPlayTitle });
+  }
+
+  return conflicts.sort((a, b) =>
+    a.otherRehearsal.startTime.localeCompare(b.otherRehearsal.startTime)
+  );
+}
+
 export function getConflictWarningId(actorId: string, otherRehearsalId: string): string {
   return `conflict:${actorId}:${otherRehearsalId}`;
+}
+
+export function getVenueConflictWarningId(venueId: string, otherRehearsalId: string): string {
+  return `venue-conflict:${venueId}:${otherRehearsalId}`;
 }
 
 export function filterVisibleRehearsalWarnings(
   warnings: RehearsalWarning[],
   conflicts: ActorScheduleConflict[],
+  venueConflicts: VenueScheduleConflict[],
   dismissedIds: string[] | undefined
-): { warnings: RehearsalWarning[]; conflicts: ActorScheduleConflict[] } {
+): {
+  warnings: RehearsalWarning[];
+  conflicts: ActorScheduleConflict[];
+  venueConflicts: VenueScheduleConflict[];
+} {
   const dismissed = new Set(dismissedIds ?? []);
   return {
     warnings: warnings.filter((warning) => !dismissed.has(warning.id)),
     conflicts: conflicts.filter(
       (conflict) =>
         !dismissed.has(getConflictWarningId(conflict.actor.id, conflict.otherRehearsal.id))
+    ),
+    venueConflicts: venueConflicts.filter(
+      (conflict) =>
+        !dismissed.has(getVenueConflictWarningId(conflict.venue.id, conflict.otherRehearsal.id))
     ),
   };
 }

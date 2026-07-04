@@ -7,7 +7,7 @@ import { Modal } from './Modal';
 type WelcomeOnboardingModalProps = {
   open: boolean;
   onClose: () => void;
-  onCreateTheater: () => void;
+  onCreateTheater?: () => void | Promise<boolean>;
 };
 
 export function WelcomeOnboardingModal({
@@ -17,7 +17,7 @@ export function WelcomeOnboardingModal({
 }: WelcomeOnboardingModalProps) {
   const handleCreate = () => {
     onClose();
-    void onCreateTheater();
+    if (onCreateTheater) void onCreateTheater();
   };
 
   return (
@@ -31,7 +31,9 @@ export function WelcomeOnboardingModal({
           <Button variant="secondary" onClick={onClose}>
             Понятно
           </Button>
-          <Button onClick={handleCreate}>Создать первый театр</Button>
+          {onCreateTheater ? (
+            <Button onClick={handleCreate}>Создать первый театр</Button>
+          ) : null}
         </div>
       }
     >

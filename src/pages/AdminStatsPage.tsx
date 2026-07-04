@@ -90,7 +90,7 @@ export function AdminStatsPage() {
       <AdminErrorBanner error={error} />
 
       {stats && stats.pendingRegistrations > 0 ? (
-        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-foreground">
           В режиме бета {stats.pendingRegistrations} пользователей подтвердили email и ждут вашего одобрения.{' '}
           <Link to={`${appPaths.adminUsers}?filter=pending`} className="font-medium text-gold-light hover:underline">
             Открыть список →
@@ -99,7 +99,7 @@ export function AdminStatsPage() {
       ) : null}
 
       {openSupportTickets > 0 ? (
-        <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 px-5 py-4 text-sm text-sky-100">
+        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-5 py-4 text-sm text-foreground">
           <span className="inline-flex items-center gap-2">
             <LifeBuoy size={16} />
             {openSupportTickets} новых обращений в поддержку.
@@ -217,7 +217,7 @@ export function AdminStatsPage() {
                   <dt className="text-muted">Роли в театрах</dt>
                   <dd className="font-medium text-white">
                     {stats.theaters.membersByRole.owner} влад. · {stats.theaters.membersByRole.editor} ред. ·{' '}
-                    {stats.theaters.membersByRole.observer} набл.
+                    {stats.theaters.membersByRole.observer} набл. · {stats.theaters.membersByRole.actor} акт.
                   </dd>
                 </div>
               </dl>

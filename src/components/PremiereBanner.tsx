@@ -3,7 +3,7 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { AppState } from '../types';
 import { getPlayScenes } from '../store/selectors';
-import { getUpcomingPremiere, getPremiereBadgeTone } from '../utils/premiere';
+import { getUpcomingPremiere, getPremiereBadgeTone, isPremierePerformance } from '../utils/premiere';
 import { appPaths } from '../navigation/appPaths';
 
 interface PremiereBannerProps {
@@ -20,7 +20,7 @@ export function PremiereBanner({ state, playId }: PremiereBannerProps) {
   if (!premiere) {
     return (
       <div className="rounded-xl border border-gold/10 bg-surface/40 px-4 py-3 text-sm text-muted">
-        Премьера не запланирована.{' '}
+        Ближайший показ не запланирован.{' '}
         <Link to={appPaths.playCast} className="text-gold-light hover:underline">
           Укажите дату показа
         </Link>
@@ -30,6 +30,11 @@ export function PremiereBanner({ state, playId }: PremiereBannerProps) {
 
   const tone = getPremiereBadgeTone(premiere.daysLeft);
   const urgent = premiere.daysLeft <= 3 && notReady.length > 0;
+  const dateLabel = format(parseISO(premiere.date), 'd MMMM yyyy', { locale: ru });
+  const isPremiere = isPremierePerformance(premiere.performance);
+  const eventLabel = isPremiere
+    ? `Премьера ${dateLabel}`
+    : `${premiere.performance.name} · ${dateLabel}`;
 
   return (
     <div
@@ -42,12 +47,11 @@ export function PremiereBanner({ state, playId }: PremiereBannerProps) {
       }`}
     >
       <p>
-        Премьера {format(parseISO(premiere.date), 'd MMMM yyyy', { locale: ru })} · осталось{' '}
-        {premiere.daysLeft} дн. · готово {ready} из {scenes.length} сцен
+        {eventLabel} · осталось {premiere.daysLeft} дн. · готово {ready} из {scenes.length} сцен
       </p>
       {urgent && (
         <p className="mt-1 text-amber-200">
-          Не готово к премьере: {notReady.slice(0, 6).map((scene) => scene.title).join(', ')}
+          Не готово к {isPremiere ? 'премьере' : 'показу'}: {notReady.slice(0, 6).map((scene) => scene.title).join(', ')}
           {notReady.length > 6 ? '…' : ''}
         </p>
       )}

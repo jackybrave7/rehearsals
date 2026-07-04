@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS theaters (
 CREATE TABLE IF NOT EXISTS theater_members (
   theater_id TEXT NOT NULL REFERENCES theaters(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'observer')),
+  role TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'observer', 'actor')),
   created_at TEXT NOT NULL,
   PRIMARY KEY (theater_id, user_id)
 );
@@ -82,7 +82,10 @@ CREATE TABLE IF NOT EXISTS plays (
   script_file_mime_type TEXT,
   script_file_size INTEGER,
   archived_at TEXT,
-  act_script_anchors TEXT
+  act_script_anchors TEXT,
+  cover_url TEXT,
+  icon_url TEXT,
+  icon_color TEXT
 );
 
 CREATE TABLE IF NOT EXISTS actors (
@@ -97,7 +100,8 @@ CREATE TABLE IF NOT EXISTS actors (
   telegram_username TEXT,
   telegram_chat_id TEXT,
   notes TEXT,
-  unavailability TEXT NOT NULL DEFAULT '[]'
+  unavailability TEXT NOT NULL DEFAULT '[]',
+  memorization_by_scene TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS venues (
@@ -114,7 +118,8 @@ CREATE TABLE IF NOT EXISTS play_roles (
   name TEXT NOT NULL,
   kind TEXT NOT NULL,
   role_order INTEGER NOT NULL,
-  description TEXT
+  description TEXT,
+  script_aliases TEXT
 );
 
 CREATE TABLE IF NOT EXISTS performances (
@@ -188,7 +193,8 @@ CREATE TABLE IF NOT EXISTS rehearsals (
   dismissed_warning_ids TEXT NOT NULL DEFAULT '[]',
   reminders_sent TEXT NOT NULL DEFAULT '[]',
   reminder_opt_out INTEGER NOT NULL DEFAULT 0,
-  rsvp TEXT NOT NULL DEFAULT '{}'
+  rsvp TEXT NOT NULL DEFAULT '{}',
+  telegram_plan_sent_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS schedule_blocks (
@@ -203,6 +209,9 @@ CREATE TABLE IF NOT EXISTS schedule_blocks (
   notes TEXT,
   decided_notes TEXT,
   remaining_notes TEXT,
+  play_id TEXT,
+  actor_ids TEXT,
+  outcome_notes TEXT,
   block_order INTEGER NOT NULL DEFAULT 0,
   completed INTEGER
 );
@@ -243,3 +252,20 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_created_at ON support_tickets(created_at);
+
+CREATE TABLE IF NOT EXISTS rehearsal_actor_notes (
+  id TEXT PRIMARY KEY,
+  theater_id TEXT NOT NULL,
+  rehearsal_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  scene_id TEXT,
+  schedule_block_id TEXT,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  sent_at TEXT,
+  acknowledged_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rehearsal_actor_notes_theater_id ON rehearsal_actor_notes(theater_id);
+CREATE INDEX IF NOT EXISTS idx_rehearsal_actor_notes_rehearsal_id ON rehearsal_actor_notes(rehearsal_id);
+CREATE INDEX IF NOT EXISTS idx_rehearsal_actor_notes_actor_id ON rehearsal_actor_notes(actor_id);

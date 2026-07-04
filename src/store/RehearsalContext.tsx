@@ -16,6 +16,7 @@ import type {
   Play,
   PlayRole,
   Rehearsal,
+  RehearsalActorNote,
   RehearsalSeries,
   RehearsalTemplate,
   Scene,
@@ -45,6 +46,7 @@ import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { scenesNumbersChanged, normalizeAllSceneNumbers, renumberPlayScenesAfterDelete } from '../utils/sceneNumbering';
 import { estimateRehearsalMinutes, resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
+import { syncDecidedNotesToActorNotes } from '../utils/decidedNotesMentions';
 import {
   mergeActorsForNewScheduleBlocks,
   mergeActorsForNewScenes,
@@ -162,6 +164,7 @@ function createBlankAppState(theaterId: string, theaterName = 'Мой театр
     tasks: [],
     venues: [],
     rehearsals: [],
+    rehearsalActorNotes: [],
     appMeta: {},
   };
 }
@@ -356,6 +359,7 @@ const initialState: AppState = {
   tasks: [],
   venues: [],
   rehearsals: [],
+  rehearsalActorNotes: [],
 };
 
 type LegacyAppState = AppState & { play?: Play | null };
@@ -437,6 +441,7 @@ function migrateState(raw: unknown): AppState {
           remainingNotes: block.remainingNotes ?? undefined,
         })),
       })),
+      rehearsalActorNotes: data.rehearsalActorNotes ?? [],
       appMeta: data.appMeta ?? {},
     }),
   };
@@ -732,6 +737,7 @@ type Action =
   | { type: 'DELETE_VENUE'; payload: string }
   | { type: 'ADD_REHEARSAL'; payload: Rehearsal }
   | { type: 'UPDATE_REHEARSAL'; payload: Rehearsal }
+  | { type: 'PATCH_REHEARSAL_RSVP'; payload: { rehearsalId: string; rsvp: Rehearsal['rsvp'] } }
   | { type: 'DELETE_REHEARSAL'; payload: string }
   | { type: 'ADD_REHEARSAL_TEMPLATE'; payload: RehearsalTemplate }
   | { type: 'DELETE_REHEARSAL_TEMPLATE'; payload: string }
@@ -743,7 +749,11 @@ type Action =
         rehearsals: Rehearsal[];
       };
     }
-  | { type: 'UPDATE_SCHEDULE'; payload: { rehearsalId: string; schedule: ScheduleBlock[] } };
+  | { type: 'UPDATE_SCHEDULE'; payload: { rehearsalId: string; schedule: ScheduleBlock[] } }
+  | { type: 'ADD_REHEARSAL_ACTOR_NOTE'; payload: RehearsalActorNote }
+  | { type: 'UPDATE_REHEARSAL_ACTOR_NOTE'; payload: RehearsalActorNote }
+  | { type: 'DELETE_REHEARSAL_ACTOR_NOTE'; payload: string }
+  | { type: 'MERGE_REHEARSAL_ACTOR_NOTES'; payload: RehearsalActorNote[] };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -796,6 +806,9 @@ function reducer(state: AppState, action: Action): AppState {
         tasks: state.tasks.filter((task) => task.theaterId !== action.payload),
         venues: state.venues.filter((venue) => venue.theaterId !== action.payload),
         rehearsals: state.rehearsals.filter((rehearsal) => rehearsal.theaterId !== action.payload),
+        rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+          (note) => note.theaterId !== action.payload
+        ),
         appMeta: {
           ...state.appMeta,
           rehearsalTemplates: (state.appMeta?.rehearsalTemplates ?? []).filter(
@@ -954,6 +967,9 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         actors: state.actors.filter((a) => a.id !== action.payload),
         castAssignments: state.castAssignments.filter((a) => a.actorId !== action.payload),
+        rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+          (note) => note.actorId !== action.payload
+        ),
       };
     case 'ADD_SCENE':
       return { ...state, scenes: [...state.scenes, action.payload] };
@@ -1127,10 +1143,22 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       };
     }
+    case 'PATCH_REHEARSAL_RSVP':
+      return {
+        ...state,
+        rehearsals: state.rehearsals.map((rehearsal) =>
+          rehearsal.id === action.payload.rehearsalId
+            ? { ...rehearsal, rsvp: action.payload.rsvp }
+            : rehearsal
+        ),
+      };
     case 'DELETE_REHEARSAL':
       return {
         ...state,
         rehearsals: state.rehearsals.filter((r) => r.id !== action.payload),
+        rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+          (note) => note.rehearsalId !== action.payload
+        ),
       };
     case 'ADD_REHEARSAL_TEMPLATE':
       return {
@@ -1168,8 +1196,8 @@ function reducer(state: AppState, action: Action): AppState {
         rehearsals: [...state.rehearsals, ...prepared],
       };
     }
-    case 'UPDATE_SCHEDULE':
-      return {
+    case 'UPDATE_SCHEDULE': {
+      const withSchedule = {
         ...state,
         rehearsals: state.rehearsals.map((r) => {
           if (r.id !== action.payload.rehearsalId) return r;
@@ -1181,6 +1209,34 @@ function reducer(state: AppState, action: Action): AppState {
           };
         }),
       };
+      return syncDecidedNotesToActorNotes(withSchedule);
+    }
+    case 'ADD_REHEARSAL_ACTOR_NOTE':
+      return {
+        ...state,
+        rehearsalActorNotes: [...(state.rehearsalActorNotes ?? []), action.payload],
+      };
+    case 'UPDATE_REHEARSAL_ACTOR_NOTE':
+      return {
+        ...state,
+        rehearsalActorNotes: (state.rehearsalActorNotes ?? []).map((note) =>
+          note.id === action.payload.id ? action.payload : note
+        ),
+      };
+    case 'DELETE_REHEARSAL_ACTOR_NOTE':
+      return {
+        ...state,
+        rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
+          (note) => note.id !== action.payload
+        ),
+      };
+    case 'MERGE_REHEARSAL_ACTOR_NOTES': {
+      const byId = new Map((state.rehearsalActorNotes ?? []).map((note) => [note.id, note]));
+      for (const note of action.payload) {
+        byId.set(note.id, note);
+      }
+      return { ...state, rehearsalActorNotes: [...byId.values()] };
+    }
     default:
       return state;
   }
@@ -1195,6 +1251,7 @@ interface RehearsalContextValue {
   saveStatus: SaveStatus;
   backupFiles: string[];
   readOnly: boolean;
+  isActorRole: boolean;
   restoreLatestBackup: () => Promise<void>;
   retryConnection: () => void;
 }
@@ -1214,7 +1271,11 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
   const saveTimerRef = useRef<number | null>(null);
   stateRef.current = state;
   const readOnly =
-    state.activeTheaterId != null && getTheaterRole(state.activeTheaterId) === 'observer';
+    state.activeTheaterId != null &&
+    (getTheaterRole(state.activeTheaterId) === 'observer' ||
+      getTheaterRole(state.activeTheaterId) === 'actor');
+  const isActorRole =
+    state.activeTheaterId != null && getTheaterRole(state.activeTheaterId) === 'actor';
 
   const retryConnection = () => setLoadAttempt((value) => value + 1);
 
@@ -1393,6 +1454,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
         saveStatus,
         backupFiles,
         readOnly,
+        isActorRole,
         restoreLatestBackup,
         retryConnection,
       }}

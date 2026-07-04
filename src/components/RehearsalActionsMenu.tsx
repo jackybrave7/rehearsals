@@ -8,6 +8,7 @@ interface RehearsalActionsMenuProps {
   title: string;
   location?: string;
   onTelegram?: () => void;
+  onPlanExported?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -44,6 +45,7 @@ export function RehearsalActionsMenu({
   title,
   location,
   onTelegram,
+  onPlanExported,
   onEdit,
   onDelete,
 }: RehearsalActionsMenuProps) {
@@ -115,12 +117,18 @@ export function RehearsalActionsMenu({
             <MenuItem
               icon={<CalendarPlus size={16} />}
               label="Google Календарь"
-              onClick={closeAnd(() => openGoogleCalendar(rehearsal, title, location))}
+              onClick={closeAnd(() => {
+                openGoogleCalendar(rehearsal, title, location);
+                onPlanExported?.();
+              })}
             />
             <MenuItem
               icon={<Download size={16} />}
               label="Файл .ics"
-              onClick={closeAnd(() => downloadRehearsalIcs(rehearsal, title, location))}
+              onClick={closeAnd(() => {
+                downloadRehearsalIcs(rehearsal, title, location);
+                onPlanExported?.();
+              })}
             />
             {onTelegram ? (
               <MenuItem

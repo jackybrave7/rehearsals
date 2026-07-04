@@ -20,7 +20,9 @@ import { DeleteButton } from './DeleteButton';
 import { Modal } from './Modal';
 import { SceneScriptLink } from './SceneScriptLink';
 import { addMinutes, formatDuration, timeToMinutes } from '../utils/time';
+import { DecidedNotesDisplay } from './DecidedNotesDisplay';
 import {
+  appendScheduleFromRehearsalItems,
   buildScheduleFromRehearsalItems,
   createBlockFromScene,
   createBlockFromTask,
@@ -52,6 +54,7 @@ const blockTypeLabels: Record<ScheduleBlockType, string> = {
   break: 'Перерыв',
   warmup: 'Разминка',
   custom: 'Другое',
+  etude: 'Этюд',
 };
 
 const blockTypeIcons: Record<ScheduleBlockType, typeof Film> = {
@@ -60,6 +63,7 @@ const blockTypeIcons: Record<ScheduleBlockType, typeof Film> = {
   break: Coffee,
   warmup: Sparkles,
   custom: Clock,
+  etude: Wand2,
 };
 
 const blockTypeColors: Record<ScheduleBlockType, string> = {
@@ -68,6 +72,7 @@ const blockTypeColors: Record<ScheduleBlockType, string> = {
   break: 'border-l-amber-500',
   warmup: 'border-l-purple-500',
   custom: 'border-l-gray-500',
+  etude: 'border-l-violet-500',
 };
 
 const PLAN_GENERATION_OPTIONS: {
@@ -85,11 +90,18 @@ const PLAN_GENERATION_OPTIONS: {
     label: PLAN_GENERATION_MODE_LABELS['by-actors'],
     description: 'Сцены с общим составом ставятся рядом; при равенстве — по хронологии',
   },
+  {
+    mode: 'by-productions',
+    label: PLAN_GENERATION_MODE_LABELS['by-productions'],
+    description: 'Блоки одного спектакля подряд — удобно при сценах из нескольких постановок',
+  },
 ];
 
 interface RehearsalScheduleEditorProps {
   rehearsal: Rehearsal;
+  /** @deprecated use playsById */
   play?: Play;
+  playsById?: Record<string, Play>;
   linkedScenes: Scene[];
   linkedTasks: Task[];
   onScheduleChange: (schedule: ScheduleBlock[]) => void;
@@ -102,6 +114,7 @@ interface RehearsalScheduleEditorProps {
 export function RehearsalScheduleEditor({
   rehearsal,
   play,
+  playsById = {},
   linkedScenes,
   linkedTasks,
   onScheduleChange,
@@ -115,6 +128,7 @@ export function RehearsalScheduleEditor({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [generatePlanModalOpen, setGeneratePlanModalOpen] = useState(false);
   const [planGenerationMode, setPlanGenerationMode] = useState<PlanGenerationMode>('chronology');
+  const [keepCurrentPlan, setKeepCurrentPlan] = useState(false);
 
   const sortedSchedule = useMemo(
     () => [...rehearsal.schedule].sort((a, b) => a.startTime.localeCompare(b.startTime)),
@@ -137,30 +151,44 @@ export function RehearsalScheduleEditor({
   const openGeneratePlanModal = () => {
     if (linkedScenes.length === 0 && linkedTasks.length === 0) return;
     setPlanGenerationMode('chronology');
+    setKeepCurrentPlan(false);
     setGeneratePlanModalOpen(true);
   };
 
   const confirmGeneratePlan = () => {
-    applySchedule(
-      buildScheduleFromRehearsalItems(
-        rehearsal.startTime,
-        rehearsal.sceneIds,
-        rehearsal.taskIds,
-        linkedScenes,
-        linkedTasks,
-        {
-          mode: planGenerationMode,
-          actorIdsBySceneId:
-            planGenerationMode === 'by-actors'
-              ? getActorIdsMapForSceneIds(
-                  state,
-                  resolveRehearsalPerformanceId(state, rehearsal),
-                  rehearsal.sceneIds
-                )
-              : undefined,
-        }
-      )
-    );
+    const planOptions = {
+      mode: planGenerationMode,
+      actorIdsBySceneId:
+        planGenerationMode === 'by-actors'
+          ? getActorIdsMapForSceneIds(
+              state,
+              resolveRehearsalPerformanceId(state, rehearsal),
+              rehearsal.sceneIds
+            )
+          : undefined,
+    };
+
+    const nextSchedule =
+      keepCurrentPlan && sortedSchedule.length > 0
+        ? appendScheduleFromRehearsalItems(
+            sortedSchedule,
+            rehearsal.startTime,
+            rehearsal.sceneIds,
+            rehearsal.taskIds,
+            linkedScenes,
+            linkedTasks,
+            planOptions
+          )
+        : buildScheduleFromRehearsalItems(
+            rehearsal.startTime,
+            rehearsal.sceneIds,
+            rehearsal.taskIds,
+            linkedScenes,
+            linkedTasks,
+            planOptions
+          );
+
+    applySchedule(nextSchedule);
     setGeneratePlanModalOpen(false);
   };
 
@@ -357,9 +385,23 @@ export function RehearsalScheduleEditor({
               block.type === 'scene' && block.sceneId
                 ? linkedScenes.find((scene) => scene.id === block.sceneId)
                 : undefined;
+            const blockPlay =
+              block.type === 'etude' && block.playId
+                ? playsById[block.playId] ?? state.plays.find((p) => p.id === block.playId)
+                : blockScene
+                  ? playsById[blockScene.playId] ?? play
+                  : undefined;
             const sceneCharacters = blockScene
               ? getSceneCharacterNames(state, blockScene)
               : [];
+            const etudeActorNames =
+              block.type === 'etude' && block.actorIds?.length
+                ? block.actorIds
+                    .map((id) => state.actors.find((a) => a.id === id)?.name)
+                    .filter((name): name is string => Boolean(name))
+                : [];
+            const participantLine =
+              block.type === 'etude' ? etudeActorNames : sceneCharacters;
             const dropActive = dragOverIndex === index + 1;
             const canComplete = canMarkBlockCompletion(rehearsal, block);
             const isDone = block.completed === true;
@@ -413,9 +455,14 @@ export function RehearsalScheduleEditor({
                           </div>
                           <div className="min-w-0">
                             <p className="text-base font-semibold leading-snug text-white">{block.title}</p>
-                            {sceneCharacters.length > 0 && (
+                            {blockPlay && block.type === 'etude' && (
+                              <p className="mt-1 text-sm leading-snug text-muted/90">
+                                {blockPlay.title}
+                              </p>
+                            )}
+                            {participantLine.length > 0 && (
                               <p className="mt-1 text-sm leading-snug text-muted">
-                                {sceneCharacters.join(', ')}
+                                {participantLine.join(', ')}
                               </p>
                             )}
                           </div>
@@ -455,26 +502,18 @@ export function RehearsalScheduleEditor({
                         {block.notes && (
                           <p className="text-sm leading-relaxed text-muted">{block.notes}</p>
                         )}
-                        {(block.decidedNotes?.trim() || block.remainingNotes?.trim()) && (
+                        {block.decidedNotes?.trim() && (
                           <div className="space-y-1 rounded-lg bg-gold/5 px-3 py-2 text-xs text-muted">
-                            {block.decidedNotes?.trim() && (
-                              <p>
-                                <span className="font-medium text-gold-light">Решили:</span>{' '}
-                                {block.decidedNotes.trim()}
-                              </p>
-                            )}
-                            {block.remainingNotes?.trim() && (
-                              <p>
-                                <span className="font-medium text-gold-light">Осталось:</span>{' '}
-                                {block.remainingNotes.trim()}
-                              </p>
-                            )}
+                            <p>
+                              <span className="font-medium text-gold-light">Решения:</span>{' '}
+                              <DecidedNotesDisplay text={block.decidedNotes.trim()} />
+                            </p>
                           </div>
                         )}
                       </div>
                       <div className="schedule-block-actions hidden shrink-0 gap-0.5 sm:flex">
-                        {play && blockScene && (
-                          <SceneScriptLink play={play} scene={blockScene} compact />
+                        {blockPlay && blockScene && (
+                          <SceneScriptLink play={blockPlay} scene={blockScene} compact />
                         )}
                         {!readOnly && (
                           <>
@@ -495,8 +534,8 @@ export function RehearsalScheduleEditor({
                     </div>
                     {!readOnly && (
                       <div className="schedule-block-actions mt-2 flex gap-1 sm:hidden">
-                        {play && blockScene && (
-                          <SceneScriptLink play={play} scene={blockScene} />
+                        {blockPlay && blockScene && (
+                          <SceneScriptLink play={blockPlay} scene={blockScene} />
                         )}
                         <Button
                           variant="secondary"
@@ -531,10 +570,14 @@ export function RehearsalScheduleEditor({
               Отмена
             </Button>
             <Button
-              variant={sortedSchedule.length > 0 ? 'danger' : 'primary'}
+              variant={sortedSchedule.length > 0 && !keepCurrentPlan ? 'danger' : 'primary'}
               onClick={confirmGeneratePlan}
             >
-              {sortedSchedule.length > 0 ? 'Заменить план' : 'Сформировать'}
+              {sortedSchedule.length > 0
+                ? keepCurrentPlan
+                  ? 'Добавить в план'
+                  : 'Заменить план'
+                : 'Сформировать'}
             </Button>
           </div>
         }
@@ -572,6 +615,22 @@ export function RehearsalScheduleEditor({
             })}
           </div>
           {sortedSchedule.length > 0 && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gold/10 bg-background/20 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={keepCurrentPlan}
+                onChange={(event) => setKeepCurrentPlan(event.target.checked)}
+                className="mt-0.5 accent-gold"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-white">Оставить текущий план</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+                  Добавить в конец только сцены и задачи, которых ещё нет в расписании
+                </span>
+              </span>
+            </label>
+          )}
+          {sortedSchedule.length > 0 && !keepCurrentPlan && (
             <p className="notice-warning rounded-xl px-4 py-3 text-sm font-medium leading-relaxed">
               Текущий план будет заменён. Ручные правки и порядок блоков пропадут.
             </p>

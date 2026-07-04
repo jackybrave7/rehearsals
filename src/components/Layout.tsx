@@ -13,7 +13,7 @@ import { ReminderSchedulerBanner } from './ReminderSchedulerBanner';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
   const { theaters } = useAuth();
-  const { saveError, saveStatus, readOnly } = useRehearsalStore();
+  const { saveError, saveStatus, readOnly, isActorRole } = useRehearsalStore();
 
   if (theaters.length === 0) return null;
 
@@ -24,7 +24,9 @@ function StatusBar({ compact = false }: { compact?: boolean }) {
         ? 'Сохранение…'
         : saveStatus === 'error'
           ? (saveError ?? 'Ошибка сохранения')
-          : 'Режим наблюдателя · данные театра только для просмотра'
+          : isActorRole
+            ? 'Режим актёра · изменения через «Моё»'
+            : 'Режим наблюдателя · данные театра только для просмотра'
     : saveStatus === 'saving'
       ? 'Сохранение…'
       : saveStatus === 'saved' && !saveError
