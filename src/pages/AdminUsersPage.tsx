@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ArrowRight, RefreshCw, Search, Shield } from 'lucide-react';
@@ -10,7 +10,7 @@ import type { AdminUserSummary } from '../types/admin';
 import { appPaths } from '../navigation/appPaths';
 import { THEATER_ROLE_LABELS } from '../types/auth';
 import { formatAdminSubscriptionLabel } from '../utils/subscription';
-import { verifyAdminUserEmail } from '../api/adminUsers';
+import { verifyAdminUserEmail, approveAdminUserRegistration } from '../api/adminUsers';
 
 function authLabel(user: AdminUserSummary): string {
   const methods: string[] = [];
@@ -39,11 +39,14 @@ function emailVerifiedClass(verified: boolean): string {
 }
 
 export function AdminUsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = searchParams.get('filter') === 'pending' ? 'pending' : 'all';
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [verifyingUserId, setVerifyingUserId] = useState<string | null>(null);
+  const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,12 +72,20 @@ export function AdminUsersPage() {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return users;
-    return users.filter(
+    let result = users;
+    if (statusFilter === 'pending') {
+      result = result.filter(
+        (user) =>
+          user.registrationStatus === 'pending_approval' ||
+          user.registrationStatus === 'pending_email'
+      );
+    }
+    if (!needle) return result;
+    return result.filter(
       (user) =>
         user.name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle)
     );
-  }, [query, users]);
+  }, [query, statusFilter, users]);
 
   const handleVerifyEmail = async (user: AdminUserSummary) => {
     if (user.emailVerified || verifyingUserId) return;
@@ -87,6 +98,25 @@ export function AdminUsersPage() {
       setError('Не удалось подтвердить email');
     } finally {
       setVerifyingUserId(null);
+    }
+  };
+
+  const handleApproveRegistration = async (user: AdminUserSummary) => {
+    if (user.registrationStatus !== 'pending_approval' || approvingUserId) return;
+    setApprovingUserId(user.id);
+    setError(null);
+    try {
+      await approveAdminUserRegistration(user.id);
+      await load();
+    } catch (approveError) {
+      const code = approveError instanceof Error ? approveError.message : '';
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        setError('Сначала подтвердите email пользователя');
+      } else {
+        setError('Не удалось одобрить регистрацию');
+      }
+    } finally {
+      setApprovingUserId(null);
     }
   };
 
@@ -119,6 +149,48 @@ export function AdminUsersPage() {
         </div>
         <AdminNav />
       </header>
+
+      {pendingCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm">
+          <span className="text-amber-100">
+            {pendingCount} заявок ждут одобрения (режим бета)
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setSearchParams(statusFilter === 'pending' ? {} : { filter: 'pending' })
+            }
+            className="text-gold-light hover:underline"
+          >
+            {statusFilter === 'pending' ? 'Показать всех' : 'Только ожидающие →'}
+          </button>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setSearchParams({})}
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            statusFilter === 'all'
+              ? 'bg-gold/15 text-gold-light'
+              : 'text-muted hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          Все ({users.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearchParams({ filter: 'pending' })}
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            statusFilter === 'pending'
+              ? 'bg-amber-500/15 text-amber-200'
+              : 'text-muted hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          Ждут одобрения ({pendingCount})
+        </button>
+      </div>
 
       <AdminErrorBanner error={error} />
 
@@ -193,11 +265,23 @@ export function AdminUsersPage() {
                     {format(parseISO(user.createdAt), 'd MMM yyyy', { locale: ru })}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${registrationStatusClass(user.registrationStatus)}`}
-                    >
-                      {registrationStatusLabel(user.registrationStatus)}
-                    </span>
+                    <div className="flex flex-col items-start gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${registrationStatusClass(user.registrationStatus)}`}
+                      >
+                        {registrationStatusLabel(user.registrationStatus)}
+                      </span>
+                      {user.registrationStatus === 'pending_approval' ? (
+                        <button
+                          type="button"
+                          disabled={approvingUserId === user.id}
+                          onClick={() => void handleApproveRegistration(user)}
+                          className="text-xs font-medium text-gold hover:underline disabled:opacity-60"
+                        >
+                          {approvingUserId === user.id ? 'Одобрение…' : 'Одобрить'}
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted">{authLabel(user)}</td>
                   <td className="px-4 py-3">

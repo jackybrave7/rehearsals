@@ -105,6 +105,7 @@ export function getDb(): AppDatabase {
       id INTEGER PRIMARY KEY CHECK (id = 1),
       registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
     )`,
+    `ALTER TABLE platform_settings ADD COLUMN legacy_registration_backfill_at TEXT`,
   ]) {
     try {
       db.exec(migration);
@@ -139,9 +140,19 @@ export function getDb(): AppDatabase {
     `INSERT OR IGNORE INTO platform_settings (id, registration_mode) VALUES (1, 'beta')`
   ).run();
 
-  db.prepare(
-    `UPDATE users SET registration_approved_at = created_at WHERE registration_approved_at IS NULL`
-  ).run();
+  // Однократно: старые пользователи до бета-одобрения считаются одобренными.
+  // Не запускать на каждом старте — иначе новые заявки в бете тоже авто-одобряются.
+  const backfillRow = db
+    .prepare(`SELECT legacy_registration_backfill_at FROM platform_settings WHERE id = 1`)
+    .get() as { legacy_registration_backfill_at: string | null } | undefined;
+  if (!backfillRow?.legacy_registration_backfill_at) {
+    db.prepare(
+      `UPDATE users SET registration_approved_at = COALESCE(email_verified_at, created_at) WHERE registration_approved_at IS NULL`
+    ).run();
+    db.prepare(
+      `UPDATE platform_settings SET legacy_registration_backfill_at = datetime('now') WHERE id = 1`
+    ).run();
+  }
 
   dbInstance = wrapDatabase(db);
   return dbInstance;

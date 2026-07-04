@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS platform_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
+  registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta')),
+  legacy_registration_backfill_at TEXT
 );
 
 INSERT OR IGNORE INTO platform_settings (id, registration_mode) VALUES (1, 'beta');

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Settings2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { RegistrationMode } from '../../types/admin';
 import { fetchPlatformSettings, updatePlatformSettings } from '../../api/adminPlatform';
+import { appPaths } from '../../navigation/appPaths';
 
 const MODE_OPTIONS: Array<{
   id: RegistrationMode;
@@ -78,7 +80,10 @@ export function AdminPlatformSettingsPanel({
             {pendingRegistrations > 0 ? (
               <span className="text-amber-200">
                 {' '}
-                · {pendingRegistrations} заявок ждут одобрения
+                ·{' '}
+                <Link to={`${appPaths.adminUsers}?filter=pending`} className="underline hover:text-white">
+                  {pendingRegistrations} заявок ждут одобрения
+                </Link>
               </span>
             ) : null}
           </p>
