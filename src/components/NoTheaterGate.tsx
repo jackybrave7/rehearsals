@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useCreateTheater } from '../hooks/useCreateTheater';
 import { Button } from './Button';
 import { WelcomeOnboardingModal } from './WelcomeOnboardingModal';
+import { appPaths } from '../navigation/appPaths';
 
 const welcomeStorageKey = (userId: string) => `rehearsals-welcome-seen:${userId}`;
 
@@ -71,8 +72,12 @@ function NoTheaterAccess() {
 export function NoTheaterGate() {
   const { theaters } = useAuth();
   const { ready, loadError } = useRehearsalStore();
+  const location = useLocation();
 
-  if (ready && !loadError && theaters.length === 0) {
+  const bypassWithoutTheater =
+    location.pathname === appPaths.support || location.pathname.startsWith(`${appPaths.admin}/`);
+
+  if (ready && !loadError && theaters.length === 0 && !bypassWithoutTheater) {
     return <NoTheaterAccess />;
   }
 

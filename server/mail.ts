@@ -288,3 +288,66 @@ export async function sendPasswordResetEmail(
     ].join('\n'),
   });
 }
+
+const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
+  bug: 'Ошибка / сбой',
+  feature: 'Предложение / улучшение',
+  billing: 'Тариф и оплата',
+  account: 'Аккаунт и доступ',
+  other: 'Другое',
+};
+
+export async function sendSupportTicketConfirmationEmail(options: {
+  to: string;
+  name: string;
+  ticketNumber: string;
+  category: string;
+  subject: string | null;
+  message: string;
+}): Promise<void> {
+  const greeting = options.name.trim() || options.to;
+  const categoryLabel = SUPPORT_CATEGORY_LABELS[options.category] ?? options.category;
+  const subjectLine = options.subject?.trim() ? `\nТема: ${options.subject.trim()}` : '';
+
+  await sendMail({
+    to: options.to,
+    subject: `Обращение ${options.ticketNumber} — Репетиции`,
+    text: [
+      `Здравствуйте, ${greeting}!`,
+      '',
+      'Мы получили ваше обращение в поддержку «Репетиции».',
+      '',
+      `Номер обращения: ${options.ticketNumber}`,
+      `Категория: ${categoryLabel}${subjectLine}`,
+      '',
+      'Ваше сообщение:',
+      options.message,
+      '',
+      'Сохраните номер обращения — он понадобится, если вы напишете нам повторно по этому вопросу.',
+      'Мы ответим на указанный email, когда обработаем заявку.',
+    ].join('\n'),
+    html: `<!DOCTYPE html>
+<html>
+  <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
+    <p style="margin:0 0 12px;line-height:1.5;">Здравствуйте, ${escapeHtml(greeting)}!</p>
+    <p style="margin:0 0 12px;line-height:1.5;">Мы получили ваше обращение в поддержку «Репетиции».</p>
+    <p style="margin:0 0 12px;line-height:1.5;">
+      <strong>Номер обращения:</strong> ${escapeHtml(options.ticketNumber)}<br>
+      <strong>Категория:</strong> ${escapeHtml(categoryLabel)}${
+        options.subject?.trim()
+          ? `<br><strong>Тема:</strong> ${escapeHtml(options.subject.trim())}`
+          : ''
+      }
+    </p>
+    <div style="margin:16px 0;padding:16px;border-left:3px solid #b8860b;background:#faf8f3;">
+      <p style="margin:0 0 8px;font-size:13px;color:#666;">Ваше сообщение:</p>
+      <p style="margin:0;line-height:1.5;white-space:pre-wrap;">${escapeHtml(options.message)}</p>
+    </div>
+    <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.5;">
+      Сохраните номер обращения — он понадобится, если вы напишете нам повторно по этому вопросу.
+      Мы ответим на указанный email, когда обработаем заявку.
+    </p>
+  </body>
+</html>`,
+  });
+}

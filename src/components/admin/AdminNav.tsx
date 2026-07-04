@@ -4,6 +4,7 @@ import { appPaths } from '../../navigation/appPaths';
 const items = [
   { to: appPaths.admin, label: 'Обзор', end: true },
   { to: appPaths.adminUsers, label: 'Пользователи', end: false },
+  { to: appPaths.adminSupport, label: 'Поддержка', end: false },
 ];
 
 export function AdminNav() {

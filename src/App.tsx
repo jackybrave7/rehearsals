@@ -19,10 +19,12 @@ import { ReadinessPage } from './pages/ReadinessPage';
 import { RehearsalDetailPage } from './pages/RehearsalDetailPage';
 import { VenuesPage } from './pages/VenuesPage';
 import { GuidePage } from './pages/GuidePage';
+import { SupportPage } from './pages/SupportPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminUserDetailPage } from './pages/AdminUserDetailPage';
+import { AdminSupportPage } from './pages/AdminSupportPage';
 import { MarketingPage } from './pages/MarketingPage';
 import { PricingPage } from './pages/PricingPage';
 import { LoginPage } from './pages/LoginPage';
@@ -90,6 +92,7 @@ export default function App() {
                 <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="guide" element={<GuidePage />} />
+                <Route path="support" element={<SupportPage />} />
                 <Route
                   path="admin"
                   element={
@@ -111,6 +114,14 @@ export default function App() {
                   element={
                     <AdminRoute>
                       <AdminUserDetailPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/support"
+                  element={
+                    <AdminRoute>
+                      <AdminSupportPage />
                     </AdminRoute>
                   }
                 />

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Database,
   Film,
+  LifeBuoy,
   RefreshCw,
   Shield,
   Users,
@@ -14,6 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { fetchPlatformStats } from '../api/admin';
+import { fetchAdminSupportTickets } from '../api/adminSupport';
 import type { PlatformStats } from '../types/admin';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel';
@@ -28,6 +30,7 @@ function formatMonthLabel(month: string): string {
 
 export function AdminStatsPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [openSupportTickets, setOpenSupportTickets] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,9 +38,15 @@ export function AdminStatsPage() {
     setLoading(true);
     setError(null);
     try {
-      setStats(await fetchPlatformStats());
+      const [platformStats, supportData] = await Promise.all([
+        fetchPlatformStats(),
+        fetchAdminSupportTickets({ limit: 1 }).catch(() => ({ tickets: [], openCount: 0 })),
+      ]);
+      setStats(platformStats);
+      setOpenSupportTickets(supportData.openCount);
     } catch (loadError) {
       setStats(null);
+      setOpenSupportTickets(0);
       setError(loadError instanceof Error ? loadError.message : 'Ошибка загрузки');
     } finally {
       setLoading(false);
@@ -84,6 +93,18 @@ export function AdminStatsPage() {
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
           В режиме бета {stats.pendingRegistrations} пользователей подтвердили email и ждут вашего одобрения.{' '}
           <Link to={`${appPaths.adminUsers}?filter=pending`} className="font-medium text-gold-light hover:underline">
+            Открыть список →
+          </Link>
+        </div>
+      ) : null}
+
+      {openSupportTickets > 0 ? (
+        <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 px-5 py-4 text-sm text-sky-100">
+          <span className="inline-flex items-center gap-2">
+            <LifeBuoy size={16} />
+            {openSupportTickets} новых обращений в поддержку.
+          </span>{' '}
+          <Link to={appPaths.adminSupport} className="font-medium text-gold-light hover:underline">
             Открыть список →
           </Link>
         </div>
