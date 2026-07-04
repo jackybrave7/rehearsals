@@ -8,6 +8,7 @@ import { useAuth } from '../store/AuthContext';
 import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
 import { NoTheaterGate } from './NoTheaterGate';
+import { MobileBottomNav } from './MobileBottomNav';
 import { ReminderSchedulerBanner } from './ReminderSchedulerBanner';
 
 function StatusBar({ compact = false }: { compact?: boolean }) {
@@ -118,10 +119,12 @@ export function Layout() {
           <RecoveryBar />
           <WorkContextBar variant="theater" onMenuClick={() => setMenuOpen(true)} />
         </div>
-        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:px-5 sm:py-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:pb-6">
           <NoTheaterGate />
         </div>
       </main>
+
+      <MobileBottomNav variant="theater" onMoreClick={() => setMenuOpen(true)} />
 
       {menuOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">

@@ -5,6 +5,7 @@ import { useDesign } from '../../store/DesignContext';
 import { useRehearsalStore } from '../../store/RehearsalContext';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
+import { MobileBottomNav } from '../MobileBottomNav';
 import { NoTheaterGate } from '../NoTheaterGate';
 import { appPaths } from '../../navigation/appPaths';
 import { getMainNavLabel, getVisibleMainNavItems } from '../../navigation/mainNav';
@@ -45,11 +46,13 @@ export function ZenShell({
         <WorkContextBar variant="zen" onMenuClick={() => setMenuOpen(true)} />
       </header>
 
-      <main className="zen-main flex-1">
+      <main className="zen-main flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div key={`${design}-${location.pathname}`} className="zen-page mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-6">
           <NoTheaterGate />
         </div>
       </main>
+
+      <MobileBottomNav variant="zen" onMoreClick={() => setMenuOpen(true)} />
 
       {menuOpen && (
         <div className="zen-overlay fixed inset-0 z-50">

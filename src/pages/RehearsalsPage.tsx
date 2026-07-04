@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Plus, MapPin, Clock } from 'lucide-react';
+import { Plus, MapPin, Clock, Sparkles } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import {
   getPlayScenes,
@@ -24,11 +24,17 @@ import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
 import { Input, Textarea, Select } from '../components/FormFields';
 import { Calendar } from '../components/Calendar';
+import { WeekCalendar, getWeekStart } from '../components/WeekCalendar';
 import { VenueSelect } from '../components/VenueSelect';
 import { ScenePicker } from '../components/ScenePicker';
 import { resolveRehearsalLocation } from '../utils/venue';
 import { mergeActorsForNewScenes, resolveRehearsalPerformanceId } from '../utils/rehearsalActors';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
+import {
+  getRehearsalWarnings,
+  getActorScheduleConflicts,
+} from '../utils/rehearsalInsights';
+import { suggestRehearsalDates } from '../utils/suggestRehearsalDates';
 import { getUpcomingRehearsals } from '../utils/rehearsalSort';
 import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { getRehearsalEventTitle } from '../utils/rehearsalCalendar';
@@ -58,6 +64,8 @@ export function RehearsalsPage() {
   const { state, dispatch, readOnly } = useRehearsalStore();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [calendarMode, setCalendarMode] = useState<'month' | 'week'>('month');
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyRehearsal(format(new Date(), 'yyyy-MM-dd')));
@@ -80,6 +88,39 @@ export function RehearsalsPage() {
   const rehearsalScenes = getPlayScenes(state, form.playId ?? state.activePlayId);
   const rehearsalPerformances = getPlayPerformances(state, form.playId ?? state.activePlayId ?? '');
   const pickerCharacterRoles = getPlayRoles(state, form.playId ?? state.activePlayId ?? '', 'character');
+
+  const draftRehearsal = useMemo<Rehearsal>(
+    () => ({
+      ...form,
+      id: '__draft__',
+      theaterId: form.theaterId ?? state.activeTheaterId ?? undefined,
+    }),
+    [form, state.activeTheaterId]
+  );
+
+  const createWarnings = useMemo(
+    () => getRehearsalWarnings(state, draftRehearsal),
+    [state, draftRehearsal]
+  );
+
+  const createConflicts = useMemo(
+    () => getActorScheduleConflicts(state, draftRehearsal),
+    [state, draftRehearsal]
+  );
+
+  const suggestedSlots = useMemo(
+    () =>
+      suggestRehearsalDates(state, draftRehearsal, {
+        fromDate: parseISO(form.date),
+      }),
+    [state, draftRehearsal, form.date]
+  );
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date);
+    setCurrentMonth(date);
+    setWeekStart(getWeekStart(date));
+  };
 
   const openCreate = () => {
     if (readOnly) return;
@@ -155,13 +196,54 @@ export function RehearsalsPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-2">
-          <Calendar
-            currentMonth={currentMonth}
-            onMonthChange={setCurrentMonth}
-            rehearsals={visibleRehearsals}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCalendarMode('month')}
+              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                calendarMode === 'month'
+                  ? 'bg-gold/15 text-gold-light'
+                  : 'text-muted hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Месяц
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalendarMode('week')}
+              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                calendarMode === 'week'
+                  ? 'bg-gold/15 text-gold-light'
+                  : 'text-muted hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Неделя
+            </button>
+            <Link
+              to={appPaths.availability}
+              className="ml-auto self-center text-xs text-gold-light hover:underline"
+            >
+              Доступность труппы →
+            </Link>
+          </div>
+
+          {calendarMode === 'month' ? (
+            <Calendar
+              currentMonth={currentMonth}
+              onMonthChange={setCurrentMonth}
+              rehearsals={visibleRehearsals}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+            />
+          ) : (
+            <WeekCalendar
+              weekStart={weekStart}
+              onWeekChange={setWeekStart}
+              rehearsals={visibleRehearsals}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+            />
+          )}
 
           <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
             <h2 className="mb-4 text-lg font-semibold text-white">Ближайшие репетиции</h2>
@@ -181,7 +263,7 @@ export function RehearsalsPage() {
                     <Link
                       key={rehearsal.id}
                       to={appPaths.rehearsal(rehearsal.id)}
-                      onClick={() => setSelectedDate(parseISO(rehearsal.date))}
+                      onClick={() => handleSelectDate(parseISO(rehearsal.date))}
                       className={`block rounded-xl border p-3 transition-colors hover:border-gold/25 ${
                         isSelectedDay
                           ? 'border-gold/30 bg-gold/5'
@@ -305,6 +387,52 @@ export function RehearsalsPage() {
             value={form.date}
             onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
+
+          {(createWarnings.length > 0 || createConflicts.length > 0) && (
+            <div className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm">
+              {createWarnings.map((warning) => (
+                <p key={warning.id} className="text-amber-100">
+                  {warning.message}
+                </p>
+              ))}
+              {createConflicts.map((conflict) => (
+                <p key={`${conflict.actor.id}-${conflict.otherRehearsal.id}`} className="text-amber-100">
+                  {conflict.actor.name} уже в репетиции «{conflict.otherPlayTitle}» в это время (
+                  {conflict.otherRehearsal.startTime}–{conflict.otherRehearsal.endTime}).
+                </p>
+              ))}
+            </div>
+          )}
+
+          {suggestedSlots.length > 0 && (
+            <div className="rounded-xl border border-gold/15 bg-surface/40 p-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                <Sparkles size={16} className="text-gold" />
+                Предложить даты — все ожидаемые участники свободны
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {suggestedSlots.map((slot) => (
+                  <button
+                    key={slot.date}
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, date: slot.date }))}
+                    className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                      form.date === slot.date
+                        ? 'border-gold/40 bg-gold/15 text-gold-light'
+                        : 'border-gold/10 bg-background/30 text-muted hover:border-gold/25 hover:text-white'
+                    }`}
+                  >
+                    <span className="block font-medium capitalize text-white">{slot.weekdayLabel}</span>
+                    <span className="block">{slot.label}</span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      {slot.availableCount}/{slot.totalCount} участников
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Начало"

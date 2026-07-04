@@ -162,7 +162,7 @@ export function GoogleDocsAuthProvider({ children }: { children: ReactNode }) {
   const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
   const [accessToken, setAccessToken] = useState<string | null>(() => readValidStoredAccessToken());
   const [isRequesting, setIsRequesting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
+  const isRestoring = false;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
