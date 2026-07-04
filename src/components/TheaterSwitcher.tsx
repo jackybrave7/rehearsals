@@ -1,90 +1,189 @@
-import { Building2, Check, ChevronDown, Pencil, Plus } from 'lucide-react';
-import { DeleteButton } from './DeleteButton';
+import { useState } from 'react';
+import { Building2, Check, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useConfirmDialog } from './ConfirmDialogContext';
 import { getActiveTheater } from '../store/selectors';
 import { useCreateTheater } from '../hooks/useCreateTheater';
+import {
+  TheaterItemMenu,
+  useTheaterRowLongPress,
+  type TheaterMenuAction,
+} from './TheaterItemMenu';
+import type { Theater } from '../types';
 
 type TheaterSwitcherProps = {
   variant: 'sidebar' | 'zen';
   onTheaterChange?: () => void;
 };
 
+function buildTheaterMenuActions(
+  theater: Theater,
+  handlers: {
+    onRename: (theater: Theater) => void;
+    onDelete: (theater: Theater) => void;
+    canDelete: boolean;
+  },
+): TheaterMenuAction[] {
+  return [
+    {
+      id: 'rename',
+      icon: <Pencil size={16} />,
+      label: 'Переименовать',
+      onClick: () => handlers.onRename(theater),
+    },
+    {
+      id: 'delete',
+      icon: <Trash2 size={16} />,
+      label: 'Удалить',
+      onClick: () => handlers.onDelete(theater),
+      danger: true,
+      disabled: !handlers.canDelete,
+    },
+  ];
+}
+
+function TheaterListItem({
+  theater,
+  selected,
+  variant,
+  menuOpen,
+  onMenuOpenChange,
+  onSelect,
+  onRename,
+  onDelete,
+  canDelete,
+}: {
+  theater: Theater;
+  selected: boolean;
+  variant: 'sidebar' | 'zen';
+  menuOpen: boolean;
+  onMenuOpenChange: (open: boolean) => void;
+  onSelect: () => void;
+  onRename: (theater: Theater) => void;
+  onDelete: (theater: Theater) => void;
+  canDelete: boolean;
+}) {
+  const longPress = useTheaterRowLongPress(() => onMenuOpenChange(true));
+
+  const actions = buildTheaterMenuActions(theater, { onRename, onDelete, canDelete });
+
+  const rowClass =
+    variant === 'zen'
+      ? `flex w-full items-center gap-1 rounded-2xl transition-all ${
+          selected ? 'zen-nav-link-active' : 'hover:bg-black/[0.03]'
+        }`
+      : `flex w-full items-center gap-1 rounded-lg transition-colors ${
+          selected ? 'bg-gold/15' : 'hover:bg-white/5'
+        }`;
+
+  const selectClass =
+    variant === 'zen'
+      ? `flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left text-base transition-all ${
+          selected
+            ? 'font-semibold text-foreground'
+            : 'text-muted hover:text-foreground'
+        }`
+      : `flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+          selected ? 'font-medium text-gold-light' : 'text-muted hover:text-white'
+        }`;
+
+  return (
+    <div className={rowClass}>
+      <button
+        type="button"
+        onClick={() => {
+          if (longPress.consumeLongPress()) return;
+          onSelect();
+        }}
+        className={selectClass}
+        {...longPress}
+      >
+        <span className="truncate">{theater.name}</span>
+        {selected ? <Check size={16} className="shrink-0 text-accent" /> : null}
+      </button>
+      <div className="pr-1">
+        <TheaterItemMenu
+          variant={variant}
+          actions={actions}
+          open={menuOpen}
+          onOpenChange={onMenuOpenChange}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherProps) {
   const { state, dispatch } = useRehearsalStore();
   const { confirmDelete, prompt } = useConfirmDialog();
   const { createTheater } = useCreateTheater();
-  const activeTheater = getActiveTheater(state);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const canDelete = state.theaters.length > 1;
 
   const setActiveTheater = (theaterId: string) => {
     dispatch({ type: 'SET_ACTIVE_THEATER', payload: theaterId });
     onTheaterChange?.();
   };
 
-  const renameTheater = async () => {
-    if (!activeTheater) return;
+  const renameTheater = async (theater: Theater) => {
     const name = await prompt({
       title: 'Переименовать театр',
-      defaultValue: activeTheater.name,
+      defaultValue: theater.name,
       confirmLabel: 'Сохранить',
     });
     if (!name) return;
-    dispatch({ type: 'UPDATE_THEATER', payload: { ...activeTheater, name } });
+    dispatch({ type: 'UPDATE_THEATER', payload: { ...theater, name } });
   };
 
-  const deleteTheater = async () => {
-    if (!activeTheater || state.theaters.length <= 1) return;
+  const deleteTheater = async (theater: Theater) => {
+    if (!canDelete) return;
     const confirmed = await confirmDelete({
-      title: `Удалить театр «${activeTheater.name}»?`,
+      title: `Удалить театр «${theater.name}»?`,
       message:
         'Все данные этого театра — постановки, сцены, репетиции и участники — будут удалены без возможности восстановления.',
       confirmLabel: 'Удалить театр',
     });
     if (!confirmed) return;
-    dispatch({ type: 'DELETE_THEATER', payload: activeTheater.id });
+    dispatch({ type: 'DELETE_THEATER', payload: theater.id });
   };
+
+  const theaterList = (
+    <div className={variant === 'zen' ? 'space-y-1' : 'space-y-0.5'}>
+      {state.theaters.map((theater) => (
+        <TheaterListItem
+          key={theater.id}
+          theater={theater}
+          selected={theater.id === state.activeTheaterId}
+          variant={variant}
+          menuOpen={openMenuId === theater.id}
+          onMenuOpenChange={(open) => setOpenMenuId(open ? theater.id : null)}
+          onSelect={() => setActiveTheater(theater.id)}
+          onRename={renameTheater}
+          onDelete={deleteTheater}
+          canDelete={canDelete}
+        />
+      ))}
+    </div>
+  );
 
   if (variant === 'sidebar') {
     return (
       <div className="mb-4 rounded-xl border border-gold/10 bg-background/30 p-3">
-        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
-          <Building2 size={14} />
-          Театр
-        </div>
-        <select
-          value={state.activeTheaterId ?? ''}
-          onChange={(event) => setActiveTheater(event.target.value)}
-          className="w-full rounded-lg border border-gold/10 bg-surface px-2 py-2 text-sm text-white outline-none transition-colors focus:border-gold/30"
-        >
-          {state.theaters.map((theater) => (
-            <option key={theater.id} value={theater.id}>
-              {theater.name}
-            </option>
-          ))}
-        </select>
-        <div className="mt-2 flex gap-1">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
+            <Building2 size={14} />
+            Театр
+          </div>
           <button
             type="button"
             onClick={createTheater}
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gold-light transition-colors hover:bg-gold/10"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gold-light transition-colors hover:bg-gold/10"
           >
-            <Plus size={13} /> Новый
+            <Plus size={13} />
+            Новый
           </button>
-          <button
-            type="button"
-            onClick={renameTheater}
-            className="rounded-lg px-2 py-1.5 text-muted transition-colors hover:bg-white/5 hover:text-white"
-            title="Переименовать"
-          >
-            <Pencil size={13} />
-          </button>
-          <DeleteButton
-            label="Удалить театр"
-            iconSize={13}
-            disabled={state.theaters.length <= 1}
-            onClick={deleteTheater}
-          />
         </div>
+        {theaterList}
       </div>
     );
   }
@@ -105,46 +204,7 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
           Новый
         </button>
       </div>
-
-      <div className="space-y-1">
-        {state.theaters.map((theater) => {
-          const selected = theater.id === state.activeTheaterId;
-          return (
-            <button
-              key={theater.id}
-              type="button"
-              onClick={() => setActiveTheater(theater.id)}
-              className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left text-base transition-all ${
-                selected
-                  ? 'zen-nav-link-active font-semibold'
-                  : 'text-muted hover:bg-black/[0.03] hover:text-foreground'
-              }`}
-            >
-              <span className="truncate">{theater.name}</span>
-              {selected && <Check size={16} className="shrink-0 text-accent" />}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeTheater && (
-        <div className="mt-3 flex gap-1 border-t border-border/60 pt-3">
-          <button
-            type="button"
-            onClick={renameTheater}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs text-muted transition-colors hover:bg-black/[0.03] hover:text-foreground"
-          >
-            <Pencil size={13} />
-            Переименовать
-          </button>
-          <DeleteButton
-            label={`Удалить театр «${activeTheater.name}»`}
-            iconSize={13}
-            disabled={state.theaters.length <= 1}
-            onClick={deleteTheater}
-          />
-        </div>
-      )}
+      {theaterList}
     </div>
   );
 }

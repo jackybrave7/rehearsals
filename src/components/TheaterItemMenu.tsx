@@ -94,7 +94,7 @@ export function TheaterItemMenu({ actions, variant, open: controlledOpen, onOpen
   useEffect(() => {
     if (!open) return;
 
-    const onDocumentClick = (event: MouseEvent) => {
+    const onDocumentClick = (event: Event) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
@@ -118,8 +118,7 @@ export function TheaterItemMenu({ actions, variant, open: controlledOpen, onOpen
     action();
   };
 
-  const visibleActions = actions.filter((action) => !action.disabled);
-  if (visibleActions.length === 0) return null;
+  if (actions.length === 0) return null;
 
   const triggerClass =
     variant === 'zen'
@@ -131,8 +130,8 @@ export function TheaterItemMenu({ actions, variant, open: controlledOpen, onOpen
       ? 'absolute right-0 top-full z-30 mt-1 min-w-[11.5rem] overflow-hidden rounded-xl border border-border/80 bg-surface py-1 shadow-lg shadow-black/10'
       : 'absolute right-0 top-full z-30 mt-1 min-w-[11.5rem] overflow-hidden rounded-xl border border-gold/15 bg-surface py-1 shadow-lg shadow-black/30';
 
-  const dangerActions = visibleActions.filter((action) => action.danger);
-  const regularActions = visibleActions.filter((action) => !action.danger);
+  const dangerActions = actions.filter((action) => action.danger);
+  const regularActions = actions.filter((action) => !action.danger);
 
   return (
     <div className="relative shrink-0" ref={rootRef}>
