@@ -6,7 +6,7 @@
   --color-foreground: #f5f0eb;
   --color-gold: #c9a962;
   --color-gold-light: #e8d5a3;
-  --color-muted: #9a8a7a;
+  --color-muted: #b5a898;
   --color-accent: #c9a962;
   --color-border: rgba(201, 169, 98, 0.12);
   --color-warning-bg: rgba(180, 83, 9, 0.12);
@@ -828,4 +828,81 @@ html[data-design='zen'] .warning-badge {
 .rehearsal-warnings-dismiss:hover {
   color: var(--color-foreground);
   background: rgba(127, 127, 127, 0.12);
+}
+
+/* Auth pages (/login, /verify-email) — always light Zen theme */
+.auth-page {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -8%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent),
+    var(--color-background);
+}
+
+.auth-card {
+  border-radius: 1.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 20px 50px rgba(17, 17, 17, 0.07);
+}
+
+.auth-segment {
+  display: flex;
+  gap: 0.25rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-foreground) 4%, var(--color-background));
+  padding: 0.25rem;
+}
+
+.auth-segment-btn {
+  flex: 1;
+  border-radius: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-segment-btn[data-active='true'] {
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  box-shadow: 0 1px 4px rgba(17, 17, 17, 0.08);
+}
+
+.auth-segment-btn[data-active='false'] {
+  color: var(--color-muted);
+}
+
+.auth-segment-btn[data-active='false']:hover {
+  color: var(--color-foreground);
+  background: color-mix(in srgb, var(--color-foreground) 5%, transparent);
+}
+
+.auth-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-foreground) 16%, var(--color-border));
+  background: var(--color-surface);
+  padding: 0.75rem 1rem;
+  color: var(--color-foreground);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-input::placeholder {
+  color: color-mix(in srgb, var(--color-muted) 75%, transparent);
+}
+
+.auth-input:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-foreground) 28%, var(--color-border));
+}
+
+.auth-input:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.auth-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--color-foreground) 4%, var(--color-surface));
 }

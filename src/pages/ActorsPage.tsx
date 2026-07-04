@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Phone, Mail, Archive, ArchiveRestore, AtSign, CalendarOff, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Phone, Archive, ArchiveRestore, AtSign, CalendarOff, Trash2 } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { getActiveActors, getArchivedActors, formatActorRolesSummary } from '../store/selectors';
+import { getActiveActors, getArchivedActors, formatActorRolesSummary, countActorRoles } from '../store/selectors';
 import { uploadFile } from '../api/files';
 import { generateId } from '../utils/id';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
@@ -43,6 +43,7 @@ function ActorCard({
   onOpen,
   archived,
   rolesSummary,
+  roleCount,
   unavailabilityBadge,
   attendancePercent,
   staleLabel,
@@ -53,11 +54,13 @@ function ActorCard({
   onOpen: (id: string) => void;
   archived?: boolean;
   rolesSummary: string;
+  roleCount: number;
   unavailabilityBadge?: string;
   attendancePercent?: number;
   staleLabel?: string;
 }) {
   const telegramUsername = actor.telegramUsername?.replace(/^@+/, '').trim();
+  const telegramConnected = Boolean(actor.telegramChatId);
   return (
     <div
       className={`group overflow-hidden rounded-2xl border bg-surface/60 ${
@@ -74,11 +77,12 @@ function ActorCard({
           <ActorAvatar name={actor.name} photoUrl={actor.photoUrl} archived={archived} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2">
             <button
               type="button"
               onClick={() => onOpen(actor.id)}
-              className="truncate text-left font-semibold text-white hover:text-gold-light"
+              title={actor.name}
+              className="line-clamp-2 text-left font-semibold leading-snug text-white hover:text-gold-light"
             >
               {actor.name}
             </button>
@@ -93,7 +97,35 @@ function ActorCard({
               </span>
             )}
           </div>
-          <p className="text-sm text-gold-light line-clamp-2">{rolesSummary}</p>
+          <p className="mt-1 text-sm text-gold-light line-clamp-2" title={rolesSummary}>
+            {rolesSummary}
+          </p>
+          {!archived && (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+              <span className="inline-flex items-center gap-1" title="Телефон">
+                <Phone size={12} className="shrink-0 opacity-70" />
+                {actor.phone ? formatPhone(actor.phone) : 'телефон не указан'}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 ${
+                  telegramConnected ? 'text-emerald-200' : ''
+                }`}
+                title="Telegram"
+              >
+                <AtSign size={12} className="shrink-0 opacity-70" />
+                {telegramConnected
+                  ? 'бот подключён'
+                  : telegramUsername
+                    ? `@${telegramUsername}`
+                    : 'Telegram не указан'}
+              </span>
+              <span title="Количество ролей в составе">
+                {roleCount > 0
+                  ? `${roleCount} ${roleCount === 1 ? 'роль' : roleCount < 5 ? 'роли' : 'ролей'}`
+                  : 'роли не назначены'}
+              </span>
+            </div>
+          )}
           {!archived && (attendancePercent !== undefined || staleLabel) && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {attendancePercent !== undefined && (
@@ -112,26 +144,6 @@ function ActorCard({
             <p className="mt-2 text-xs text-muted">
               <span className="text-muted/70">Причина: </span>
               {actor.archiveReason}
-            </p>
-          )}
-          {!archived && actor.phone && (
-            <p className="mt-1 flex items-center gap-1 text-xs text-muted">
-              <Phone size={12} /> {formatPhone(actor.phone)}
-            </p>
-          )}
-          {!archived && actor.email && (
-            <p className="flex items-center gap-1 text-xs text-muted">
-              <Mail size={12} /> {actor.email}
-            </p>
-          )}
-          {!archived && telegramUsername && (
-            <p className="flex items-center gap-1 text-xs text-muted">
-              <AtSign size={12} /> @{telegramUsername}
-            </p>
-          )}
-          {!archived && actor.telegramChatId && (
-            <p className="flex items-center gap-1 text-xs text-emerald-200/90">
-              <AtSign size={12} /> бот подключён
             </p>
           )}
         </div>
@@ -321,6 +333,7 @@ export function ActorsPage() {
               actor={actor}
               archived={tab === 'archived'}
               rolesSummary={formatActorRolesSummary(state, actor.id)}
+              roleCount={countActorRoles(state, actor.id)}
               unavailabilityBadge={
                 tab === 'active' ? getActorUnavailabilityBadge(actor) : undefined
               }

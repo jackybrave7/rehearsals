@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Search, X } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
@@ -10,7 +10,7 @@ import { getActivePlay, getPlayRoles, getPlayScenes, getSceneRoles, getSelectedP
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { formatDuration } from '../utils/time';
-import { getSceneShortLabel, groupScenesByAct } from '../utils/sceneLabels';
+import { getSceneShortLabel, getSceneActGroup, groupScenesByAct } from '../utils/sceneLabels';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 import type { Scene, ScenePriority, SceneStatus } from '../types';
 import { Button } from '../components/Button';
@@ -27,7 +27,7 @@ import { PremiereBanner } from '../components/PremiereBanner';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
-import { sceneMatchesCharacterFilter } from '../utils/sceneFilters';
+import { sceneMatchesCharacterFilter, sceneMatchesSearch } from '../utils/sceneFilters';
 
 const statusLabels: Record<SceneStatus, string> = {
   not_started: 'Не начата',
@@ -83,6 +83,8 @@ export function ScenesPage() {
   const [priorityFilter, setPriorityFilter] = useState<Set<ScenePriority>>(new Set());
   const [characterFilter, setCharacterFilter] = useState<Set<string>>(new Set());
   const [characterFilterOnlySelected, setCharacterFilterOnlySelected] = useState(false);
+  const [actFilter, setActFilter] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const [scriptLinkInput, setScriptLinkInput] = useState('');
 
   const openCreate = () => {
@@ -192,13 +194,36 @@ export function ScenesPage() {
     return counts;
   }, [sorted, characterRoles]);
 
+  const actGroups = useMemo(() => {
+    const groups = new Set<string>();
+    for (const scene of sorted) {
+      groups.add(getSceneActGroup(scene));
+    }
+    return Array.from(groups);
+  }, [sorted]);
+
+  const actSceneCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const scene of sorted) {
+      const group = getSceneActGroup(scene);
+      counts.set(group, (counts.get(group) ?? 0) + 1);
+    }
+    return counts;
+  }, [sorted]);
+
   const filteredScenes = useMemo(() => {
     let result = sorted;
+    if (searchQuery.trim()) {
+      result = result.filter((scene) => sceneMatchesSearch(state, scene, searchQuery));
+    }
     if (statusFilter.size > 0) {
       result = result.filter((scene) => statusFilter.has(scene.status));
     }
     if (priorityFilter.size > 0) {
       result = result.filter((scene) => priorityFilter.has(scene.priority ?? 'medium'));
+    }
+    if (actFilter.size > 0) {
+      result = result.filter((scene) => actFilter.has(getSceneActGroup(scene)));
     }
     if (characterFilter.size > 0) {
       result = result.filter((scene) =>
@@ -208,7 +233,25 @@ export function ScenesPage() {
       );
     }
     return result;
-  }, [sorted, statusFilter, priorityFilter, characterFilter, characterFilterOnlySelected]);
+  }, [
+    sorted,
+    state,
+    searchQuery,
+    statusFilter,
+    priorityFilter,
+    actFilter,
+    characterFilter,
+    characterFilterOnlySelected,
+  ]);
+
+  const filteredDurationMinutes = useMemo(
+    () =>
+      filteredScenes.reduce(
+        (sum, scene) => sum + (scene.estimatedMinutes ?? DEFAULT_SCENE_REHEARSAL_MINUTES),
+        0
+      ),
+    [filteredScenes]
+  );
 
   const groupedScenes = groupScenesByAct(filteredScenes);
 
@@ -251,9 +294,22 @@ export function ScenesPage() {
     setCharacterFilterOnlySelected(false);
   };
 
+  const toggleActFilter = (act: string) => {
+    setActFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(act)) next.delete(act);
+      else next.add(act);
+      return next;
+    });
+  };
+
+  const clearActFilter = () => setActFilter(new Set());
+
   const clearAllFilters = () => {
+    setSearchQuery('');
     setStatusFilter(new Set());
     setPriorityFilter(new Set());
+    setActFilter(new Set());
     setCharacterFilter(new Set());
     setCharacterFilterOnlySelected(false);
   };
@@ -264,8 +320,10 @@ export function ScenesPage() {
       : characterRoles;
 
   const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
     statusFilter.size > 0 ||
     priorityFilter.size > 0 ||
+    actFilter.size > 0 ||
     characterFilter.size > 0 ||
     characterFilterOnlySelected;
 
@@ -331,7 +389,55 @@ export function ScenesPage() {
       <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
 
       {sorted.length > 0 && (
-        <div className="space-y-3">
+        <div className="sticky top-0 z-30 -mx-4 space-y-3 border-b border-gold/10 bg-background/95 px-4 py-3 backdrop-blur-sm sm:-mx-5 lg:-mx-8 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span className="font-medium text-foreground">
+                {filteredScenes.length === sorted.length
+                  ? `${sorted.length} сцен`
+                  : `${filteredScenes.length} из ${sorted.length} сцен`}
+              </span>
+              <span className="text-muted">
+                хронометраж: {formatDuration(filteredDurationMinutes)}
+              </span>
+            </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="shrink-0 text-xs text-muted underline-offset-2 hover:text-gold-light hover:underline"
+              >
+                Сбросить фильтры
+              </button>
+            )}
+          </div>
+
+          <div className="relative">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Поиск по названию, описанию, персонажам…"
+              className="w-full rounded-xl border border-gold/20 bg-surface/60 py-2.5 pl-9 pr-9 text-sm text-white placeholder:text-muted/60 focus:border-gold/45 focus:outline-none focus:ring-1 focus:ring-gold/25"
+              aria-label="Поиск сцен"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:bg-white/5 hover:text-white"
+                aria-label="Очистить поиск"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted">Статус:</span>
             <button
@@ -398,6 +504,41 @@ export function ScenesPage() {
             })}
           </div>
 
+          {actGroups.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">Действие:</span>
+              <button
+                type="button"
+                onClick={clearActFilter}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  actFilter.size === 0
+                    ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+                    : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Все
+              </button>
+              {actGroups.map((act) => {
+                const selected = actFilter.has(act);
+                const count = actSceneCounts.get(act) ?? 0;
+                return (
+                  <button
+                    key={act}
+                    type="button"
+                    onClick={() => toggleActFilter(act)}
+                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                      selected
+                        ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+                        : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {act} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {characterRoles.length > 0 && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -449,21 +590,6 @@ export function ScenesPage() {
                 />
                 Только выбранные
               </label>
-            </div>
-          )}
-
-          {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-muted">
-                {filteredScenes.length} из {sorted.length} сцен
-              </span>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-muted underline-offset-2 hover:text-gold-light hover:underline"
-              >
-                Сбросить все фильтры
-              </button>
             </div>
           )}
         </div>
@@ -525,7 +651,7 @@ export function ScenesPage() {
                         )}
                         <SceneTimingHint scene={scene} appMeta={state.appMeta} compact className="mt-1" />
                         {scene.directorNotes?.trim() && (
-                          <p className="mt-1 line-clamp-2 rounded-lg bg-gold/5 px-2 py-1 text-xs text-gold-light/90">
+                          <p className="mt-1 line-clamp-2 rounded-lg bg-gold/5 px-2 py-1 text-xs text-gold-light">
                             Режиссёр: {scene.directorNotes.trim()}
                           </p>
                         )}

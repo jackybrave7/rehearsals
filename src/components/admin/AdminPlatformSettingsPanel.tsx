@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Settings2 } from 'lucide-react';
-import type { RegistrationMode } from '../types/admin';
-import { fetchPlatformSettings, updatePlatformSettings } from '../api/adminPlatform';
+import type { RegistrationMode } from '../../types/admin';
+import { fetchPlatformSettings, updatePlatformSettings } from '../../api/adminPlatform';
 
 const MODE_OPTIONS: Array<{
   id: RegistrationMode;

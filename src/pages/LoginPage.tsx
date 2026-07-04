@@ -7,6 +7,8 @@ import { fetchAuthConfig, requestPasswordReset, resendEmailVerification } from '
 import { Button } from '../components/Button';
 import { LEGAL_DOCUMENTS } from '../content/legalOperator';
 
+const inputClass = 'auth-input';
+
 export function LoginPage() {
   const { user, loading, login, register } = useAuth();
   const navigate = useNavigate();
@@ -109,41 +111,43 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="auth-page flex min-h-screen flex-col">
       <div className="flex flex-1 items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 shadow-2xl">
+        <div className="auth-card w-full max-w-md p-8">
           <div className="mb-8 flex items-center gap-3">
             <AppLogo size="lg" />
             <div>
-              <h1 className="text-2xl font-bold text-gold-light">Репетиции</h1>
+              <h1 className="text-2xl font-bold text-foreground">Репетиции</h1>
               <p className="text-sm text-muted">Вход в планировщик постановки</p>
             </div>
           </div>
 
           {mode !== 'forgot' ? (
-            <div className="mb-6 flex gap-2 rounded-xl bg-black/20 p-1">
+            <div className="auth-segment mb-6" role="tablist" aria-label="Режим входа">
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === 'login'}
+                data-active={mode === 'login'}
                 onClick={() => switchMode('login')}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  mode === 'login' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-                }`}
+                className="auth-segment-btn"
               >
                 Вход
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === 'register'}
+                data-active={mode === 'register'}
                 onClick={() => switchMode('register')}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  mode === 'register' ? 'bg-gold/20 text-white' : 'text-muted hover:text-white'
-                }`}
+                className="auth-segment-btn"
               >
                 Регистрация
               </button>
             </div>
           ) : (
             <div className="mb-6">
-              <h2 className="text-lg font-medium text-white">Восстановление пароля</h2>
+              <h2 className="text-lg font-medium text-foreground">Восстановление пароля</h2>
               <p className="mt-1 text-sm text-muted">
                 Отправим одноразовый пароль на email. После входа смените его в Настройках.
               </p>
@@ -151,7 +155,7 @@ export function LoginPage() {
           )}
 
           {mode === 'register' && registrationMode === 'beta' ? (
-            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
               Сервис работает в режиме бета-тестирования. После регистрации и подтверждения email
               заявка будет рассмотрена администратором — мы сообщим на почту, когда доступ откроется.
             </div>
@@ -160,32 +164,33 @@ export function LoginPage() {
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === 'register' && (
               <label className="block">
-                <span className="mb-1 block text-sm text-muted">Имя</span>
+                <span className="mb-1.5 block text-sm font-medium text-foreground/90">Имя</span>
                 <input
                   type="text"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
+                  className={inputClass}
                   placeholder="Как к вам обращаться"
                 />
               </label>
             )}
 
             <label className="block">
-              <span className="mb-1 block text-sm text-muted">Email</span>
+              <span className="mb-1.5 block text-sm font-medium text-foreground/90">Email</span>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-gold/15 bg-black/20 px-4 py-3 text-white outline-none focus:border-gold/40"
+                className={inputClass}
                 autoComplete="email"
+                placeholder="you@example.com"
               />
             </label>
 
             {mode !== 'forgot' && (
               <label className="block">
-                <span className="mb-1 block text-sm text-muted">Пароль</span>
+                <span className="mb-1.5 block text-sm font-medium text-foreground/90">Пароль</span>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -193,13 +198,13 @@ export function LoginPage() {
                     minLength={mode === 'register' ? 8 : undefined}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    className="w-full rounded-xl border border-gold/15 bg-black/20 py-3 pl-4 pr-11 text-white outline-none focus:border-gold/40"
+                    className={`${inputClass} pr-11`}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted transition-colors hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted transition-colors hover:text-foreground"
                     aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -217,19 +222,19 @@ export function LoginPage() {
                   type="checkbox"
                   checked={acceptTerms}
                   onChange={(event) => setAcceptTerms(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-gold/30 accent-gold"
+                  className="mt-1 h-4 w-4 rounded border-gold/40 accent-gold"
                 />
                 <span>
                   Я принимаю{' '}
-                  <Link to={LEGAL_DOCUMENTS.terms.path} className="text-gold-light hover:underline" target="_blank">
+                  <Link to={LEGAL_DOCUMENTS.terms.path} className="text-accent hover:underline" target="_blank">
                     пользовательское соглашение
                   </Link>
                   ,{' '}
-                  <Link to={LEGAL_DOCUMENTS.privacy.path} className="text-gold-light hover:underline" target="_blank">
+                  <Link to={LEGAL_DOCUMENTS.privacy.path} className="text-accent hover:underline" target="_blank">
                     политику конфиденциальности
                   </Link>{' '}
                   и{' '}
-                  <Link to={LEGAL_DOCUMENTS.offer.path} className="text-gold-light hover:underline" target="_blank">
+                  <Link to={LEGAL_DOCUMENTS.offer.path} className="text-accent hover:underline" target="_blank">
                     публичную оферту
                   </Link>
                 </span>
@@ -240,7 +245,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => switchMode('forgot')}
-                className="text-sm text-gold-light hover:underline"
+                className="text-sm text-accent hover:underline"
               >
                 Забыли пароль?
               </button>
@@ -250,20 +255,20 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-sm text-muted hover:text-white"
+                className="text-sm text-muted hover:text-foreground"
               >
                 ← Назад ко входу
               </button>
             )}
 
             {error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+              <div className="rounded-xl border border-red-500/35 bg-red-950/40 px-4 py-3 text-sm text-red-200">
                 {error}
                 {showResendVerification && (
                   <button
                     type="button"
                     onClick={() => void handleResendVerification()}
-                    className="mt-2 block text-gold-light hover:underline"
+                    className="mt-2 block text-accent hover:underline"
                     disabled={submitting}
                   >
                     Отправить письмо повторно
@@ -273,7 +278,7 @@ export function LoginPage() {
             )}
 
             {info && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-200">
+              <div className="rounded-xl border border-emerald-500/35 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
                 {info}
               </div>
             )}
@@ -290,7 +295,7 @@ export function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-sm text-muted">
-            <Link to="/" className="text-gold-light hover:underline">
+            <Link to="/" className="text-accent hover:underline">
               На главную
             </Link>
           </p>
@@ -299,13 +304,13 @@ export function LoginPage() {
 
       <footer className="border-t border-gold/10 px-4 py-6 text-center text-xs text-muted">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-          <Link to={LEGAL_DOCUMENTS.terms.path} className="hover:text-gold-light">
+          <Link to={LEGAL_DOCUMENTS.terms.path} className="hover:text-accent">
             {LEGAL_DOCUMENTS.terms.title}
           </Link>
-          <Link to={LEGAL_DOCUMENTS.privacy.path} className="hover:text-gold-light">
+          <Link to={LEGAL_DOCUMENTS.privacy.path} className="hover:text-accent">
             {LEGAL_DOCUMENTS.privacy.title}
           </Link>
-          <Link to={LEGAL_DOCUMENTS.offer.path} className="hover:text-gold-light">
+          <Link to={LEGAL_DOCUMENTS.offer.path} className="hover:text-accent">
             {LEGAL_DOCUMENTS.offer.title}
           </Link>
         </div>

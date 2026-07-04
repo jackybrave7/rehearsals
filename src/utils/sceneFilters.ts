@@ -1,5 +1,5 @@
-import type { PlayRole, Scene, SceneStatus } from '../types';
-import { sceneMatchesQuery } from './sceneLabels';
+import type { AppState, PlayRole, Scene, SceneStatus } from '../types';
+import { getSceneCharacterNames, sceneMatchesQuery } from './sceneLabels';
 
 export const sceneStatusLabels: Record<SceneStatus, string> = {
   not_started: 'Не начата',
@@ -34,6 +34,17 @@ export function sceneMatchesCharacterFilter(
     return roleIds.length === characterFilter.size;
   }
   return true;
+}
+
+export function sceneMatchesSearch(state: AppState, scene: Scene, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  if (sceneMatchesQuery(scene, query)) return true;
+  if (scene.description?.toLowerCase().includes(normalized)) return true;
+  if (scene.directorNotes?.toLowerCase().includes(normalized)) return true;
+  const characterNames = getSceneCharacterNames(state, scene);
+  if (characterNames.some((name) => name.toLowerCase().includes(normalized))) return true;
+  return false;
 }
 
 export function sceneMatchesFilters(

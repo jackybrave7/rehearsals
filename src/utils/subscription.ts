@@ -1,5 +1,5 @@
 import type { SubscriptionPlan } from '../types/subscription';
-import { FREE_PLAN_LIMITS, PRO_PRICING } from '../types/subscription';
+import { FREE_PLAN_LIMITS, PRO_PRICING, SUBSCRIPTION_PLAN_LABELS } from '../types/subscription';
 import type { AppState, Play } from '../types';
 
 export function isProPlan(plan: SubscriptionPlan | undefined, isPlatformAdmin = false): boolean {

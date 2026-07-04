@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { isPromoPath } from '../navigation/promoPaths';
+import { isAuthPath, isPromoPath } from '../navigation/promoPaths';
 
 export type AppDesign = 'theater' | 'zen';
 
@@ -20,7 +20,8 @@ function applyDocumentDesign(design: AppDesign) {
 
 if (typeof document !== 'undefined') {
   const path = window.location.pathname;
-  applyDocumentDesign(isPromoPath(path) ? 'zen' : readDesign());
+  if (isAuthPath(path) || isPromoPath(path)) applyDocumentDesign('zen');
+  else applyDocumentDesign(readDesign());
 }
 
 type DesignContextValue = {
@@ -35,9 +36,10 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const [design, setDesign] = useState<AppDesign>(readDesign);
   const onPromo = isPromoPath(pathname);
+  const onAuth = isAuthPath(pathname);
 
   useEffect(() => {
-    if (onPromo) {
+    if (onPromo || onAuth) {
       applyDocumentDesign('zen');
       return;
     }
@@ -47,10 +49,10 @@ export function DesignProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-  }, [design, onPromo]);
+  }, [design, onPromo, onAuth]);
 
   return (
-    <DesignContext.Provider value={{ design, setDesign, isZen: onPromo || design === 'zen' }}>
+    <DesignContext.Provider value={{ design, setDesign, isZen: onPromo || onAuth || design === 'zen' }}>
       {children}
     </DesignContext.Provider>
   );

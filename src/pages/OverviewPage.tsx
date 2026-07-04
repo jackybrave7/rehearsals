@@ -11,7 +11,7 @@ import { useDesign } from '../store/DesignContext';
 
 function premiereBadgeClass(tone: ReturnType<typeof getPremiereBadgeTone>): string {
   if (tone === 'urgent') return 'bg-red-500/15 text-red-200 ring-1 ring-red-500/30';
-  if (tone === 'gold') return 'bg-gold/15 text-gold-light ring-1 ring-gold/30';
+  if (tone === 'gold') return 'bg-gold/20 text-gold-light ring-1 ring-gold/35';
   return 'bg-white/5 text-muted ring-1 ring-white/10';
 }
 

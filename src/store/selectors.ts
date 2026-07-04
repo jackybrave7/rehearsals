@@ -149,6 +149,11 @@ export function formatActorRolesSummary(state: AppState, actorId: string): strin
     .join(' · ');
 }
 
+export function countActorRoles(state: AppState, actorId: string): number {
+  const roleIds = new Set(getActorAssignments(state, actorId).map((a) => a.roleId));
+  return roleIds.size;
+}
+
 export function isActorAssignedToRole(
   state: AppState,
   performanceId: string,

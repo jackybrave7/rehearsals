@@ -25,15 +25,15 @@ export function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-gold/15 bg-surface/60 p-8 text-center shadow-2xl">
+    <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="auth-card w-full max-w-md p-8 text-center">
         <div className="mx-auto mb-6">
           <AppLogo size="lg" className="justify-center" />
         </div>
 
         {status === 'loading' && (
           <>
-            <h1 className="text-xl font-bold text-white">Подтверждаем email…</h1>
+            <h1 className="text-xl font-bold text-foreground">Подтверждаем email…</h1>
             <p className="mt-2 text-sm text-muted">Подождите несколько секунд.</p>
           </>
         )}
@@ -41,7 +41,7 @@ export function VerifyEmailPage() {
         {status === 'success' && (
           <>
             <CheckCircle2 size={40} className="mx-auto text-emerald-400" />
-            <h1 className="mt-4 text-xl font-bold text-white">Email подтверждён</h1>
+            <h1 className="mt-4 text-xl font-bold text-foreground">Email подтверждён</h1>
             <p className="mt-2 text-sm text-muted">
               {betaPendingApproval
                 ? 'Заявка отправлена администратору. Мы сообщим на почту, когда доступ к сервису откроется.'
@@ -62,7 +62,7 @@ export function VerifyEmailPage() {
         {status === 'error' && (
           <>
             <XCircle size={40} className="mx-auto text-red-300" />
-            <h1 className="mt-4 text-xl font-bold text-white">Ссылка недействительна</h1>
+            <h1 className="mt-4 text-xl font-bold text-foreground">Ссылка недействительна</h1>
             <p className="mt-2 text-sm text-muted">
               Срок действия истёк или ссылка уже использована. Запросите новое письмо при входе.
             </p>

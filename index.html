@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1212" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Репетиции" />
     <meta
       name="description"
       content="Планировщик театральных репетиций: сцены, состав, почасовой план и рассылка в Telegram. Google Docs, self-hosted, для независимых коллективов."
@@ -11,13 +17,12 @@
     <script>
       (function () {
         var path = location.pathname.replace(/\/$/, '') || '/';
+        var auth = path === '/login' || path === '/verify-email';
         var promo =
           path === '/' ||
           path === '/pricing' ||
-          path === '/login' ||
-          path === '/verify-email' ||
           path.indexOf('/legal/') === 0;
-        if (promo) document.documentElement.dataset.design = 'zen';
+        if (auth || promo) document.documentElement.dataset.design = 'zen';
       })();
     </script>
     <title>Репетиции — планировщик постановки</title>
