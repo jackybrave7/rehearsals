@@ -48,7 +48,7 @@ export function getTheaterSetupSteps(state: AppState): TheaterSetupStep[] {
     {
       id: 'actors',
       label: 'Участники театра',
-      done: actors.length >= 2,
+      done: actors.length >= 1,
       href: appPaths.actors,
     },
     {

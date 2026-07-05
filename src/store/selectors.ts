@@ -33,6 +33,7 @@ export function getTheaterTasks(state: AppState) {
 export { getOverdueTasks, getTasksByPlay };
 
 export function getTheaterVenues(state: AppState) {
+  if (!state.activeTheaterId) return [];
   return state.venues.filter((venue) => venue.theaterId === state.activeTheaterId);
 }
 

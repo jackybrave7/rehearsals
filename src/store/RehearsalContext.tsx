@@ -27,7 +27,6 @@ import type {
 } from '../types';
 import { normalizeTask } from '../utils/tasks';
 import { clearRemindersOnScheduleChange } from '../utils/reminders';
-import { createDefaultVenue } from '../data/seedVenue';
 import {
   applyStoneHeartCastToState,
   isStoneHeartPlay,
@@ -396,54 +395,52 @@ function migrateState(raw: unknown): AppState {
   );
 
   let migrated: AppState = {
-    ...ensureDefaultVenues({
-      theaters: data.theaters ?? [],
-      activeTheaterId: data.activeTheaterId ?? null,
-      actors,
-      plays: plays.map((play) =>
-        enrichPlayDocumentMeta(
-          isStoneHeartPlay(play.title)
-            ? {
-                ...play,
-                author: play.author?.trim() || STONE_HEART_PLAY_META.author,
-                description: play.description ?? STONE_HEART_PLAY_META.description,
-                year: play.year ?? STONE_HEART_PLAY_META.year,
-                documentUrl: play.documentUrl ?? STONE_HEART_PLAY_META.documentUrl,
-              }
-            : play
-        )
-      ),
-      activePlayId,
-      selectedPerformanceByPlayId: data.selectedPerformanceByPlayId ?? {},
-      playRoles: (data.playRoles ?? []).map((role, index) => {
-        const legacy = role as LegacyPlayRole;
-        return {
-          ...legacy,
-          kind: legacy.kind ?? 'character',
-          order: legacy.order ?? index + 1,
-        };
-      }),
-      performances: data.performances ?? [],
-      castAssignments: (data.castAssignments ?? []) as CastAssignment[],
-      scenes: (data.scenes ?? []).map((scene) => ({
-        ...scene,
-        priority: scene.priority ?? 'medium',
-        directorNotes: scene.directorNotes ?? undefined,
-      })),
-      tasks: (data.tasks ?? []).map((task) => normalizeTask(task as Task)),
-      venues: data.venues ?? [],
-      rehearsals: (data.rehearsals ?? []).map((rehearsal) => ({
-        ...rehearsal,
-        attendance: rehearsal.attendance ?? {},
-        schedule: (rehearsal.schedule ?? []).map((block) => ({
-          ...block,
-          decidedNotes: block.decidedNotes ?? undefined,
-          remainingNotes: block.remainingNotes ?? undefined,
-        })),
-      })),
-      rehearsalActorNotes: data.rehearsalActorNotes ?? [],
-      appMeta: data.appMeta ?? {},
+    theaters: data.theaters ?? [],
+    activeTheaterId: data.activeTheaterId ?? null,
+    actors,
+    plays: plays.map((play) =>
+      enrichPlayDocumentMeta(
+        isStoneHeartPlay(play.title)
+          ? {
+              ...play,
+              author: play.author?.trim() || STONE_HEART_PLAY_META.author,
+              description: play.description ?? STONE_HEART_PLAY_META.description,
+              year: play.year ?? STONE_HEART_PLAY_META.year,
+              documentUrl: play.documentUrl ?? STONE_HEART_PLAY_META.documentUrl,
+            }
+          : play
+      )
+    ),
+    activePlayId,
+    selectedPerformanceByPlayId: data.selectedPerformanceByPlayId ?? {},
+    playRoles: (data.playRoles ?? []).map((role, index) => {
+      const legacy = role as LegacyPlayRole;
+      return {
+        ...legacy,
+        kind: legacy.kind ?? 'character',
+        order: legacy.order ?? index + 1,
+      };
     }),
+    performances: data.performances ?? [],
+    castAssignments: (data.castAssignments ?? []) as CastAssignment[],
+    scenes: (data.scenes ?? []).map((scene) => ({
+      ...scene,
+      priority: scene.priority ?? 'medium',
+      directorNotes: scene.directorNotes ?? undefined,
+    })),
+    tasks: (data.tasks ?? []).map((task) => normalizeTask(task as Task)),
+    venues: data.venues ?? [],
+    rehearsals: (data.rehearsals ?? []).map((rehearsal) => ({
+      ...rehearsal,
+      attendance: rehearsal.attendance ?? {},
+      schedule: (rehearsal.schedule ?? []).map((block) => ({
+        ...block,
+        decidedNotes: block.decidedNotes ?? undefined,
+        remainingNotes: block.remainingNotes ?? undefined,
+      })),
+    })),
+    rehearsalActorNotes: data.rehearsalActorNotes ?? [],
+    appMeta: data.appMeta ?? {},
   };
 
   migrated = migratePerformances(migrated);
@@ -631,13 +628,6 @@ function migrateLegacyCast(state: AppState, legacyActors: LegacyActor[]): AppSta
   }
 
   return { ...state, playRoles, performances, castAssignments };
-}
-
-function ensureDefaultVenues(state: AppState): AppState {
-  if (state.venues.length > 0) return state;
-  const theaterId = state.activeTheaterId ?? state.theaters[0]?.id;
-  if (!theaterId) return state;
-  return { ...state, venues: [{ ...createDefaultVenue(), theaterId }] };
 }
 
 function parseSavedState(raw: string): AppState | null {
