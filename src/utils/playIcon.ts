@@ -1,4 +1,5 @@
 import type { Play } from '../types';
+import { getPlayColor } from './playColors';
 
 const DEFAULT_COLORS = [
   '#b45309',
@@ -17,8 +18,9 @@ function hashTitle(title: string): number {
   return Math.abs(hash);
 }
 
-export function resolvePlayIconColor(play: Pick<Play, 'title' | 'iconColor'>): string {
+export function resolvePlayIconColor(play: Pick<Play, 'title' | 'iconColor'> & { id?: string }): string {
   if (play.iconColor?.trim()) return play.iconColor.trim();
+  if (play.id) return getPlayColor(play.id);
   return DEFAULT_COLORS[hashTitle(play.title) % DEFAULT_COLORS.length];
 }
 

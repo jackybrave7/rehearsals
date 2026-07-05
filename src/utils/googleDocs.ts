@@ -131,19 +131,68 @@ function normalizeTitle(value: string): string {
     .trim();
 }
 
+const ACT_SCENE_BOUNDARY = String.raw`(?=\s|,|\.|$|[-—–])`;
+
 function parseActScene(value: string): { act?: number; scene?: number } {
-  const actMatch = value.match(/(?:акт|действие)\s*(\d+)/i);
-  const sceneMatch = value.match(/сц\.?\s*(\d+)/i) ?? value.match(/сцена\s*(\d+)/i);
-  return {
-    act: actMatch ? Number(actMatch[1]) : undefined,
-    scene: sceneMatch ? Number(sceneMatch[1]) : undefined,
-  };
+  const actBeforeMatch = value.match(
+    new RegExp(`(\\d+)\\s*(?:акт|действие)${ACT_SCENE_BOUNDARY}`, 'i')
+  );
+  const actAfterMatch = value.match(
+    new RegExp(`(?:акт|действие)\\s*(\\d+)${ACT_SCENE_BOUNDARY}`, 'i')
+  );
+  const act = actBeforeMatch
+    ? Number(actBeforeMatch[1])
+    : actAfterMatch
+      ? Number(actAfterMatch[1])
+      : undefined;
+
+  const sceneAfterDotMatch = value.match(/сц\.?\s*(\d+)/i);
+  const sceneBeforeWordMatch = value.match(
+    new RegExp(`(\\d+)\\s*сцена${ACT_SCENE_BOUNDARY}`, 'i')
+  );
+  const sceneAfterWordMatch = value.match(
+    new RegExp(`сцена\\s*(\\d+)${ACT_SCENE_BOUNDARY}`, 'i')
+  );
+  const scene = sceneBeforeWordMatch
+    ? Number(sceneBeforeWordMatch[1])
+    : sceneAfterDotMatch
+      ? Number(sceneAfterDotMatch[1])
+      : sceneAfterWordMatch
+        ? Number(sceneAfterWordMatch[1])
+        : undefined;
+
+  return { act, scene };
 }
 
-function extractCharacterHint(value: string): string | null {
-  const match = value.match(/\(([^)]+)\)\s*$/);
-  if (!match) return null;
-  return normalizeTitle(match[1]);
+function extractSceneLocationHint(value: string): string | null {
+  const parenMatch = value.match(/\(([^)]+)\)\s*$/);
+  if (parenMatch) return normalizeTitle(parenMatch[1]);
+
+  const dashMatch = value.match(/[—–-]\s*([^—–-]+?)\s*$/);
+  if (dashMatch) return normalizeTitle(dashMatch[1]);
+
+  return null;
+}
+
+function actSceneNumbersConflict(
+  sceneKey: { act?: number; scene?: number },
+  anchorKey: { act?: number; scene?: number }
+): boolean {
+  if (
+    sceneKey.act !== undefined &&
+    anchorKey.act !== undefined &&
+    sceneKey.act !== anchorKey.act
+  ) {
+    return true;
+  }
+  if (
+    sceneKey.scene !== undefined &&
+    anchorKey.scene !== undefined &&
+    sceneKey.scene !== anchorKey.scene
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function characterHintScore(sceneHint: string | null, anchorHint: string | null): number {
@@ -261,9 +310,12 @@ function scoreSceneHeadingMatch(sceneTitle: string, anchorText: string): number 
 
   const sceneKey = parseActScene(sceneTitle);
   const anchorKey = parseActScene(anchorText);
-  const sceneChars = extractCharacterHint(sceneTitle);
-  const anchorChars = extractCharacterHint(anchorText);
-  const charScore = characterHintScore(sceneChars, anchorChars);
+  if (actSceneNumbersConflict(sceneKey, anchorKey)) return 0;
+
+  const charScore = characterHintScore(
+    extractSceneLocationHint(sceneTitle),
+    extractSceneLocationHint(anchorText)
+  );
 
   if (
     sceneKey.act &&
@@ -275,9 +327,12 @@ function scoreSceneHeadingMatch(sceneTitle: string, anchorText: string): number 
   }
 
   if (sceneKey.scene && anchorKey.scene && sceneKey.scene === anchorKey.scene) {
+    if (sceneKey.act !== undefined && anchorKey.act !== undefined && sceneKey.act !== anchorKey.act) {
+      return 0;
+    }
     if (charScore >= 80) return 98;
     if (charScore > 0) return 0;
-    if (!anchorKey.act) return 80;
+    if (sceneKey.act === undefined && anchorKey.act === undefined) return 80;
   }
 
   if (charScore >= 100) return 92;

@@ -21,6 +21,7 @@ import { Modal } from './Modal';
 import { SceneScriptLink } from './SceneScriptLink';
 import { addMinutes, formatDuration, timeToMinutes } from '../utils/time';
 import { DecidedNotesDisplay } from './DecidedNotesDisplay';
+import { PlayIcon } from './PlayIcon';
 import {
   appendScheduleFromRehearsalItems,
   buildScheduleFromRehearsalItems,
@@ -450,9 +451,13 @@ export function RehearsalScheduleEditor({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-2 select-none">
                         <div className="flex items-start gap-2.5">
-                          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gold/30 bg-surface">
-                            <Icon size={12} className="text-gold" />
-                          </div>
+                          {blockPlay && (block.type === 'scene' || block.type === 'etude') ? (
+                            <PlayIcon play={blockPlay} size="sm" className="mt-0.5 shrink-0" />
+                          ) : (
+                            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gold/30 bg-surface">
+                              <Icon size={12} className="text-gold" />
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="text-base font-semibold leading-snug text-white">{block.title}</p>
                             {blockPlay && block.type === 'etude' && (

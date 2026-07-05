@@ -1,6 +1,7 @@
 import type { Play, Scene } from '../types/index.js';
 import {
   extractLearnTextFromDocxParagraphs,
+  findParagraphIndexByFileAnchorId,
   htmlToDocxParagraphs,
   paragraphsToLearnScriptText,
 } from '../src/utils/docxLearnText.js';
@@ -44,14 +45,21 @@ export async function resolveSceneBodyFromScriptFile(
 
     const { anchors } = await parseScriptFileBuffer(buffer, record.originalName, record.mimeType);
     const match = matchScenesToDocAnchors([scene], anchors).find(
-      (item) => item.sceneId === scene.id
+      (item) => item.sceneId === scene.id && item.score >= 70
     );
     if (match) {
-      const normalizedAnchor = match.anchorText.trim().toLowerCase();
-      const headingIndex = paragraphs.findIndex((paragraph) => {
-        const plain = paragraph.plainText.trim().toLowerCase();
-        return plain === normalizedAnchor || plain.includes(normalizedAnchor);
-      });
+      let headingIndex = scene.scriptAnchor?.id.startsWith('file-')
+        ? findParagraphIndexByFileAnchorId(paragraphs, scene.scriptAnchor.id)
+        : -1;
+      if (headingIndex < 0 && match.anchor.id.startsWith('file-')) {
+        headingIndex = findParagraphIndexByFileAnchorId(paragraphs, match.anchor.id);
+      }
+      if (headingIndex < 0) {
+        const normalizedAnchor = match.anchorText.trim().toLowerCase();
+        headingIndex = paragraphs.findIndex(
+          (paragraph) => paragraph.plainText.trim().toLowerCase() === normalizedAnchor
+        );
+      }
       if (headingIndex >= 0) {
         const bodyParagraphs = [];
         for (let index = headingIndex + 1; index < paragraphs.length; index += 1) {
@@ -76,7 +84,7 @@ export async function resolveSceneBodyFromScriptFile(
   let sceneForExtraction = scene;
   if (!scene.scriptAnchor?.id.startsWith('file-')) {
     const match = matchScenesToDocAnchors([scene], anchors).find(
-      (item) => item.sceneId === scene.id
+      (item) => item.sceneId === scene.id && item.score >= 70
     );
     if (!match) return null;
     sceneForExtraction = { ...scene, scriptAnchor: match.anchor };
@@ -86,7 +94,7 @@ export async function resolveSceneBodyFromScriptFile(
     extractSceneBodyTextsFromPlainText(text, anchors, [sceneForExtraction]).get(scene.id) ?? '';
   if (!body.trim()) {
     const match = matchScenesToDocAnchors([scene], anchors).find(
-      (item) => item.sceneId === scene.id
+      (item) => item.sceneId === scene.id && item.score >= 70
     );
     if (match) {
       body =

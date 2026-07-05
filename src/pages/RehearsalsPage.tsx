@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Plus, MapPin, Clock, Sparkles, AlertTriangle } from 'lucide-react';
+import { Plus, MapPin, Clock, Sparkles, AlertTriangle, Wand2, X } from 'lucide-react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import {
   getActiveActors,
@@ -38,6 +38,12 @@ import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { getArchivedPlaysInRehearsal, rehearsalInvolvesActor, rehearsalInvolvesPlay } from '../utils/rehearsalPlays';
 import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
 import { getRehearsalEventLabel, getRehearsalPlayMarkers } from '../utils/rehearsalCalendarMarkers';
+import {
+  createBlockFromEtude,
+  recalculateScheduleStartTimes,
+} from '../utils/schedulePlan';
+import { formatDuration } from '../utils/time';
+import type { ScheduleBlock } from '../types';
 
 const emptyRehearsal = (date: string, theaterId?: string): Omit<Rehearsal, 'id'> => ({
   theaterId,
@@ -198,6 +204,44 @@ export function RehearsalsPage() {
       taskIds: f.taskIds.includes(taskId)
         ? f.taskIds.filter((id) => id !== taskId)
         : [...f.taskIds, taskId],
+    }));
+  };
+
+  const createEtudes = useMemo(
+    () => form.schedule.filter((block) => block.type === 'etude'),
+    [form.schedule]
+  );
+
+  const addEtude = () => {
+    const etude = createBlockFromEtude({
+      title: 'Этюд',
+      playId: activePlay?.id,
+    });
+    setForm((current) => ({
+      ...current,
+      schedule: recalculateScheduleStartTimes([...current.schedule, etude], current.startTime),
+    }));
+  };
+
+  const removeEtude = (blockId: string) => {
+    setForm((current) => ({
+      ...current,
+      schedule: recalculateScheduleStartTimes(
+        current.schedule.filter((block) => block.id !== blockId),
+        current.startTime
+      ),
+    }));
+  };
+
+  const updateEtude = (blockId: string, patch: Partial<ScheduleBlock>) => {
+    setForm((current) => ({
+      ...current,
+      schedule: recalculateScheduleStartTimes(
+        current.schedule.map((block) =>
+          block.id === blockId ? { ...block, ...patch } : block
+        ),
+        current.startTime
+      ),
     }));
   };
 
@@ -568,6 +612,56 @@ export function RehearsalsPage() {
               defaultPlayId={activePlay?.id ?? state.activePlayId}
             />
           )}
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-muted">Этюды и эксперименты</p>
+              <Button type="button" variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={addEtude}>
+                <Wand2 size={14} />
+                Добавить этюд
+              </Button>
+            </div>
+            {createEtudes.length > 0 && (
+              <div className="space-y-2 rounded-xl border border-gold/10 bg-background/20 p-3">
+                {createEtudes.map((etude) => (
+                  <div
+                    key={etude.id}
+                    className="flex flex-wrap items-end gap-2 rounded-lg border border-gold/10 bg-surface/40 p-3"
+                  >
+                    <div className="min-w-[10rem] flex-1">
+                      <Input
+                        label="Название"
+                        value={etude.title}
+                        onChange={(e) => updateEtude(etude.id, { title: e.target.value })}
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Input
+                        label="Минут"
+                        type="number"
+                        min={5}
+                        value={etude.durationMinutes}
+                        onChange={(e) =>
+                          updateEtude(etude.id, {
+                            durationMinutes: Number(e.target.value) || 30,
+                          })
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeEtude(etude.id)}
+                      className="mb-1 rounded-lg p-2 text-muted transition-colors hover:bg-white/5 hover:text-white"
+                      aria-label="Удалить этюд"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="w-full text-xs text-muted">{formatDuration(etude.durationMinutes)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {theaterTasks.filter((t) => !t.completed).length > 0 && (
             <div className="space-y-2">

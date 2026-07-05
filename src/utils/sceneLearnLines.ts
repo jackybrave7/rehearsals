@@ -127,6 +127,19 @@ function parseSingleLine(
 } {
   const standaloneDirection = trimmed.match(/^\(([\s\S]+)\)$/);
   if (standaloneDirection) {
+    const inner = standaloneDirection[1].trim();
+    if (CHARACTER_DIALOGUE_INLINE_RE.test(inner) || CHARACTER_CUE_LINE_RE.test(inner)) {
+      return parseSingleLine(
+        inner,
+        lineId,
+        result,
+        playRoles,
+        playId,
+        actorRoleIds,
+        pendingCue,
+        pendingDirection
+      );
+    }
     pushLearnLine(result, lineId, trimmed, 'direction', actorRoleIds);
     return { pendingCue: null, pendingDirection: true };
   }

@@ -113,6 +113,21 @@ export function createBlockFromEtude(options: {
   };
 }
 
+export const DEFAULT_PRODUCTION_BREAK_MINUTES = 15;
+
+export function createBlockFromBreak(
+  title = 'Перерыв',
+  durationMinutes = DEFAULT_PRODUCTION_BREAK_MINUTES
+): ScheduleBlock {
+  return {
+    id: generateId(),
+    startTime: '00:00',
+    durationMinutes,
+    type: 'break',
+    title,
+  };
+}
+
 export type PlanGenerationMode = 'chronology' | 'by-actors' | 'by-productions';
 
 export const PLAN_GENERATION_MODE_LABELS: Record<PlanGenerationMode, string> = {
@@ -224,10 +239,21 @@ export function buildScheduleFromRehearsalItems(
   const orderedSceneIds = orderSceneIdsForPlan(sceneIds, scenes, mode, actorIdsBySceneId);
 
   const blocks: ScheduleBlock[] = [];
+  let lastPlayId: string | undefined;
 
   for (const sceneId of orderedSceneIds) {
     const scene = sceneById.get(sceneId);
-    if (scene) blocks.push(createBlockFromScene(scene));
+    if (!scene) continue;
+    if (
+      mode === 'by-productions' &&
+      lastPlayId &&
+      scene.playId !== lastPlayId &&
+      blocks.length > 0
+    ) {
+      blocks.push(createBlockFromBreak());
+    }
+    blocks.push(createBlockFromScene(scene));
+    lastPlayId = scene.playId;
   }
 
   for (const taskId of taskIds) {

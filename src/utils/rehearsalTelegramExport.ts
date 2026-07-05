@@ -5,10 +5,10 @@ import { resolveSceneScriptUrl } from './googleDocs';
 import { getTelegramSceneHeading, getTelegramSceneLocation, getSceneCharacterNames, getSceneShortLabel } from './sceneLabels';
 import { formatPerformanceLabel, getActorAssignments } from '../store/selectors';
 import { getParticipatingActorIds, resolveRehearsalPerformanceId } from './rehearsalActors';
-import { getRehearsalPlayTitles, getScenePlayId } from './rehearsalPlays';
+import { getRehearsalPlayTitles, getScenePlayId, getRehearsalAllSceneIds } from './rehearsalPlays';
 import { resolveRehearsalLocation } from './venue';
 import { addMinutes, formatDuration } from './time';
-import { getActorSceneNumbersInRehearsal, getActorScenesInRehearsal } from './actorProfile';
+import { getActorScenesInRehearsal } from './actorProfile';
 import { groupActorScenesByPlay } from './actorMyPage';
 
 const blockTypeLabels: Record<ScheduleBlock['type'], string> = {
@@ -81,6 +81,72 @@ function formatSceneLineCore(
     : escapeHtml(core);
 
   return { plain: core, html: linkedHtml };
+}
+
+function formatSceneNumberRanges(numbers: number[]): string {
+  if (numbers.length === 0) return '';
+  if (numbers.length === 1) return String(numbers[0]);
+
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let rangeStart = sorted[0];
+  let rangeEnd = sorted[0];
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (sorted[index] === rangeEnd + 1) {
+      rangeEnd = sorted[index];
+    } else {
+      parts.push(rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}–${rangeEnd}`);
+      rangeStart = sorted[index];
+      rangeEnd = sorted[index];
+    }
+  }
+  parts.push(rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}–${rangeEnd}`);
+  return parts.join(', ');
+}
+
+function formatPlayScenesLabel(numbers: number[]): string {
+  if (numbers.length === 0) return '';
+  const ranges = formatSceneNumberRanges(numbers);
+  return numbers.length === 1 ? `сцена ${ranges}` : `сцены ${ranges}`;
+}
+
+function buildPlanSummaryLine(state: AppState, rehearsal: Rehearsal): string | null {
+  const sceneIds = getRehearsalAllSceneIds(rehearsal);
+  const scenesByPlay = new Map<string, number[]>();
+  const playOrder: string[] = [];
+
+  for (const sceneId of sceneIds) {
+    const scene = state.scenes.find((item) => item.id === sceneId);
+    if (!scene) continue;
+    const playId = scene.playId;
+    if (!scenesByPlay.has(playId)) {
+      scenesByPlay.set(playId, []);
+      playOrder.push(playId);
+    }
+    scenesByPlay.get(playId)!.push(scene.number);
+  }
+
+  const parts: string[] = [];
+
+  for (const playId of playOrder) {
+    const play = state.plays.find((item) => item.id === playId);
+    const numbers = scenesByPlay.get(playId) ?? [];
+    if (numbers.length === 0) continue;
+    const title = (play?.title ?? 'Без постановки').toUpperCase();
+    parts.push(`${title}: ${formatPlayScenesLabel(numbers)}`);
+  }
+
+  const etudeTitles = rehearsal.schedule
+    .filter((block) => block.type === 'etude')
+    .map((block) => block.title.trim())
+    .filter(Boolean);
+
+  if (etudeTitles.length > 0) {
+    parts.push(`ЭТЮДЫ: ${etudeTitles.join(', ')}`);
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 function formatBlockPrefix(blockNumber: number): string {
@@ -210,6 +276,15 @@ function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
     htmlLines.push(escapeHtml(`🎬 ${formatPerformanceLabel(performance)}`));
   }
 
+  const sortedSchedule = [...rehearsal.schedule].sort((a, b) =>
+    a.startTime.localeCompare(b.startTime)
+  );
+  const planSummary = buildPlanSummaryLine(state, rehearsal);
+  if (planSummary) {
+    plainLines.push(planSummary);
+    htmlLines.push(escapeHtml(planSummary));
+  }
+
   const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
   const participatingActors = getParticipatingActorIds(state, rehearsal)
     .map((id) => state.actors.find((a) => a.id === id))
@@ -233,9 +308,6 @@ function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
     }
   }
 
-  const sortedSchedule = [...rehearsal.schedule].sort((a, b) =>
-    a.startTime.localeCompare(b.startTime)
-  );
   const groupPlanByPlay = countDistinctPlanPlays(state, sortedSchedule) > 1;
 
   if (sortedSchedule.length > 0) {
@@ -349,11 +421,21 @@ export function buildActorReminderTelegramBotMessage(
     ? `<b>${escapeHtml(actor.name)}</b>, напоминание о репетиции:\n\n`
     : `<b>Напоминание о репетиции</b>\n\n`;
 
-  const sceneNumbers = getActorSceneNumbersInRehearsal(state, rehearsal, actorId);
-  const scenesLine =
-    sceneNumbers.length > 0 ? `\n\nТвои сцены: ${sceneNumbers.join(', ')}` : '';
+  const myScenes = getActorScenesInRehearsal(state, rehearsal, actorId);
+  const sceneLines: string[] = [];
+  if (myScenes.length > 0) {
+    sceneLines.push('', '<b>Твои сцены:</b>');
+    for (const { play, scenes } of groupActorScenesByPlay(state, myScenes)) {
+      if (play) {
+        sceneLines.push(`<i>«${escapeHtml(play.title)}»</i>`);
+      }
+      for (const scene of scenes) {
+        sceneLines.push(`• ${escapeHtml(getSceneShortLabel(scene))}`);
+      }
+    }
+  }
 
-  return `${greeting}${body}${scenesLine}`;
+  return `${greeting}${body}${sceneLines.join('\n')}`;
 }
 
 export function buildActorPlanTelegramBotMessage(

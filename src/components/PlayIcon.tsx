@@ -3,7 +3,7 @@ import { resolveAssetUrl } from '../utils/fileUrls';
 import { resolvePlayIconColor, resolvePlayInitial } from '../utils/playIcon';
 
 type PlayIconProps = {
-  play: Pick<Play, 'title' | 'iconUrl' | 'iconColor'>;
+  play: Pick<Play, 'title' | 'iconUrl' | 'iconColor'> & { id?: string };
   size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
 };

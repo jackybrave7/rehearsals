@@ -9,6 +9,7 @@ import {
 import { buildPlayReadinessReport } from '../utils/sceneReadiness';
 import { Select } from './FormFields';
 import { ScenePicker } from './ScenePicker';
+import { PlayIcon } from './PlayIcon';
 
 interface TheaterScenePickerProps {
   plays: Play[];
@@ -75,6 +76,8 @@ export function TheaterScenePicker({
     return selectedIds.filter((id) => !browseIds.has(id)).length;
   }, [selectedIds, browseScenes]);
 
+  const browsePlay = playsWithScenes.find((play) => play.id === browsePlayId);
+
   if (playsWithScenes.length === 0) {
     return <p className="text-sm text-muted">Нет сцен в театре. Добавьте сцены в постановках.</p>;
   }
@@ -82,16 +85,19 @@ export function TheaterScenePicker({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-[12rem] flex-1">
-          <Select
-            label="Постановка"
-            value={browsePlayId}
-            onChange={(e) => setBrowsePlayId(e.target.value)}
-            options={playsWithScenes.map((play) => ({
-              value: play.id,
-              label: play.archivedAt ? `«${play.title}» (архив)` : `«${play.title}»`,
-            }))}
-          />
+        <div className="flex min-w-[12rem] flex-1 items-end gap-2">
+          {browsePlay && <PlayIcon play={browsePlay} size="sm" className="mb-2 shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <Select
+              label="Постановка"
+              value={browsePlayId}
+              onChange={(e) => setBrowsePlayId(e.target.value)}
+              options={playsWithScenes.map((play) => ({
+                value: play.id,
+                label: play.archivedAt ? `«${play.title}» (архив)` : `«${play.title}»`,
+              }))}
+            />
+          </div>
         </div>
         {selectedIds.length > 0 && (
           <p className="pb-2 text-xs text-muted">

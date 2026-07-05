@@ -9,7 +9,7 @@ import { generateId } from '../utils/id';
 import { formatFileSize } from '../utils/file';
 import { ImageCropField } from '../components/ImageCropField';
 import { uploadFile } from '../api/files';
-import { resolvePlayScriptUrl } from '../utils/fileUrls';
+import { resolvePlayScriptUrl, resolveAssetUrl } from '../utils/fileUrls';
 import type { Play } from '../types';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { Button } from '../components/Button';
@@ -59,6 +59,7 @@ export function PlayPage() {
   const [form, setForm] = useState(emptyPlay());
   const [fileError, setFileError] = useState<string | null>(null);
   const [iconError, setIconError] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const [viewingPlayId, setViewingPlayId] = useState<string | null>(null);
   const theaterPlays = getTheaterPlays(state);
   const activePlays = getActiveTheaterPlays(state);
@@ -80,6 +81,7 @@ export function PlayPage() {
     setForm(emptyPlay());
     setFileError(null);
     setIconError(null);
+    setCoverError(null);
     setModalOpen(true);
   };
 
@@ -91,6 +93,7 @@ export function PlayPage() {
     });
     setFileError(null);
     setIconError(null);
+    setCoverError(null);
     setModalOpen(true);
   };
 
@@ -117,6 +120,31 @@ export function PlayPage() {
       iconUrl: undefined,
     }));
     setIconError(null);
+  };
+
+  const handleCoverCropped = async (file: File) => {
+    setCoverError(null);
+    try {
+      const uploaded = await uploadFile(file);
+      setForm((current) => ({
+        ...current,
+        coverUrl: uploaded.url,
+      }));
+    } catch (error) {
+      setCoverError(
+        error instanceof Error && error.message === 'FILE_TOO_LARGE'
+          ? 'Файл слишком большой. Максимум — 5 МБ.'
+          : 'Не удалось загрузить обложку.'
+      );
+    }
+  };
+
+  const removeCover = () => {
+    setForm((current) => ({
+      ...current,
+      coverUrl: undefined,
+    }));
+    setCoverError(null);
   };
 
   const handleScriptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,9 +351,14 @@ export function PlayPage() {
               (r) => r.playId === play.id && r.kind === 'character'
             ).length;
             const performanceCount = state.performances.filter((p) => p.playId === play.id).length;
+            const coverSrc = resolveAssetUrl(play.coverUrl);
 
             return (
-              <div className="rounded-2xl border border-gold/30 bg-surface/80 p-6">
+              <div className="overflow-hidden rounded-2xl border border-gold/30 bg-surface/80">
+                {coverSrc && (
+                  <img src={coverSrc} alt="" className="aspect-video w-full object-cover" />
+                )}
+                <div className="p-6">
                 {playReadOnly && (
                   <p className="mb-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted">
                     Архивная постановка — только просмотр. Нажмите «Восстановить», чтобы снова редактировать
@@ -417,6 +450,7 @@ export function PlayPage() {
                     Чтобы назначать исполнителей, восстановите постановку из архива.
                   </p>
                 )}
+                </div>
               </div>
             );
           })()}
@@ -472,6 +506,7 @@ export function PlayPage() {
             <div className="flex flex-wrap items-center gap-4">
               <PlayIcon
                 play={{
+                  id: editingId ?? undefined,
                   title: form.title || 'Постановка',
                   iconUrl: form.iconUrl,
                   iconColor: form.iconColor,
@@ -505,13 +540,36 @@ export function PlayPage() {
             {iconError && <p className="text-sm text-red-400">{iconError}</p>}
           </div>
 
-          <Input
-            label="URL обложки"
-            type="url"
-            value={form.coverUrl ?? ''}
-            onChange={(e) => setForm({ ...form, coverUrl: e.target.value || undefined })}
-            placeholder="https://…"
-          />
+          <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-4">
+            <p className="text-sm font-medium text-white">Обложка постановки</p>
+            <p className="text-xs text-muted">
+              Прямоугольное изображение для карточки на странице «Все постановки»
+            </p>
+            {form.coverUrl && resolveAssetUrl(form.coverUrl) && (
+              <img
+                src={resolveAssetUrl(form.coverUrl)!}
+                alt=""
+                className="aspect-video w-full max-w-md rounded-xl object-cover"
+              />
+            )}
+            <div className="flex flex-wrap gap-2">
+              <ImageCropField
+                title="Обложка постановки"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gold/25 px-3 py-2 text-sm text-gold-light transition-colors hover:border-gold/40 hover:bg-gold/5"
+                onPickError={setCoverError}
+                onCropped={handleCoverCropped}
+              >
+                <Upload size={16} />
+                {form.coverUrl ? 'Заменить обложку' : 'Загрузить обложку'}
+              </ImageCropField>
+              {form.coverUrl && (
+                <Button variant="secondary" className="!px-3 !py-2 text-sm" onClick={removeCover}>
+                  Убрать
+                </Button>
+              )}
+            </div>
+            {coverError && <p className="text-sm text-red-400">{coverError}</p>}
+          </div>
 
           <Input
             label="Ссылка на онлайн-документ"

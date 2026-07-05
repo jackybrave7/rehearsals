@@ -9,6 +9,7 @@ import { getPremiereBadgeTone, isPremierePerformance } from '../utils/premiere';
 import { appPaths } from '../navigation/appPaths';
 import { useDesign } from '../store/DesignContext';
 import { PlayIcon } from '../components/PlayIcon';
+import { resolveAssetUrl } from '../utils/fileUrls';
 
 function premiereBadgeClass(tone: ReturnType<typeof getPremiereBadgeTone>): string {
   if (tone === 'urgent') return 'bg-red-500/15 text-red-200 ring-1 ring-red-500/30';
@@ -26,10 +27,11 @@ function PlayOverviewCard({
   const { isZen } = useDesign();
   const cardClass = isZen ? 'zen-card p-5' : 'rounded-2xl border border-gold/10 bg-surface/40 p-5';
   const { play, premiere, scenes, nextRehearsal, rehearsalsCount, openTasks, staleScenes } = overview;
+  const coverSrc = resolveAssetUrl(play.coverUrl);
 
   return (
     <article
-      className={`${cardClass} flex cursor-pointer flex-col gap-4 transition-colors hover:border-gold/25`}
+      className={`${cardClass} flex cursor-pointer flex-col gap-4 overflow-hidden transition-colors hover:border-gold/25`}
       onClick={() => onOpenPlay(play.id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -40,6 +42,9 @@ function PlayOverviewCard({
       role="button"
       tabIndex={0}
     >
+      {coverSrc && (
+        <img src={coverSrc} alt="" className="-mx-5 -mt-5 mb-1 aspect-video w-[calc(100%+2.5rem)] object-cover" />
+      )}
       <div className="flex items-start gap-3">
         <PlayIcon play={play} size="md" className="shrink-0" />
         <div className="min-w-0 space-y-1">

@@ -48,13 +48,29 @@ export function isEntirelyRemarkHtml(html: string): boolean {
 
 function wrapItalicInner(text: string): string {
   const normalized = normalizeSpaces(stripHtmlTags(text));
-  return normalized ? `(${normalized})` : '';
+  if (!normalized) return '';
+  if (/^\([^)]+\)$/.test(normalized)) return normalized;
+  return `(${normalized})`;
 }
 
 export function convertEmphasisHtmlToLearnText(html: string): string {
   let converted = html;
-  converted = converted.replace(EMPHASIS_TAG_RE, (match) => wrapItalicInner(match));
-  converted = converted.replace(ITALIC_SPAN_RE, (match) => wrapItalicInner(match));
+  converted = converted.replace(EMPHASIS_TAG_RE, (match) => {
+    const inner = normalizeSpaces(stripHtmlTags(match));
+    if (!inner) return '';
+    if (CHARACTER_DIALOGUE_INLINE_RE.test(inner) || CHARACTER_CUE_LINE_RE.test(inner)) {
+      return inner;
+    }
+    return wrapItalicInner(match);
+  });
+  converted = converted.replace(ITALIC_SPAN_RE, (match) => {
+    const inner = normalizeSpaces(stripHtmlTags(match));
+    if (!inner) return '';
+    if (CHARACTER_DIALOGUE_INLINE_RE.test(inner) || CHARACTER_CUE_LINE_RE.test(inner)) {
+      return inner;
+    }
+    return wrapItalicInner(match);
+  });
   converted = stripHtmlTags(converted).replace(/\s+/g, ' ').trim();
   return converted;
 }
@@ -63,9 +79,28 @@ function looksLikeDialogueParagraph(paragraph: DocxScriptParagraph): boolean {
   const plainText = paragraph.plainText.trim();
   if (CHARACTER_DIALOGUE_INLINE_RE.test(plainText)) return true;
   if (CHARACTER_CUE_LINE_RE.test(plainText)) return true;
-  if (/^<strong\b[^>]*>[\s\S]*?<\/strong>\s*[:.]/i.test(paragraph.html.trim())) return true;
-  if (/^<b\b[^>]*>[\s\S]*?<\/b>\s*[:.]/i.test(paragraph.html.trim())) return true;
+  if (/^<(?:em|i)\b[^>]*>[\s\S]*<\/(?:em|i)>\s*[:.]/i.test(paragraph.html.trim())) return true;
+  if (/^<strong\b[^>]*>[\s\S]*?<\/strong>(?:\s*<(?:em|i)\b[^>]*>[\s\S]*?<\/(?:em|i)>)?\s*[:.]/i.test(paragraph.html.trim())) {
+    return true;
+  }
+  if (/^<b\b[^>]*>[\s\S]*?<\/b>(?:\s*<(?:em|i)\b[^>]*>[\s\S]*?<\/(?:em|i)>)?\s*[:.]/i.test(paragraph.html.trim())) {
+    return true;
+  }
   return false;
+}
+
+function unwrapOuterRemarkFromDialogue(line: string, plainText: string): string {
+  const trimmed = line.trim();
+  if (!/^\([\s\S]+\)$/.test(trimmed)) return line;
+  const inner = trimmed.slice(1, -1).trim();
+  if (
+    CHARACTER_DIALOGUE_INLINE_RE.test(inner) ||
+    CHARACTER_DIALOGUE_INLINE_RE.test(plainText.trim()) ||
+    CHARACTER_CUE_LINE_RE.test(inner)
+  ) {
+    return inner;
+  }
+  return line;
 }
 
 function toRemarkLine(text: string): string {
@@ -79,7 +114,9 @@ export function docxParagraphToLearnLine(paragraph: DocxScriptParagraph): string
   if (!paragraph.plainText.trim()) return null;
 
   if (looksLikeDialogueParagraph(paragraph)) {
-    return convertEmphasisHtmlToLearnText(paragraph.html) || normalizeSpaces(paragraph.plainText);
+    const plain = normalizeSpaces(paragraph.plainText);
+    const converted = convertEmphasisHtmlToLearnText(paragraph.html) || plain;
+    return unwrapOuterRemarkFromDialogue(converted, plain);
   }
 
   return toRemarkLine(paragraph.plainText);
@@ -150,19 +187,23 @@ export function htmlToDocxParagraphs(html: string): DocxScriptParagraph[] {
   });
 }
 
+function isParagraphSceneHeading(paragraph: DocxScriptParagraph): boolean {
+  const lower = paragraph.plainText.toLowerCase();
+  if (lower === 'персонажи' || lower === 'действующие лица') return false;
+
+  return (
+    Boolean(paragraph.isHeading) ||
+    isImportableSceneHeading(paragraph.plainText) ||
+    /\d+\s*акт\b.*\d+\s*сцен/i.test(paragraph.plainText)
+  );
+}
+
 function buildHeadingAnchorsFromParagraphs(paragraphs: DocxScriptParagraph[]): DocTextAnchor[] {
   const anchors: DocTextAnchor[] = [];
   let index = 0;
 
   for (const paragraph of paragraphs) {
-    const lower = paragraph.plainText.toLowerCase();
-    if (lower === 'персонажи' || lower === 'действующие лица') continue;
-
-    const isSceneHeading =
-      paragraph.isHeading ||
-      isImportableSceneHeading(paragraph.plainText) ||
-      /\d+\s*акт\b.*\d+\s*сцен/i.test(paragraph.plainText);
-    if (!isSceneHeading) continue;
+    if (!isParagraphSceneHeading(paragraph)) continue;
 
     anchors.push({
       type: 'heading',
@@ -176,31 +217,58 @@ function buildHeadingAnchorsFromParagraphs(paragraphs: DocxScriptParagraph[]): D
   return anchors;
 }
 
+export function findParagraphIndexByFileAnchorId(
+  paragraphs: DocxScriptParagraph[],
+  anchorId: string
+): number {
+  if (!anchorId.startsWith('file-')) return -1;
+
+  const ordinal = Number.parseInt(anchorId.slice('file-'.length), 10);
+  if (!Number.isFinite(ordinal) || ordinal < 0) return -1;
+
+  let headingCount = 0;
+  for (let i = 0; i < paragraphs.length; i += 1) {
+    if (!isParagraphSceneHeading(paragraphs[i])) continue;
+    if (headingCount === ordinal) return i;
+    headingCount += 1;
+  }
+
+  return -1;
+}
+
 function findHeadingParagraphIndex(
   paragraphs: DocxScriptParagraph[],
   anchorText: string
 ): number {
   const normalizedAnchor = normalizeSpaces(anchorText).toLowerCase();
-  const exact = paragraphs.findIndex(
+  return paragraphs.findIndex(
     (paragraph) => normalizeSpaces(paragraph.plainText).toLowerCase() === normalizedAnchor
   );
-  if (exact >= 0) return exact;
-
-  return paragraphs.findIndex((paragraph) => {
-    const plain = normalizeSpaces(paragraph.plainText).toLowerCase();
-    return plain.includes(normalizedAnchor) || normalizedAnchor.includes(plain);
-  });
 }
 
 export function extractLearnTextFromDocxParagraphs(
   paragraphs: DocxScriptParagraph[],
   scene: Scene
 ): string | null {
-  const anchors = buildHeadingAnchorsFromParagraphs(paragraphs);
-  const match = matchScenesToDocAnchors([scene], anchors).find((item) => item.sceneId === scene.id);
-  if (!match) return null;
+  const storedAnchorId = scene.scriptAnchor?.id;
+  let headingIndex =
+    storedAnchorId?.startsWith('file-')
+      ? findParagraphIndexByFileAnchorId(paragraphs, storedAnchorId)
+      : -1;
 
-  const headingIndex = findHeadingParagraphIndex(paragraphs, match.anchorText);
+  if (headingIndex < 0) {
+    const anchors = buildHeadingAnchorsFromParagraphs(paragraphs);
+    const match = matchScenesToDocAnchors([scene], anchors).find(
+      (item) => item.sceneId === scene.id && item.score >= 70
+    );
+    if (!match) return null;
+
+    headingIndex = findParagraphIndexByFileAnchorId(paragraphs, match.anchor.id);
+    if (headingIndex < 0) {
+      headingIndex = findHeadingParagraphIndex(paragraphs, match.anchorText);
+    }
+  }
+
   if (headingIndex < 0) return null;
 
   const bodyParagraphs: DocxScriptParagraph[] = [];
