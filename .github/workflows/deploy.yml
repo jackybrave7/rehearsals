@@ -1,0 +1,55 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'deploy — полный деплой (git pull + build + restart); restart — только перезапуск API'
+        type: choice
+        default: deploy
+        options:
+          - deploy
+          - restart
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H 45.153.71.162 >> ~/.ssh/known_hosts
+
+      - name: Restart API only
+        if: inputs.action == 'restart'
+        run: |
+          ssh -i ~/.ssh/vps_key root@45.153.71.162 '
+            set -e
+            echo "--- container status ---"
+            docker ps -a --filter name=rehearsals-api
+            echo "--- last logs before restart ---"
+            docker logs --tail 50 rehearsals-api 2>&1 || true
+            docker restart rehearsals-api
+            echo "--- waiting for API ---"
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if curl -sf http://127.0.0.1:3001/api/health; then echo; echo OK; exit 0; fi
+              sleep 5
+            done
+            echo "API did not come up; recent logs:"
+            docker logs --tail 100 rehearsals-api 2>&1 || true
+            exit 1
+          '
+
+      - name: Full deploy
+        if: inputs.action == 'deploy'
+        run: |
+          scp -i ~/.ssh/vps_key deploy/remote-deploy.sh root@45.153.71.162:/tmp/rehearsals-deploy.sh
+          ssh -i ~/.ssh/vps_key root@45.153.71.162 "tr -d '\r' < /tmp/rehearsals-deploy.sh | bash -l -s"
