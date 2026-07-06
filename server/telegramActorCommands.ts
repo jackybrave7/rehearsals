@@ -14,7 +14,7 @@ import { formatNotesTelegramHtml } from '../src/utils/rehearsalActorNotes.js';
 import { buildActorPlanTelegramBotMessage } from '../src/utils/rehearsalTelegramExport.js';
 import { getExpectedActorIds } from '../src/utils/rehearsalInsights.js';
 import { isRehearsalPast } from '../src/utils/rehearsalSort.js';
-import { rsvpLabels } from '../src/utils/rehearsalRsvp.js';
+import { buildRsvpTelegramKeyboard, rsvpLabels } from '../src/utils/rehearsalRsvp.js';
 import type { RsvpStatus } from '../src/types/index.js';
 
 const RSVP_STATUSES = new Set<RsvpStatus>(['confirmed', 'declined', 'late']);
@@ -277,6 +277,45 @@ export async function handleTelegramNoteAckCallback(
 
   await answerTelegramCallbackQuery(callbackQueryId, 'Отмечено как учтено', token);
   console.log(`[telegram] note_ack from actor ${actor.id} for note ${noteId}`);
+  return true;
+}
+
+export async function handleTelegramRsvpMenuCallback(
+  db: AppDatabase,
+  callbackQueryId: string,
+  chatId: string,
+  data: string,
+  token: string
+): Promise<boolean> {
+  const match = data.match(/^rsvp_menu:([^:]+)$/);
+  if (!match) return false;
+
+  const rehearsalId = match[1];
+  const actor = findLinkedActorByChatId(db, chatId);
+  if (!actor) {
+    await answerTelegramCallbackQuery(
+      callbackQueryId,
+      'Сначала привяжите Telegram в профиле участника',
+      token
+    );
+    return true;
+  }
+
+  const rehearsal = db
+    .prepare(`SELECT id FROM rehearsals WHERE id = ?`)
+    .get(rehearsalId) as { id: string } | undefined;
+  if (!rehearsal) {
+    await answerTelegramCallbackQuery(callbackQueryId, 'Репетиция не найдена', token);
+    return true;
+  }
+
+  await answerTelegramCallbackQuery(callbackQueryId, 'Выберите ответ', token);
+  await sendTelegramMessageWithInlineKeyboard(
+    chatId,
+    '<b>Подтвердите участие</b>\nНажмите кнопку ниже:',
+    buildRsvpTelegramKeyboard(rehearsalId),
+    token
+  );
   return true;
 }
 

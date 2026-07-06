@@ -11,7 +11,7 @@ import { supportMailto } from '../content/pricing';
 import { getShowRehearsalWarnings, getActiveTheater } from '../store/selectors';
 import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
-import { Input } from '../components/FormFields';
+import { Input, Select } from '../components/FormFields';
 import { Button } from '../components/Button';
 import {
   fetchTelegramStatus,
@@ -31,6 +31,11 @@ import {
 } from '../utils/sceneTiming';
 import { appPaths } from '../navigation/appPaths';
 import { pageTitleClass } from '../utils/pageLayout';
+import {
+  DEFAULT_TIMEZONE,
+  TIMEZONE_OPTIONS,
+  resolveTheaterTimezone,
+} from '../utils/timezone';
 
 const options: Array<{
   id: AppDesign;
@@ -64,6 +69,7 @@ export function SettingsPage() {
   const sceneTiming = resolveSceneTimingSettings(state.appMeta);
   const activeTheater = getActiveTheater(state);
   const theaterReminders = resolveTheaterReminderSettings(activeTheater ?? {}, state.appMeta);
+  const theaterTimezone = resolveTheaterTimezone(activeTheater);
   const [tab, setTab] = useState<SettingsTab>('general');
   const [adminRevealOpen, setAdminRevealOpen] = useState(false);
   const [profileName, setProfileName] = useState(user?.name ?? '');
@@ -184,6 +190,14 @@ export function SettingsPage() {
     } finally {
       setTelegramTestPending(false);
     }
+  };
+
+  const updateTheaterTimezone = (timezone: string) => {
+    if (!activeTheater || readOnly) return;
+    dispatch({
+      type: 'UPDATE_THEATER',
+      payload: { ...activeTheater, timezone },
+    });
   };
 
   const updateSceneTiming = (patch: Partial<typeof sceneTiming>) => {
@@ -390,6 +404,37 @@ export function SettingsPage() {
               Выйти
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
+          <Clock size={16} />
+          Часовой пояс
+        </div>
+        <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
+          {!activeTheater ? (
+            <p className="text-sm text-muted">Выберите театр в меню, чтобы задать часовой пояс.</p>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-muted">
+                Время репетиций и авто-напоминания в Telegram считаются в этом поясе. По умолчанию — Москва.
+              </p>
+              <Select
+                label="Часовой пояс театра"
+                value={theaterTimezone}
+                disabled={readOnly}
+                onChange={(event) => updateTheaterTimezone(event.target.value)}
+                options={TIMEZONE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+              />
+              {theaterTimezone === DEFAULT_TIMEZONE && !activeTheater.timezone ? (
+                <p className="text-xs text-muted/80">Используется значение по умолчанию: Москва (UTC+3).</p>
+              ) : null}
+            </>
+          )}
         </div>
       </section>
 

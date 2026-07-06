@@ -73,3 +73,11 @@ export function buildRsvpTelegramKeyboard(rehearsalId: string) {
     ],
   ];
 }
+
+export function buildRsvpChangeTelegramKeyboard(rehearsalId: string) {
+  return [[{ text: '✏️ Изменить ответ', callback_data: `rsvp_menu:${rehearsalId}` }]];
+}
+
+export function formatActorRsvpStatusLine(status: RsvpStatus): string {
+  return `${rsvpShortLabels[status]} ${rsvpLabels[status]}`;
+}

@@ -117,7 +117,7 @@ function ActorCard({
                 {telegramConnected
                   ? 'бот подключён'
                   : telegramUsername
-                    ? `@${telegramUsername}`
+                    ? telegramUsername
                     : 'Telegram не указан'}
               </span>
               <span title="Количество ролей в составе">

@@ -62,7 +62,8 @@ export function ActorTelegramBotLink({
         </p>
       ) : (
         <p className="text-xs text-muted">
-          Участник должен открыть ссылку и нажать «Start» в боте @{botUsername}
+          Участник должен открыть ссылку и нажать «Start» в боте @{botUsername}. Если у него несколько
+          театров с одним email — достаточно одной активации.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">

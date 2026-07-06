@@ -9,7 +9,9 @@ import {
   resolveTheaterReminderSettings,
   isReminderTypeDue,
   isRehearsalInFuture,
+  resolveReminderUtcOffsetHours,
 } from '../src/utils/reminders.js';
+import { resolveTheaterTimezone, getTimezoneLabel } from '../src/utils/timezone.js';
 
 if (process.argv.includes('--tick')) {
   const { runReminderTick } = await import('../server/reminderScheduler.js');
@@ -31,7 +33,7 @@ console.log('rehearsal:', rehearsal);
 if (!rehearsal) process.exit(0);
 
 const theater = db
-  .prepare(`SELECT id, name, owner_user_id, reminder_settings FROM theaters WHERE id = ?`)
+  .prepare(`SELECT id, name, owner_user_id, reminder_settings, timezone FROM theaters WHERE id = ?`)
   .get(rehearsal.theater_id);
 console.log('theater:', theater);
 
@@ -60,7 +62,10 @@ const state = loadState(db, { userId: ownerId, theaterIds });
 const r = state?.rehearsals.find((item) => item.id === rid);
 const theaterState = state?.theaters.find((item) => item.id === rehearsal.theater_id) ?? {};
 const settings = resolveTheaterReminderSettings(theaterState, state?.appMeta);
+const utcOffsetHours = resolveReminderUtcOffsetHours(theaterState);
 console.log('reminder_settings:', settings);
+console.log('timezone:', resolveTheaterTimezone(theaterState), getTimezoneLabel(resolveTheaterTimezone(theaterState)));
+console.log('utc_offset_hours:', utcOffsetHours);
 
 if (r) {
   console.log('participating:', getParticipatingActorIds(state, r));
@@ -69,8 +74,11 @@ if (r) {
   console.log('remindersSent:', r.remindersSent);
   const now = new Date();
   console.log('now:', now.toISOString());
-  console.log('in_future:', isRehearsalInFuture(rehearsal.date, rehearsal.start_time, now));
+  console.log('in_future:', isRehearsalInFuture(rehearsal.date, rehearsal.start_time, now, utcOffsetHours));
   for (const type of settings.types) {
-    console.log(`due_now_${type}:`, isReminderTypeDue(type, rehearsal.date, rehearsal.start_time, now, 10));
+    console.log(
+      `due_now_${type}:`,
+      isReminderTypeDue(type, rehearsal.date, rehearsal.start_time, now, 10, utcOffsetHours)
+    );
   }
 }

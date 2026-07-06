@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS theaters (
   notes TEXT,
   owner_user_id TEXT REFERENCES users(id),
   telegram_chat_id TEXT,
-  reminder_settings TEXT NOT NULL DEFAULT '{}'
+  reminder_settings TEXT NOT NULL DEFAULT '{}',
+  timezone TEXT
 );
 
 CREATE TABLE IF NOT EXISTS theater_members (

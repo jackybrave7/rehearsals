@@ -4,6 +4,8 @@ export interface Theater {
   id: string;
   name: string;
   notes?: string;
+  /** IANA-часовой пояс театра (напоминания, расписание). По умолчанию Europe/Moscow */
+  timezone?: string;
   /** ID рабочего чата театра в Telegram (группа/канал) */
   telegramChatId?: string;
   /** Авто-напоминания участникам репетиций */

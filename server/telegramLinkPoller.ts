@@ -9,6 +9,7 @@ import {
   handleTelegramBusyCallback,
   handleTelegramNoteAckCallback,
   handleTelegramRsvpCallback,
+  handleTelegramRsvpMenuCallback,
 } from './telegramActorCommands.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,7 +30,9 @@ function writeOffset(offset: number): void {
   fs.writeFileSync(offsetPath, String(offset), 'utf8');
 }
 
-export async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
+import {
+  propagateTelegramChatIdByEmail,
+} from './actorTelegramLink.js';
   const token = getTelegramBotToken();
   if (!token) return 0;
 
@@ -71,6 +74,7 @@ export async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
         const chatIdStr = String(chatId);
         const processed =
           (await handleTelegramRsvpCallback(db, callback.id, chatIdStr, callback.data, token)) ||
+          (await handleTelegramRsvpMenuCallback(db, callback.id, chatIdStr, callback.data, token)) ||
           (await handleTelegramBusyCallback(db, callback.id, chatIdStr, callback.data, token)) ||
           (await handleTelegramNoteAckCallback(db, callback.id, chatIdStr, callback.data, token));
         if (processed) handled += 1;
@@ -86,10 +90,21 @@ export async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
     const linkMatch = text.match(/^\/start(?:@\w+)?\s+link_([0-9a-f-]+)$/i);
     if (linkMatch) {
       const actorId = linkMatch[1];
-      const exists = db.prepare(`SELECT id FROM actors WHERE id = ?`).get(actorId);
-      if (!exists) continue;
+      const actorRow = db
+        .prepare(`SELECT id, email FROM actors WHERE id = ?`)
+        .get(actorId) as { id: string; email: string | null } | undefined;
+      if (!actorRow) continue;
 
       updateActor.run(chatIdStr, actorId);
+
+      const email = actorRow.email?.trim();
+      if (email) {
+        const linkedPeers = propagateTelegramChatIdByEmail(db, actorId, chatIdStr, email);
+        if (linkedPeers > 0) {
+          console.log(`[telegram] propagated chat ${chatIdStr} to ${linkedPeers} actor(s) with email ${email}`);
+        }
+      }
+
       handled += 1;
       console.log(`[telegram] linked actor ${actorId} to chat ${chatIdStr}`);
       continue;

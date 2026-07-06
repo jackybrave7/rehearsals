@@ -9,6 +9,7 @@ import {
   filterStateByTheaters,
   insertStateEntities,
   isEmptyState,
+  loadPreservedActorTelegramChatIds,
   loadState,
   type LoadStateOptions,
   wouldLoseUserData,
@@ -187,6 +188,8 @@ export function saveStateForUser(
     }
   }
 
+  const preservedActorTelegramChatIds = loadPreservedActorTelegramChatIds(db);
+
   const tx = db.transaction(() => {
     for (const theaterId of editableIds) {
       if (!newTheaterIds.has(theaterId) && !canEditTheater(session, theaterId)) continue;
@@ -199,7 +202,11 @@ export function saveStateForUser(
       }
     }
 
-    insertStateEntities(db, editablePayload, { ownerByTheaterId, addOwnerMembershipFor });
+    insertStateEntities(db, editablePayload, {
+      ownerByTheaterId,
+      addOwnerMembershipFor,
+      preservedActorTelegramChatIds,
+    });
 
     db.prepare(
       `INSERT INTO user_settings (user_id, active_theater_id, active_play_id, selected_performance_by_play_id, app_meta)

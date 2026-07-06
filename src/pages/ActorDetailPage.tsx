@@ -106,7 +106,7 @@ export function ActorDetailPage() {
             )}
             {telegramUsername && (
               <p className="flex items-center gap-2">
-                <AtSign size={14} /> @{telegramUsername}
+                <AtSign size={14} /> {telegramUsername}
               </p>
             )}
             {!actor.phone && !actor.email && !telegramUsername && (

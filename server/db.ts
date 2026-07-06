@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { propagateActorTelegramLinksByEmail } from './actorTelegramLink.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -108,6 +109,7 @@ export function getDb(): AppDatabase {
     `ALTER TABLE plays ADD COLUMN script_file_url TEXT`,
     `ALTER TABLE theaters ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE theaters ADD COLUMN reminder_settings TEXT`,
+    `ALTER TABLE theaters ADD COLUMN timezone TEXT`,
     `ALTER TABLE actors ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE users ADD COLUMN subscription_plan TEXT NOT NULL DEFAULT 'free'`,
     `ALTER TABLE plays ADD COLUMN archived_at TEXT`,
@@ -196,6 +198,12 @@ export function getDb(): AppDatabase {
   }
 
   dbInstance = wrapDatabase(db);
+
+  const propagatedLinks = propagateActorTelegramLinksByEmail(dbInstance);
+  if (propagatedLinks > 0) {
+    console.log(`[telegram] propagated bot links to ${propagatedLinks} actor card(s) by email`);
+  }
+
   return dbInstance;
 }
 

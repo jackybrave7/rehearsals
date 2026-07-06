@@ -1,4 +1,5 @@
 import type { AppState, Theater } from '../types';
+import { resolveTheaterUtcOffsetHours } from './timezone';
 
 export type ReminderType = 'day_before' | 'morning_of' | 'two_hours';
 
@@ -30,7 +31,15 @@ export const DEFAULT_THEATER_REMINDER_SETTINGS: TheaterReminderSettings = {
   morningHour: 9,
 };
 
+/** Москва (UTC+3) — значение по умолчанию, если у театра не задан timezone. */
 export const DEFAULT_REHEARSAL_UTC_OFFSET_HOURS = 3;
+
+export function resolveReminderUtcOffsetHours(
+  theater?: Pick<Theater, 'timezone'> | null,
+  date = new Date()
+): number {
+  return resolveTheaterUtcOffsetHours(theater, date);
+}
 
 export const DEFAULT_REMINDER_MORNING_HOUR = 9;
 
@@ -96,6 +105,24 @@ export function hasReminderBeenSent(
     if (kind === 'two_hours' && entry.kind === 'T-2h') return true;
     return reminderSentKey(entry.kind as ReminderType, entry.actorId ?? '') === key;
   });
+}
+
+const REMINDER_KINDS = new Set<RehearsalReminderSent['kind']>([
+  'day_before',
+  'morning_of',
+  'two_hours',
+  'T-24h',
+  'T-2h',
+]);
+
+/** Было ли уже любое напоминание (не RSVP) этому участнику по репетиции. */
+export function hasAnyActorReminderBeenSent(
+  sent: RehearsalReminderSent[] | undefined,
+  actorId: string
+): boolean {
+  return (sent ?? []).some(
+    (entry) => entry.actorId === actorId && REMINDER_KINDS.has(entry.kind)
+  );
 }
 
 export function formatReminderKindLabel(kind: RehearsalReminderSent['kind'], offsetHours?: number): string {

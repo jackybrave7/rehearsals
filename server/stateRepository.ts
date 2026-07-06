@@ -27,6 +27,18 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
+export function loadPreservedActorTelegramChatIds(db: AppDatabase): Map<string, string> {
+  return new Map(
+    (
+      db
+        .prepare(
+          `SELECT id, telegram_chat_id FROM actors WHERE telegram_chat_id IS NOT NULL AND trim(telegram_chat_id) != ''`
+        )
+        .all() as Array<{ id: string; telegram_chat_id: string }>
+    ).map((row) => [row.id, row.telegram_chat_id.trim()])
+  );
+}
+
 function asBool(value: number | null | undefined): boolean {
   return value === 1;
 }
@@ -217,13 +229,14 @@ export function insertStateEntities(
   }
 ): void {
   const insertTheater = db.prepare(
-    `INSERT INTO theaters (id, name, notes, owner_user_id, telegram_chat_id, reminder_settings) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO theaters (id, name, notes, owner_user_id, telegram_chat_id, reminder_settings, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        notes = excluded.notes,
        owner_user_id = COALESCE(theaters.owner_user_id, excluded.owner_user_id),
        telegram_chat_id = excluded.telegram_chat_id,
-       reminder_settings = excluded.reminder_settings`
+       reminder_settings = excluded.reminder_settings,
+       timezone = excluded.timezone`
   );
   for (const theater of state.theaters) {
     const ownerUserId = options?.ownerByTheaterId?.get(theater.id) ?? null;
@@ -233,7 +246,8 @@ export function insertStateEntities(
       theater.notes ?? null,
       ownerUserId,
       theater.telegramChatId?.trim() || null,
-      JSON.stringify(theater.reminderSettings ?? {})
+      JSON.stringify(theater.reminderSettings ?? {}),
+      theater.timezone ?? null
     );
     if (ownerUserId && options?.addOwnerMembershipFor?.has(theater.id)) {
       db.prepare(
@@ -627,6 +641,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       id: String(row.id),
       name: String(row.name),
       notes: (row.notes as string | null) ?? undefined,
+      timezone: (row.timezone as string | null)?.trim() || undefined,
       telegramChatId: (row.telegram_chat_id as string | null)?.trim() || undefined,
       reminderSettings: parseTheaterReminderSettings(row.reminder_settings as string | null | undefined),
     })
@@ -897,15 +912,7 @@ export function saveState(state: AppState, db: AppDatabase = getDb()): void {
   }
 
   const tx = db.transaction(() => {
-    const preservedActorTelegramChatIds = new Map(
-      (
-        db
-          .prepare(
-            `SELECT id, telegram_chat_id FROM actors WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id != ''`
-          )
-          .all() as Array<{ id: string; telegram_chat_id: string }>
-      ).map((row) => [row.id, row.telegram_chat_id])
-    );
+    const preservedActorTelegramChatIds = loadPreservedActorTelegramChatIds(db);
 
     const existingRsvpRows = db
       .prepare(`SELECT id, rsvp FROM rehearsals`)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Check,
   CheckSquare,
@@ -131,19 +131,15 @@ export function RehearsalScheduleEditor({
   const [planGenerationMode, setPlanGenerationMode] = useState<PlanGenerationMode>('chronology');
   const [keepCurrentPlan, setKeepCurrentPlan] = useState(false);
 
-  const sortedSchedule = useMemo(
-    () => [...rehearsal.schedule].sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [rehearsal.schedule]
-  );
-
-  const totalMinutes = getScheduleTotalMinutes(sortedSchedule);
-  const planEndTime = getScheduleEndTime(sortedSchedule, rehearsal.startTime);
+  const planSchedule = rehearsal.schedule;
+  const totalMinutes = getScheduleTotalMinutes(planSchedule);
+  const planEndTime = getScheduleEndTime(planSchedule, rehearsal.startTime);
   const exceedsWindow =
-    sortedSchedule.length > 0 &&
+    planSchedule.length > 0 &&
     timeToMinutes(planEndTime) > timeToMinutes(rehearsal.endTime);
   const showCompletionMarks = canMarkScheduleCompletion(rehearsal);
   const pastRehearsal = isPastRehearsalDay(rehearsal);
-  const completionStats = getScheduleCompletionStats(sortedSchedule);
+  const completionStats = getScheduleCompletionStats(planSchedule);
 
   const applySchedule = (schedule: ScheduleBlock[]) => {
     onScheduleChange(recalculateScheduleStartTimes(schedule, rehearsal.startTime));
@@ -170,9 +166,9 @@ export function RehearsalScheduleEditor({
     };
 
     const nextSchedule =
-      keepCurrentPlan && sortedSchedule.length > 0
+      keepCurrentPlan && planSchedule.length > 0
         ? appendScheduleFromRehearsalItems(
-            sortedSchedule,
+            planSchedule,
             rehearsal.startTime,
             rehearsal.sceneIds,
             rehearsal.taskIds,
@@ -215,13 +211,13 @@ export function RehearsalScheduleEditor({
           ? createBlockFromScene(block as Scene)
           : createBlockFromTask(block as Task);
 
-      applySchedule(insertScheduleBlockAt(sortedSchedule, newBlock, targetIndex, rehearsal.startTime));
+      applySchedule(insertScheduleBlockAt(planSchedule, newBlock, targetIndex, rehearsal.startTime));
       return;
     }
 
     if (payload.source === 'schedule') {
       applySchedule(
-        moveScheduleBlock(sortedSchedule, payload.blockId, targetIndex, rehearsal.startTime)
+        moveScheduleBlock(planSchedule, payload.blockId, targetIndex, rehearsal.startTime)
       );
     }
   };
@@ -242,7 +238,7 @@ export function RehearsalScheduleEditor({
   const setBlockCompletion = (blockId: string, completed: boolean) => {
     if (readOnly) return;
     applySchedule(
-      sortedSchedule.map((block) => {
+      planSchedule.map((block) => {
         if (block.id !== blockId) return block;
         if (block.completed === completed) {
           const { completed: _removed, ...rest } = block;
@@ -255,7 +251,7 @@ export function RehearsalScheduleEditor({
 
   const markAllBlocks = (completed: boolean) => {
     applySchedule(
-      sortedSchedule.map((block) => {
+      planSchedule.map((block) => {
         if (!isScheduleBlockCompletable(block)) return block;
         if (!canMarkBlockCompletion(rehearsal, block)) return block;
         if (block.completed === completed) return block;
@@ -266,7 +262,7 @@ export function RehearsalScheduleEditor({
 
   const clearAllMarks = () => {
     applySchedule(
-      sortedSchedule.map((block) => {
+      planSchedule.map((block) => {
         if (block.completed === undefined) return block;
         const { completed: _removed, ...rest } = block;
         return rest;
@@ -297,7 +293,7 @@ export function RehearsalScheduleEditor({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-white sm:text-3xl">План по времени</h2>
-          {sortedSchedule.length > 0 && (
+          {planSchedule.length > 0 && (
             <p className="mt-1 text-sm text-muted">
               {formatDuration(totalMinutes)} · {rehearsal.startTime} – {planEndTime}
               {exceedsWindow && (
@@ -342,13 +338,13 @@ export function RehearsalScheduleEditor({
         </div>
       </div>
 
-      {(linkedScenes.length > 0 || linkedTasks.length > 0) && sortedSchedule.length === 0 && (
+      {(linkedScenes.length > 0 || linkedTasks.length > 0) && planSchedule.length === 0 && (
         <p className="text-xs text-muted">
           Перетащите сцены и задачи из колонки слева (за иконку ⋮⋮) или нажмите «Сформировать план».
         </p>
       )}
 
-      {sortedSchedule.length === 0 ? (
+      {planSchedule.length === 0 ? (
         <div
           className={`rounded-2xl border border-dashed p-12 text-center transition-colors ${
             !readOnly && dragOverIndex === 0
@@ -378,7 +374,7 @@ export function RehearsalScheduleEditor({
           }}
         >
           {renderInsertSlot(0)}
-          {sortedSchedule.map((block, index) => {
+          {planSchedule.map((block, index) => {
             const Icon = blockTypeIcons[block.type];
             const endTime = addMinutes(block.startTime, block.durationMinutes);
             const isDragging = draggingId === block.id;
@@ -575,10 +571,10 @@ export function RehearsalScheduleEditor({
               Отмена
             </Button>
             <Button
-              variant={sortedSchedule.length > 0 && !keepCurrentPlan ? 'danger' : 'primary'}
+              variant={planSchedule.length > 0 && !keepCurrentPlan ? 'danger' : 'primary'}
               onClick={confirmGeneratePlan}
             >
-              {sortedSchedule.length > 0
+              {planSchedule.length > 0
                 ? keepCurrentPlan
                   ? 'Добавить в план'
                   : 'Заменить план'
@@ -619,7 +615,7 @@ export function RehearsalScheduleEditor({
               );
             })}
           </div>
-          {sortedSchedule.length > 0 && (
+          {planSchedule.length > 0 && (
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gold/10 bg-background/20 px-4 py-3">
               <input
                 type="checkbox"
@@ -635,7 +631,7 @@ export function RehearsalScheduleEditor({
               </span>
             </label>
           )}
-          {sortedSchedule.length > 0 && !keepCurrentPlan && (
+          {planSchedule.length > 0 && !keepCurrentPlan && (
             <p className="notice-warning rounded-xl px-4 py-3 text-sm font-medium leading-relaxed">
               Текущий план будет заменён. Ручные правки и порядок блоков пропадут.
             </p>

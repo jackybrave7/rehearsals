@@ -228,13 +228,9 @@ export function RehearsalDetailPage() {
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
   const showRehearsalWarnings = getShowRehearsalWarnings(state);
-  const sortedSchedule = [...rehearsal.schedule].sort((a, b) =>
-    a.startTime.localeCompare(b.startTime)
-  );
-
   const openAddBlock = () => {
     if (readOnly) return;
-    const lastBlock = sortedSchedule[sortedSchedule.length - 1];
+    const lastBlock = rehearsal.schedule[rehearsal.schedule.length - 1];
     const startTime = lastBlock
       ? addMinutes(lastBlock.startTime, lastBlock.durationMinutes)
       : rehearsal.startTime;
@@ -258,14 +254,19 @@ export function RehearsalDetailPage() {
 
   const saveBlock = () => {
     if (readOnly) return;
-    if (!blockForm.title.trim()) return;
+    let title = blockForm.title.trim();
+    if (!title && blockForm.type === 'scene' && blockForm.sceneId) {
+      title = state.scenes.find((s) => s.id === blockForm.sceneId)?.title?.trim() ?? '';
+    }
+    if (!title) return;
     let schedule: ScheduleBlock[];
+    const blockPayload = { ...blockForm, title };
     if (editingBlock) {
       schedule = rehearsal.schedule.map((b) =>
-        b.id === editingBlock.id ? { ...blockForm, id: editingBlock.id } : b
+        b.id === editingBlock.id ? { ...blockPayload, id: editingBlock.id } : b
       );
     } else {
-      schedule = [...rehearsal.schedule, { ...blockForm, id: generateId() }];
+      schedule = [...rehearsal.schedule, { ...blockPayload, id: generateId() }];
     }
     dispatch({
       type: 'UPDATE_SCHEDULE',
@@ -390,39 +391,46 @@ export function RehearsalDetailPage() {
 
   const handleBlockTypeChange = (type: ScheduleBlockType) => {
     setBlockForm((f) => {
-      const common = {
+      const base = {
         startTime: f.startTime,
         durationMinutes: f.durationMinutes,
-        title: f.title,
         notes: f.notes,
         type,
       };
-      if (type === 'scene') {
-        const scene = f.sceneId ? state.scenes.find((s) => s.id === f.sceneId) : undefined;
-        return {
-          ...common,
-          sceneId: f.sceneId,
-          title: scene?.title ?? f.title,
-          decidedNotes: f.decidedNotes,
-        };
+      switch (type) {
+        case 'scene': {
+          const scene = f.sceneId ? state.scenes.find((s) => s.id === f.sceneId) : undefined;
+          return {
+            ...base,
+            sceneId: f.sceneId,
+            title: scene?.title ?? '',
+            decidedNotes: f.decidedNotes,
+          };
+        }
+        case 'task': {
+          const task = f.taskId ? theaterTasks.find((t) => t.id === f.taskId) : undefined;
+          return {
+            ...base,
+            taskId: f.taskId,
+            title: task?.title ?? blockTypeLabels.task,
+          };
+        }
+        case 'etude':
+          return {
+            ...base,
+            playId: f.playId,
+            actorIds: f.actorIds,
+            title: 'Этюд',
+          };
+        case 'break':
+          return { ...base, title: blockTypeLabels.break };
+        case 'warmup':
+          return { ...base, title: blockTypeLabels.warmup };
+        case 'custom':
+          return { ...base, title: f.title || '' };
+        default:
+          return { ...base, title: f.title };
       }
-      if (type === 'task') {
-        const task = f.taskId ? theaterTasks.find((t) => t.id === f.taskId) : undefined;
-        return {
-          ...common,
-          taskId: f.taskId,
-          title: task?.title ?? f.title,
-        };
-      }
-      if (type === 'etude') {
-        return {
-          ...common,
-          playId: f.playId,
-          actorIds: f.actorIds,
-          title: f.title || 'Этюд',
-        };
-      }
-      return common;
     });
   };
 
@@ -468,6 +476,14 @@ export function RehearsalDetailPage() {
   const theaterScenes = state.scenes.filter((scene) =>
     theaterPlays.some((play) => play.id === scene.playId)
   );
+  const selectablePlanScenes = (() => {
+    const playIds = new Set(getRehearsalPlayIds(state, rehearsal));
+    if (state.activePlayId) playIds.add(state.activePlayId);
+    if (playIds.size > 0) {
+      return theaterScenes.filter((scene) => scene.playId && playIds.has(scene.playId));
+    }
+    return theaterScenes;
+  })();
   const playsById = Object.fromEntries(theaterPlays.map((play) => [play.id, play]));
   const linkedTasks = rehearsal.taskIds
     .map((tid) => theaterTasks.find((t) => t.id === tid))
@@ -1162,10 +1178,10 @@ export function RehearsalDetailPage() {
             options={Object.entries(blockTypeLabels).map(([value, label]) => ({ value, label }))}
           />
 
-          {blockForm.type === 'scene' && linkedScenes.length > 0 && (
+          {blockForm.type === 'scene' && selectablePlanScenes.length > 0 && (
             <SceneSelect
               label="Сцена"
-              scenes={linkedScenes}
+              scenes={selectablePlanScenes}
               value={blockForm.sceneId ?? ''}
               onChange={handleSceneSelect}
             />
