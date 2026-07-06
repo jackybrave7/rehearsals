@@ -11,6 +11,7 @@ import {
   handleTelegramRsvpCallback,
   handleTelegramRsvpMenuCallback,
 } from './telegramActorCommands.js';
+import { propagateTelegramChatIdByEmail } from './actorTelegramLink.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const offsetPath = path.join(path.resolve(__dirname, '..'), 'data', 'telegram-update-offset.txt');
@@ -30,9 +31,7 @@ function writeOffset(offset: number): void {
   fs.writeFileSync(offsetPath, String(offset), 'utf8');
 }
 
-import {
-  propagateTelegramChatIdByEmail,
-} from './actorTelegramLink.js';
+async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
   const token = getTelegramBotToken();
   if (!token) return 0;
 
