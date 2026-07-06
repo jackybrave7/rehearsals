@@ -203,5 +203,9 @@ async function parseAuthError(
     return 'Сервис авторизации недоступен. Перезапустите API (restart.bat) — возможно, порт 3001 занят другим приложением.';
   }
 
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    return 'Сервер временно недоступен. Попробуйте войти через минуту — если не поможет, перезапустите API на сервере.';
+  }
+
   return `AUTH_${response.status}`;
 }
