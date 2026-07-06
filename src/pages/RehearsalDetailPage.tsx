@@ -519,9 +519,12 @@ export function RehearsalDetailPage() {
   const rsvpSummary = countRsvpSummary(rehearsal, participantActorIds);
   const activeActors = getActiveActors(state);
 
-  const theaterActorPool = activeActors.filter(
-    (actor) => !participantActorIds.includes(actor.id)
-  );
+  const manualParticipantActors = [...activeActors].sort((a, b) => {
+    const aAdded = participantActorIds.includes(a.id);
+    const bAdded = participantActorIds.includes(b.id);
+    if (aAdded !== bAdded) return aAdded ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ru');
+  });
 
   const addManualParticipant = () => {
     if (readOnly || !manualParticipantId || participantActorIds.includes(manualParticipantId)) return;
@@ -921,7 +924,7 @@ export function RehearsalDetailPage() {
             {!readOnly && (
               <div className="mt-4 space-y-2 border-t border-gold/10 pt-4">
                 <p className="text-xs font-medium text-muted">Добавить вручную</p>
-                {theaterActorPool.length > 0 ? (
+                {manualParticipantActors.length > 0 ? (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <select
                       value={manualParticipantId}
@@ -929,8 +932,9 @@ export function RehearsalDetailPage() {
                       className="min-w-0 flex-1 rounded-xl border border-gold/15 bg-black/20 px-3 py-2.5 text-sm text-white focus:border-gold/40 focus:outline-none"
                     >
                       <option value="">Выберите из состава…</option>
-                      {theaterActorPool.map((actor) => {
-                        const unavailable = isActorUnavailable(actor, rehearsal.date, {
+                      {manualParticipantActors.map((actor) => {
+                        const alreadyAdded = participantActorIds.includes(actor.id);
+                        const unavailable = !alreadyAdded && isActorUnavailable(actor, rehearsal.date, {
                           startTime: rehearsal.startTime,
                           endTime: rehearsal.endTime,
                         });
@@ -944,10 +948,17 @@ export function RehearsalDetailPage() {
                           <option
                             key={actor.id}
                             value={actor.id}
-                            className="bg-surface"
-                            title={reason ? `Недоступен: ${reason}` : undefined}
+                            disabled={alreadyAdded}
+                            className={alreadyAdded ? 'bg-emerald-950/40 text-muted' : 'bg-surface'}
+                            title={
+                              alreadyAdded
+                                ? 'Уже в списке участников'
+                                : reason
+                                  ? `Недоступен: ${reason}`
+                                  : undefined
+                            }
                           >
-                            {actor.name}
+                            {alreadyAdded ? `✓ ${actor.name} — в списке` : actor.name}
                             {unavailable ? ' (недоступен)' : ''}
                           </option>
                         );
@@ -957,7 +968,7 @@ export function RehearsalDetailPage() {
                       type="button"
                       variant="secondary"
                       className="shrink-0"
-                      disabled={!manualParticipantId}
+                      disabled={!manualParticipantId || participantActorIds.includes(manualParticipantId)}
                       onClick={addManualParticipant}
                     >
                       <UserPlus size={16} />

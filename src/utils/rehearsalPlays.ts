@@ -16,7 +16,7 @@ export function getScenePlayId(state: AppState, sceneId: string): string | undef
   return state.scenes.find((scene) => scene.id === sceneId)?.playId;
 }
 
-/** Постановки, затронутые репетицией (через сцены и этюды). legacy playId учитывается. */
+/** Постановки, затронутые репетицией (сцены, playId блоков плана, legacy playId). */
 export function getRehearsalPlayIds(state: AppState, rehearsal: Rehearsal): string[] {
   const playIds = new Set<string>();
   if (rehearsal.playId) playIds.add(rehearsal.playId);
@@ -25,7 +25,7 @@ export function getRehearsalPlayIds(state: AppState, rehearsal: Rehearsal): stri
     if (playId) playIds.add(playId);
   }
   for (const block of rehearsal.schedule) {
-    if (block.type === 'etude' && block.playId) playIds.add(block.playId);
+    if (block.playId) playIds.add(block.playId);
   }
   return [...playIds];
 }
