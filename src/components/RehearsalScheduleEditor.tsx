@@ -383,7 +383,7 @@ export function RehearsalScheduleEditor({
                 ? linkedScenes.find((scene) => scene.id === block.sceneId)
                 : undefined;
             const blockPlay =
-              block.type === 'etude' && block.playId
+              block.playId
                 ? playsById[block.playId] ?? state.plays.find((p) => p.id === block.playId)
                 : blockScene
                   ? playsById[blockScene.playId] ?? play
@@ -456,6 +456,11 @@ export function RehearsalScheduleEditor({
                           )}
                           <div className="min-w-0">
                             <p className="text-base font-semibold leading-snug text-white">{block.title}</p>
+                            {blockPlay && block.type === 'scene' && !blockScene && (
+                              <p className="mt-1 text-sm leading-snug text-muted/90">
+                                {blockPlay.title}
+                              </p>
+                            )}
                             {blockPlay && block.type === 'etude' && (
                               <p className="mt-1 text-sm leading-snug text-muted/90">
                                 {blockPlay.title}

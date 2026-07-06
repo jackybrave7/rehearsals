@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
-import type { PlayRole, Scene, SceneStatus } from '../types';
+import type { PlayRole, Scene, ScenePriority, SceneStatus } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActorNamesForRoleInPerformance, getSceneRoles } from '../store/selectors';
-import { groupScenesByAct, getSceneShortLabel } from '../utils/sceneLabels';
+import { groupScenesByAct, getSceneActGroup, getSceneShortLabel } from '../utils/sceneLabels';
 import { buildSceneRehearsalDatesMap } from '../utils/sceneRehearsalHistory';
 import {
   countScenesByRole,
@@ -17,6 +17,8 @@ import type { SceneReadinessItem } from '../utils/sceneReadiness';
 import { heatLevelColors, heatLevelLabel } from '../utils/sceneReadiness';
 import { SceneStatusBadge } from './SceneStatusBadge';
 import { SceneRoleChip } from './SceneRoleChip';
+
+const priorityFilterOrder: ScenePriority[] = ['high', 'medium', 'low'];
 
 const priorityLabels = {
   high: 'Важно',
@@ -40,6 +42,8 @@ interface ScenePickerProps {
   performanceLabel?: string;
   readinessBySceneId?: Map<string, SceneReadinessItem>;
   excludeRehearsalId?: string;
+  /** Одна сцена или несколько (по умолчанию — несколько) */
+  selectionMode?: 'single' | 'multiple';
 }
 
 export function ScenePicker({
@@ -52,16 +56,42 @@ export function ScenePicker({
   performanceLabel = 'Состав',
   readinessBySceneId,
   excludeRehearsalId,
+  selectionMode = 'multiple',
 }: ScenePickerProps) {
+  const singleSelect = selectionMode === 'single';
   const { state } = useRehearsalStore();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<Set<SceneStatus>>(new Set());
+  const [priorityFilter, setPriorityFilter] = useState<Set<ScenePriority>>(new Set());
+  const [actFilter, setActFilter] = useState<Set<string>>(new Set());
   const [characterFilter, setCharacterFilter] = useState<Set<string>>(new Set());
   const [characterFilterOnlySelected, setCharacterFilterOnlySelected] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const grouped = useMemo(() => groupScenesByAct(scenes), [scenes]);
   const statusCounts = useMemo(() => countScenesByStatus(scenes), [scenes]);
+  const priorityCounts = useMemo(() => {
+    const counts: Record<ScenePriority, number> = { high: 0, medium: 0, low: 0 };
+    for (const scene of scenes) {
+      counts[scene.priority ?? 'medium'] += 1;
+    }
+    return counts;
+  }, [scenes]);
+  const actGroups = useMemo(() => {
+    const groups = new Set<string>();
+    for (const scene of scenes) {
+      groups.add(getSceneActGroup(scene));
+    }
+    return Array.from(groups);
+  }, [scenes]);
+  const actSceneCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const scene of scenes) {
+      const group = getSceneActGroup(scene);
+      counts.set(group, (counts.get(group) ?? 0) + 1);
+    }
+    return counts;
+  }, [scenes]);
   const roleSceneCounts = useMemo(
     () => countScenesByRole(scenes, characterRoles),
     [scenes, characterRoles]
@@ -81,14 +111,23 @@ export function ScenePicker({
       grouped
         .map(({ group, scenes: groupScenes }) => ({
           group,
-          scenes: groupScenes.filter((scene) =>
-            sceneMatchesFilters(scene, query, statusFilter, characterFilter, {
+          scenes: groupScenes.filter((scene) => {
+            if (!sceneMatchesFilters(scene, query, statusFilter, characterFilter, {
               onlySelected: characterFilterOnlySelected,
-            })
-          ),
+            })) {
+              return false;
+            }
+            if (priorityFilter.size > 0 && !priorityFilter.has(scene.priority ?? 'medium')) {
+              return false;
+            }
+            if (actFilter.size > 0 && !actFilter.has(getSceneActGroup(scene))) {
+              return false;
+            }
+            return true;
+          }),
         }))
         .filter(({ scenes: groupScenes }) => groupScenes.length > 0),
-    [grouped, query, statusFilter, characterFilter, characterFilterOnlySelected]
+    [grouped, query, statusFilter, priorityFilter, actFilter, characterFilter, characterFilterOnlySelected]
   );
 
   const visibleCount = filteredGroups.reduce(
@@ -103,6 +142,8 @@ export function ScenePicker({
   const hasActiveFilters =
     query.trim().length > 0 ||
     statusFilter.size > 0 ||
+    priorityFilter.size > 0 ||
+    actFilter.size > 0 ||
     characterFilter.size > 0 ||
     characterFilterOnlySelected;
 
@@ -112,6 +153,10 @@ export function ScenePicker({
       : characterRoles;
 
   const toggleScene = (sceneId: string) => {
+    if (singleSelect) {
+      onChange(selectedIds.includes(sceneId) ? [] : [sceneId]);
+      return;
+    }
     onChange(
       selectedIds.includes(sceneId)
         ? selectedIds.filter((id) => id !== sceneId)
@@ -140,6 +185,24 @@ export function ScenePicker({
     });
   };
 
+  const togglePriorityFilter = (priority: ScenePriority) => {
+    setPriorityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(priority)) next.delete(priority);
+      else next.add(priority);
+      return next;
+    });
+  };
+
+  const toggleActFilter = (act: string) => {
+    setActFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(act)) next.delete(act);
+      else next.add(act);
+      return next;
+    });
+  };
+
   const toggleCharacterFilter = (roleId: string) => {
     setCharacterFilter((prev) => {
       const next = new Set(prev);
@@ -161,9 +224,15 @@ export function ScenePicker({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">Сцены для прохождения</p>
+        <p className="text-sm text-muted">
+          {singleSelect ? 'Конкретная сцена (необязательно)' : 'Сцены для прохождения'}
+        </p>
         <p className="text-xs text-muted">
-          Выбрано {selectedIds.length} из {scenes.length}
+          {singleSelect
+            ? selectedIds.length > 0
+              ? 'Выбрана 1'
+              : 'Без сцены'
+            : `Выбрано ${selectedIds.length} из ${scenes.length}`}
           {hasActiveFilters ? ` · видно ${visibleCount}` : ''}
         </p>
       </div>
@@ -214,6 +283,74 @@ export function ScenePicker({
           );
         })}
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted">Приоритет:</span>
+        <button
+          type="button"
+          onClick={() => setPriorityFilter(new Set())}
+          className={`rounded-full px-3 py-1 text-xs transition-colors ${
+            priorityFilter.size === 0
+              ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+              : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          Все
+        </button>
+        {priorityFilterOrder.map((priority) => {
+          const selected = priorityFilter.has(priority);
+          const count = priorityCounts[priority];
+          return (
+            <button
+              key={priority}
+              type="button"
+              onClick={() => togglePriorityFilter(priority)}
+              className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                selected
+                  ? `${priorityColors[priority]} ring-1 ring-white/10`
+                  : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {priorityLabels[priority]} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {actGroups.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted">Действие:</span>
+          <button
+            type="button"
+            onClick={() => setActFilter(new Set())}
+            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+              actFilter.size === 0
+                ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+                : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            Все
+          </button>
+          {actGroups.map((act) => {
+            const selected = actFilter.has(act);
+            const count = actSceneCounts.get(act) ?? 0;
+            return (
+              <button
+                key={act}
+                type="button"
+                onClick={() => toggleActFilter(act)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  selected
+                    ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+                    : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {act} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {characterRoles.length > 0 && (
         <div className="space-y-2">
@@ -273,26 +410,41 @@ export function ScenePicker({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={selectVisible}
-          className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
-        >
-          Выбрать видимые
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
-        >
-          Снять все
-        </button>
+        {!singleSelect && (
+          <>
+            <button
+              type="button"
+              onClick={selectVisible}
+              className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
+            >
+              Выбрать видимые
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
+            >
+              Снять все
+            </button>
+          </>
+        )}
+        {singleSelect && selectedIds.length > 0 && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Без конкретной сцены
+          </button>
+        )}
         {hasActiveFilters && (
           <button
             type="button"
             onClick={() => {
               setQuery('');
               setStatusFilter(new Set());
+              setPriorityFilter(new Set());
+              setActFilter(new Set());
               setCharacterFilter(new Set());
               setCharacterFilterOnlySelected(false);
             }}
@@ -325,8 +477,8 @@ export function ScenePicker({
                   </button>
                   <button
                     type="button"
-                    onClick={() => toggleGroup(groupIds)}
-                    className="min-w-0 flex-1 text-left"
+                    onClick={() => !singleSelect && toggleGroup(groupIds)}
+                    className={`min-w-0 flex-1 text-left ${singleSelect ? 'cursor-default' : ''}`}
                   >
                     <span className="text-sm font-medium text-gold-light">{group}</span>
                     <span className="ml-2 text-xs text-muted">

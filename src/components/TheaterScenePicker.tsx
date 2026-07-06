@@ -18,6 +18,10 @@ interface TheaterScenePickerProps {
   onChange: (ids: string[]) => void;
   /** Постановка по умолчанию — обычно текущая выбранная в шапке */
   defaultPlayId?: string | null;
+  /** Управляемая постановка (для форм с playId в данных) */
+  selectedPlayId?: string | null;
+  onPlayChange?: (playId: string) => void;
+  selectionMode?: 'single' | 'multiple';
   excludeRehearsalId?: string;
 }
 
@@ -27,6 +31,9 @@ export function TheaterScenePicker({
   selectedIds,
   onChange,
   defaultPlayId,
+  selectedPlayId,
+  onPlayChange,
+  selectionMode = 'multiple',
   excludeRehearsalId,
 }: TheaterScenePickerProps) {
   const { state } = useRehearsalStore();
@@ -44,11 +51,18 @@ export function TheaterScenePicker({
     return playsWithScenes[0]?.id ?? '';
   };
 
-  const [browsePlayId, setBrowsePlayId] = useState(() => resolveBrowsePlayId(defaultPlayId));
+  const [browsePlayId, setBrowsePlayId] = useState(() =>
+    resolveBrowsePlayId(selectedPlayId ?? defaultPlayId)
+  );
 
   useEffect(() => {
-    setBrowsePlayId(resolveBrowsePlayId(defaultPlayId));
-  }, [defaultPlayId, playsWithScenes]);
+    setBrowsePlayId(resolveBrowsePlayId(selectedPlayId ?? defaultPlayId));
+  }, [selectedPlayId, defaultPlayId, playsWithScenes]);
+
+  const handlePlayChange = (playId: string) => {
+    setBrowsePlayId(playId);
+    onPlayChange?.(playId);
+  };
 
   const browseScenes = useMemo(
     () =>
@@ -91,7 +105,7 @@ export function TheaterScenePicker({
             <Select
               label="Постановка"
               value={browsePlayId}
-              onChange={(e) => setBrowsePlayId(e.target.value)}
+              onChange={(e) => handlePlayChange(e.target.value)}
               options={playsWithScenes.map((play) => ({
                 value: play.id,
                 label: play.archivedAt ? `«${play.title}» (архив)` : `«${play.title}»`,
@@ -124,6 +138,7 @@ export function TheaterScenePicker({
           performanceLabel={performance ? formatPerformanceLabel(performance) : undefined}
           readinessBySceneId={readinessBySceneId}
           excludeRehearsalId={excludeRehearsalId}
+          selectionMode={selectionMode}
         />
       ) : (
         <p className="text-sm text-muted">В этой постановке пока нет сцен.</p>

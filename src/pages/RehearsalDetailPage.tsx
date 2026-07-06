@@ -56,7 +56,6 @@ import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actor
 import { ActorAvatar } from '../components/ActorAvatar';
 import { TheaterSceneListGrouped } from '../components/TheaterSceneListGrouped';
 import { TheaterScenePicker } from '../components/TheaterScenePicker';
-import { SceneSelect } from '../components/SceneSelect';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import type {
   AttendanceStatus,
@@ -93,13 +92,12 @@ import {
   rsvpShortLabels,
 } from '../utils/rehearsalRsvp';
 
-const blockTypeLabels: Record<ScheduleBlockType, string> = {
+const blockTypeLabels: Record<Exclude<ScheduleBlockType, 'etude'>, string> = {
   scene: 'Сцена',
   task: 'Задача',
   break: 'Перерыв',
   warmup: 'Разминка',
   custom: 'Другое',
-  etude: 'Этюд',
 };
 
 const attendanceLabels: Record<AttendanceStatus, string> = {
@@ -234,6 +232,8 @@ export function RehearsalDetailPage() {
     const startTime = lastBlock
       ? addMinutes(lastBlock.startTime, lastBlock.durationMinutes)
       : rehearsal.startTime;
+    const defaultPlayId =
+      getRehearsalPlayIds(state, rehearsal)[0] ?? state.activePlayId ?? undefined;
     setEditingBlock(null);
     setBlockForm({
       startTime,
@@ -241,6 +241,7 @@ export function RehearsalDetailPage() {
       type: 'scene',
       title: '',
       notes: '',
+      playId: defaultPlayId,
     });
     setBlockModalOpen(true);
   };
@@ -248,7 +249,21 @@ export function RehearsalDetailPage() {
   const openEditBlock = (block: ScheduleBlock) => {
     if (readOnly) return;
     setEditingBlock(block);
-    setBlockForm({ ...block });
+    const scene = block.sceneId ? state.scenes.find((s) => s.id === block.sceneId) : undefined;
+    const normalized =
+      block.type === 'etude'
+        ? {
+            ...block,
+            type: 'scene' as const,
+            playId: block.playId,
+            title: block.title || 'Этюд',
+            actorIds: undefined,
+          }
+        : block;
+    setBlockForm({
+      ...normalized,
+      playId: normalized.playId ?? scene?.playId,
+    });
     setBlockModalOpen(true);
   };
 
@@ -257,6 +272,9 @@ export function RehearsalDetailPage() {
     let title = blockForm.title.trim();
     if (!title && blockForm.type === 'scene' && blockForm.sceneId) {
       title = state.scenes.find((s) => s.id === blockForm.sceneId)?.title?.trim() ?? '';
+    }
+    if (!title && blockForm.type === 'scene' && blockForm.playId) {
+      title = theaterPlays.find((p) => p.id === blockForm.playId)?.title?.trim() ?? '';
     }
     if (!title) return;
     let schedule: ScheduleBlock[];
@@ -400,9 +418,16 @@ export function RehearsalDetailPage() {
       switch (type) {
         case 'scene': {
           const scene = f.sceneId ? state.scenes.find((s) => s.id === f.sceneId) : undefined;
+          const playId =
+            f.playId ??
+            scene?.playId ??
+            getRehearsalPlayIds(state, rehearsal)[0] ??
+            state.activePlayId ??
+            undefined;
           return {
             ...base,
             sceneId: f.sceneId,
+            playId,
             title: scene?.title ?? '',
             decidedNotes: f.decidedNotes,
           };
@@ -415,13 +440,6 @@ export function RehearsalDetailPage() {
             title: task?.title ?? blockTypeLabels.task,
           };
         }
-        case 'etude':
-          return {
-            ...base,
-            playId: f.playId,
-            actorIds: f.actorIds,
-            title: 'Этюд',
-          };
         case 'break':
           return { ...base, title: blockTypeLabels.break };
         case 'warmup':
@@ -434,30 +452,35 @@ export function RehearsalDetailPage() {
     });
   };
 
-  const handleEtudePlaySelect = (playId: string) => {
-    setBlockForm((f) => ({
-      ...f,
-      playId: playId || undefined,
-    }));
-  };
-
-  const toggleEtudeActor = (actorId: string) => {
+  const handlePlanPlayChange = (playId: string) => {
+    const play = theaterPlays.find((p) => p.id === playId);
     setBlockForm((f) => {
-      const current = f.actorIds ?? [];
-      const actorIds = current.includes(actorId)
-        ? current.filter((id) => id !== actorId)
-        : [...current, actorId];
-      return { ...f, actorIds: actorIds.length > 0 ? actorIds : undefined };
+      const sceneStillValid =
+        f.sceneId && state.scenes.find((s) => s.id === f.sceneId)?.playId === playId;
+      return {
+        ...f,
+        playId: playId || undefined,
+        sceneId: sceneStillValid ? f.sceneId : undefined,
+        title: sceneStillValid
+          ? f.title
+          : f.title.trim() || play?.title || '',
+      };
     });
   };
 
-  const handleSceneSelect = (sceneId: string) => {
+  const handlePlanSceneChange = (ids: string[]) => {
+    const sceneId = ids[0];
+    if (!sceneId) {
+      setBlockForm((f) => ({ ...f, sceneId: undefined }));
+      return;
+    }
     const scene = state.scenes.find((s) => s.id === sceneId);
     setBlockForm((f) => ({
       ...f,
       sceneId,
+      playId: scene?.playId ?? f.playId,
       title: scene?.title ?? f.title,
-      durationMinutes: scene?.estimatedMinutes ?? DEFAULT_SCENE_REHEARSAL_MINUTES,
+      durationMinutes: scene?.estimatedMinutes ?? f.durationMinutes,
     }));
   };
 
@@ -476,14 +499,11 @@ export function RehearsalDetailPage() {
   const theaterScenes = state.scenes.filter((scene) =>
     theaterPlays.some((play) => play.id === scene.playId)
   );
-  const selectablePlanScenes = (() => {
-    const playIds = new Set(getRehearsalPlayIds(state, rehearsal));
-    if (state.activePlayId) playIds.add(state.activePlayId);
-    if (playIds.size > 0) {
-      return theaterScenes.filter((scene) => scene.playId && playIds.has(scene.playId));
-    }
-    return theaterScenes;
-  })();
+  const defaultBlockPlayId =
+    blockForm.playId ??
+    getRehearsalPlayIds(state, rehearsal)[0] ??
+    state.activePlayId ??
+    undefined;
   const playsById = Object.fromEntries(theaterPlays.map((play) => [play.id, play]));
   const linkedTasks = rehearsal.taskIds
     .map((tid) => theaterTasks.find((t) => t.id === tid))
@@ -1178,12 +1198,17 @@ export function RehearsalDetailPage() {
             options={Object.entries(blockTypeLabels).map(([value, label]) => ({ value, label }))}
           />
 
-          {blockForm.type === 'scene' && selectablePlanScenes.length > 0 && (
-            <SceneSelect
-              label="Сцена"
-              scenes={selectablePlanScenes}
-              value={blockForm.sceneId ?? ''}
-              onChange={handleSceneSelect}
+          {blockForm.type === 'scene' && theaterPlays.length > 0 && (
+            <TheaterScenePicker
+              plays={theaterPlays}
+              scenes={theaterScenes}
+              selectedIds={blockForm.sceneId ? [blockForm.sceneId] : []}
+              onChange={handlePlanSceneChange}
+              defaultPlayId={defaultBlockPlayId}
+              selectedPlayId={blockForm.playId}
+              onPlayChange={handlePlanPlayChange}
+              selectionMode="single"
+              excludeRehearsalId={rehearsal.id}
             />
           )}
 
@@ -1197,59 +1222,6 @@ export function RehearsalDetailPage() {
                 ...theaterTasks.map((t) => ({ value: t.id, label: t.title })),
               ]}
             />
-          )}
-
-          {blockForm.type === 'etude' && theaterPlays.length > 0 && (
-            <Select
-              label="Постановка"
-              value={blockForm.playId ?? ''}
-              onChange={(e) => handleEtudePlaySelect(e.target.value)}
-              options={[
-                { value: '', label: '— без привязки —' },
-                ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
-              ]}
-            />
-          )}
-
-          {blockForm.type === 'etude' && activeActors.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted">Участники этюда</p>
-              <div className="max-h-32 overflow-y-auto rounded-xl border border-gold/10 bg-background/20 p-2">
-                <div className="flex flex-wrap gap-2">
-                  {activeActors.map((actor) => {
-                    const selected = blockForm.actorIds?.includes(actor.id) ?? false;
-                    const unavailable = isActorUnavailable(actor, rehearsal.date, {
-                      startTime: rehearsal.startTime,
-                      endTime: rehearsal.endTime,
-                    });
-                    const reason = unavailable
-                      ? getActorUnavailabilityReason(actor, rehearsal.date, {
-                          startTime: rehearsal.startTime,
-                          endTime: rehearsal.endTime,
-                        })
-                      : undefined;
-                    return (
-                      <button
-                        key={actor.id}
-                        type="button"
-                        title={reason ? `Недоступен: ${reason}` : undefined}
-                        onClick={() => toggleEtudeActor(actor.id)}
-                        className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                          selected
-                            ? 'bg-gold/20 text-gold-light'
-                            : unavailable
-                              ? 'bg-amber-500/10 text-amber-200/80 hover:bg-amber-500/20'
-                              : 'bg-white/5 text-muted hover:bg-white/10'
-                        }`}
-                      >
-                        {actor.name}
-                        {unavailable ? ' ⚠' : ''}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
           )}
 
           <Input
