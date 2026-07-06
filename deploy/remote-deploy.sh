@@ -48,6 +48,7 @@ run_in_node_container() {
     -v "$REMOTE_DIR:/app" \
     -w /app \
     "${env_file_args[@]}" \
+    -e NODE_ENV=development \
     "$NODE_IMAGE" \
     bash -lc "$cmd"
 }
@@ -68,7 +69,7 @@ use_docker_build() {
 }
 
 npm_install() {
-  local install_cmd='rm -rf node_modules && if [ -f package-lock.json ]; then npm ci --include=dev || npm install --include=dev; else npm install --include=dev; fi'
+  local install_cmd='rm -rf node_modules && if [ -f package-lock.json ]; then npm ci; else npm install; fi && test -x node_modules/.bin/tsc'
   if use_docker_build; then
     run_in_node_container "$install_cmd"
     return
@@ -76,7 +77,7 @@ npm_install() {
 
   if host_node_ok; then
     echo "[deploy] npm install (host)..."
-    bash -lc "$install_cmd"
+    NODE_ENV=development bash -lc "$install_cmd"
     return
   fi
 
@@ -98,6 +99,13 @@ npm_build() {
 
   echo "[deploy] ERROR: cannot run build"
   exit 127
+}
+
+stop_api() {
+  if has_docker && docker ps --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
+    echo "[deploy] docker stop $DOCKER_CONTAINER (free node_modules)..."
+    docker stop "$DOCKER_CONTAINER"
+  fi
 }
 
 restart_api() {
@@ -171,6 +179,7 @@ else
   echo "[deploy] WARNING: .env missing. Copy from .env.example before build."
 fi
 
+stop_api
 npm_install
 npm_build
 restart_api
