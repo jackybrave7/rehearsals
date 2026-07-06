@@ -53,7 +53,7 @@ const blockTypeLabels: Record<ScheduleBlockType, string> = {
   scene: 'Сцена',
   task: 'Задача',
   break: 'Перерыв',
-  warmup: 'Разминка',
+  warmup: 'Тренинг',
   custom: 'Другое',
   etude: 'Этюд',
 };

@@ -96,7 +96,7 @@ const blockTypeLabels: Record<Exclude<ScheduleBlockType, 'etude'>, string> = {
   scene: 'Сцена',
   task: 'Задача',
   break: 'Перерыв',
-  warmup: 'Разминка',
+  warmup: 'Тренинг',
   custom: 'Другое',
 };
 
@@ -1208,6 +1208,7 @@ export function RehearsalDetailPage() {
               selectedPlayId={blockForm.playId}
               onPlayChange={handlePlanPlayChange}
               selectionMode="single"
+              includePlaysWithoutScenes
               excludeRehearsalId={rehearsal.id}
             />
           )}

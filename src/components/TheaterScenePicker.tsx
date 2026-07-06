@@ -23,6 +23,8 @@ interface TheaterScenePickerProps {
   onPlayChange?: (playId: string) => void;
   selectionMode?: 'single' | 'multiple';
   excludeRehearsalId?: string;
+  /** Показывать постановки без заведённых сцен (для блоков плана) */
+  includePlaysWithoutScenes?: boolean;
 }
 
 export function TheaterScenePicker({
@@ -35,20 +37,20 @@ export function TheaterScenePicker({
   onPlayChange,
   selectionMode = 'multiple',
   excludeRehearsalId,
+  includePlaysWithoutScenes = false,
 }: TheaterScenePickerProps) {
   const { state } = useRehearsalStore();
 
-  const playsWithScenes = useMemo(
-    () =>
-      plays
-        .filter((play) => scenes.some((scene) => scene.playId === play.id))
-        .sort((a, b) => a.title.localeCompare(b.title, 'ru')),
-    [plays, scenes]
-  );
+  const selectablePlays = useMemo(() => {
+    const list = includePlaysWithoutScenes
+      ? [...plays]
+      : plays.filter((play) => scenes.some((scene) => scene.playId === play.id));
+    return list.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+  }, [plays, scenes, includePlaysWithoutScenes]);
 
   const resolveBrowsePlayId = (preferred?: string | null) => {
-    if (preferred && playsWithScenes.some((play) => play.id === preferred)) return preferred;
-    return playsWithScenes[0]?.id ?? '';
+    if (preferred && selectablePlays.some((play) => play.id === preferred)) return preferred;
+    return selectablePlays[0]?.id ?? '';
   };
 
   const [browsePlayId, setBrowsePlayId] = useState(() =>
@@ -57,7 +59,7 @@ export function TheaterScenePicker({
 
   useEffect(() => {
     setBrowsePlayId(resolveBrowsePlayId(selectedPlayId ?? defaultPlayId));
-  }, [selectedPlayId, defaultPlayId, playsWithScenes]);
+  }, [selectedPlayId, defaultPlayId, selectablePlays]);
 
   const handlePlayChange = (playId: string) => {
     setBrowsePlayId(playId);
@@ -90,10 +92,16 @@ export function TheaterScenePicker({
     return selectedIds.filter((id) => !browseIds.has(id)).length;
   }, [selectedIds, browseScenes]);
 
-  const browsePlay = playsWithScenes.find((play) => play.id === browsePlayId);
+  const browsePlay = selectablePlays.find((play) => play.id === browsePlayId);
 
-  if (playsWithScenes.length === 0) {
-    return <p className="text-sm text-muted">Нет сцен в театре. Добавьте сцены в постановках.</p>;
+  if (selectablePlays.length === 0) {
+    return (
+      <p className="text-sm text-muted">
+        {includePlaysWithoutScenes
+          ? 'Нет постановок в театре.'
+          : 'Нет сцен в театре. Добавьте сцены в постановках.'}
+      </p>
+    );
   }
 
   return (
@@ -106,7 +114,7 @@ export function TheaterScenePicker({
               label="Постановка"
               value={browsePlayId}
               onChange={(e) => handlePlayChange(e.target.value)}
-              options={playsWithScenes.map((play) => ({
+              options={selectablePlays.map((play) => ({
                 value: play.id,
                 label: play.archivedAt ? `«${play.title}» (архив)` : `«${play.title}»`,
               }))}
@@ -141,7 +149,11 @@ export function TheaterScenePicker({
           selectionMode={selectionMode}
         />
       ) : (
-        <p className="text-sm text-muted">В этой постановке пока нет сцен.</p>
+        <p className="text-sm text-muted">
+          {includePlaysWithoutScenes
+            ? 'Конкретные сцены ещё не заведены — блок будет привязан к постановке.'
+            : 'В этой постановке пока нет сцен.'}
+        </p>
       )}
     </div>
   );
