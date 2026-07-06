@@ -124,8 +124,10 @@ docker run -d \
   --env-file /var/www/rehearsals/.env \
   -e NODE_OPTIONS=--dns-result-order=ipv4first \
   -w /app node:22-bookworm-slim \
-  sh -c 'rm -rf node_modules && npm install --omit=dev && npm start'
+  npm start
 ```
+
+Зависимости ставятся при деплое (`deploy/remote-deploy.sh`); контейнер только запускает API. Старый вариант с `npm install` внутри контейнера при каждом restart больше не нужен.
 
 `TELEGRAM_BOT_TOKEN` задаётся в `/var/www/rehearsals/.env` (не в git). После правки — `docker restart rehearsals-api`.
 

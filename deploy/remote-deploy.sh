@@ -101,6 +101,17 @@ npm_build() {
   exit 127
 }
 
+npm_prune_for_prod() {
+  if use_docker_build; then
+    echo "[deploy] npm prune --omit=dev (production runtime)..."
+    run_in_node_container "npm prune --omit=dev"
+    return
+  fi
+  if host_node_ok; then
+    NODE_ENV=production npm prune --omit=dev
+  fi
+}
+
 stop_api() {
   if has_docker && docker ps --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
     echo "[deploy] docker stop $DOCKER_CONTAINER (free node_modules)..."
@@ -108,10 +119,44 @@ stop_api() {
   fi
 }
 
+api_container_needs_recreate() {
+  local cmd
+  cmd="$(docker inspect --format '{{join .Config.Cmd " "}}' "$DOCKER_CONTAINER" 2>/dev/null || true)"
+  echo "$cmd" | grep -q 'npm install'
+}
+
+start_api_container() {
+  local env_file_args=()
+  if [ -f "$REMOTE_DIR/.env" ]; then
+    env_file_args=(--env-file "$REMOTE_DIR/.env")
+  fi
+  echo "[deploy] docker run $DOCKER_CONTAINER (npm start)..."
+  docker run -d \
+    --name "$DOCKER_CONTAINER" \
+    --restart unless-stopped \
+    --network host \
+    -v "$REMOTE_DIR:/app" \
+    "${env_file_args[@]}" \
+    -e NODE_OPTIONS=--dns-result-order=ipv4first \
+    -w /app \
+    "$NODE_IMAGE" \
+    npm start
+}
+
 restart_api() {
   if has_docker && docker ps -a --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
-    echo "[deploy] docker restart $DOCKER_CONTAINER..."
-    docker restart "$DOCKER_CONTAINER"
+    if api_container_needs_recreate; then
+      echo "[deploy] Replacing legacy API container (old entrypoint reinstalled deps on every restart)..."
+      docker stop "$DOCKER_CONTAINER" 2>/dev/null || true
+      docker rm "$DOCKER_CONTAINER" 2>/dev/null || true
+      start_api_container
+    elif ! docker ps --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
+      echo "[deploy] docker start $DOCKER_CONTAINER..."
+      docker start "$DOCKER_CONTAINER"
+    else
+      echo "[deploy] docker restart $DOCKER_CONTAINER..."
+      docker restart "$DOCKER_CONTAINER"
+    fi
     return
   fi
 
@@ -182,15 +227,18 @@ fi
 stop_api
 npm_install
 npm_build
+npm_prune_for_prod
 restart_api
 
 echo "[deploy] waiting for API..."
-for i in 1 2 3 4 5 6; do
+for i in $(seq 1 36); do
   HEALTH=$(curl -sf "http://127.0.0.1:${API_PORT:-3001}/api/health" || true)
   if [ -n "$HEALTH" ]; then
     break
   fi
-  echo "[deploy] API not ready yet, retry $i/6..."
+  if [ "$((i % 6))" -eq 0 ]; then
+    echo "[deploy] API not ready yet, retry $i/36..."
+  fi
   sleep 5
 done
 
@@ -205,5 +253,9 @@ elif echo "$HEALTH" | grep -q '"ok":true'; then
   exit 1
 else
   echo "[deploy] ERROR: API health check failed"
+  if has_docker && docker ps -a --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
+    echo "[deploy] API container logs (last 80 lines):"
+    docker logs "$DOCKER_CONTAINER" --tail 80 2>&1 || true
+  fi
   exit 1
 fi
