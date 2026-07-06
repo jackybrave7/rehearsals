@@ -68,18 +68,15 @@ use_docker_build() {
 }
 
 npm_install() {
+  local install_cmd='rm -rf node_modules && if [ -f package-lock.json ]; then npm ci --include=dev || npm install --include=dev; else npm install --include=dev; fi'
   if use_docker_build; then
-    run_in_node_container "if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi"
+    run_in_node_container "$install_cmd"
     return
   fi
 
   if host_node_ok; then
     echo "[deploy] npm install (host)..."
-    if [ -f package-lock.json ]; then
-      npm ci || npm install
-    else
-      npm install
-    fi
+    bash -lc "$install_cmd"
     return
   fi
 
