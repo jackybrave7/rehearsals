@@ -48,6 +48,33 @@ export async function fetchTelegramConfigured(theaterId?: string): Promise<boole
   return status.configured;
 }
 
+export interface TelegramGroupChat {
+  id: string;
+  title: string;
+  type: 'group' | 'supergroup' | 'channel';
+  seenAt: string;
+}
+
+export async function fetchTelegramGroupChats(
+  theaterId: string,
+  options?: { refresh?: boolean }
+): Promise<TelegramGroupChat[]> {
+  const params = new URLSearchParams({ theaterId });
+  if (options?.refresh) params.set('refresh', '1');
+
+  const response = await fetch(`${API_BASE}/telegram/group-chats?${params}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+    throw new Error(data?.message ?? data?.error ?? `GROUP_CHATS_FAILED_${response.status}`);
+  }
+
+  const payload = (await response.json()) as { chats?: TelegramGroupChat[] };
+  return payload.chats ?? [];
+}
+
 export async function sendTelegramHtmlMessage(theaterId: string, html: string): Promise<void> {
   const response = await fetch(`${API_BASE}/telegram/send`, {
     method: 'POST',

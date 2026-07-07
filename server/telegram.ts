@@ -1,4 +1,28 @@
 import type { AppDatabase } from './db.js';
+import {
+  listRecentTelegramGroupChats,
+  rememberTelegramGroupChatFromUpdate,
+  type CachedTelegramGroupChat,
+} from './telegramGroupChatCache.js';
+import { buildTelegramGetUpdatesUrl } from './telegramUpdates.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const updateOffsetPath = path.join(path.resolve(__dirname, '..'), 'data', 'telegram-update-offset.txt');
+
+function readTelegramUpdateOffset(): number {
+  try {
+    const raw = fs.readFileSync(updateOffsetPath, 'utf8').trim();
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export type { CachedTelegramGroupChat };
 
 export interface TelegramBotInfo {
   configured: boolean;
@@ -56,6 +80,33 @@ export async function getTelegramBotInfo(): Promise<TelegramBotInfo> {
   const token = getTelegramBotToken();
   if (!token) return { configured: false, username: null };
   return { configured: true, username: await getTelegramBotUsername() };
+}
+
+/** Подтянуть группы из getUpdates (не сдвигает offset) + кэш недавних чатов. */
+export async function discoverTelegramGroupChats(): Promise<CachedTelegramGroupChat[]> {
+  const token = getTelegramBotToken();
+  if (!token) throw new Error('BOT_NOT_CONFIGURED');
+
+  const offset = readTelegramUpdateOffset();
+  const response = await fetch(buildTelegramGetUpdatesUrl(token, offset));
+  if (response.ok) {
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      result?: Array<{
+        message?: { chat?: { id?: number; title?: string; type?: string } };
+        callback_query?: { message?: { chat?: { id?: number; title?: string; type?: string } } };
+        my_chat_member?: { chat?: { id?: number; title?: string; type?: string } };
+        channel_post?: { chat?: { id?: number; title?: string; type?: string } };
+      }>;
+    };
+    if (payload.ok && payload.result?.length) {
+      for (const update of payload.result) {
+        rememberTelegramGroupChatFromUpdate(update);
+      }
+    }
+  }
+
+  return listRecentTelegramGroupChats();
 }
 
 export async function sendTelegramHtmlMessage(

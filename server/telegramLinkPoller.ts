@@ -12,6 +12,12 @@ import {
   handleTelegramRsvpMenuCallback,
 } from './telegramActorCommands.js';
 import { propagateTelegramChatIdByEmail } from './actorTelegramLink.js';
+import { rememberTelegramGroupChatFromUpdate } from './telegramGroupChatCache.js';
+import {
+  handleTelegramGroupChatIdCommand,
+  handleTelegramGroupChatWelcome,
+} from './telegramGroupWelcome.js';
+import { buildTelegramGetUpdatesUrl, ensureTelegramPollingMode } from './telegramUpdates.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const offsetPath = path.join(path.resolve(__dirname, '..'), 'data', 'telegram-update-offset.txt');
@@ -36,9 +42,7 @@ async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
   if (!token) return 0;
 
   let offset = readOffset();
-  const response = await fetch(
-    `https://api.telegram.org/bot${token}/getUpdates?timeout=0&offset=${offset}`
-  );
+  const response = await fetch(buildTelegramGetUpdatesUrl(token, offset));
   if (!response.ok) return 0;
 
   const payload = (await response.json()) as {
@@ -46,13 +50,23 @@ async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
     result?: Array<{
       update_id: number;
       message?: {
-        chat?: { id?: number };
+        chat?: { id?: number; title?: string; type?: string };
         text?: string;
+        migrate_to_chat_id?: number;
+        new_chat_members?: Array<{ id?: number; is_bot?: boolean }>;
+      };
+      my_chat_member?: {
+        chat?: { id?: number; title?: string; type?: string };
+        old_chat_member?: { status?: string };
+        new_chat_member?: { status?: string; user?: { id?: number } };
+      };
+      channel_post?: {
+        chat?: { id?: number; title?: string; type?: string };
       };
       callback_query?: {
         id: string;
         data?: string;
-        message?: { chat?: { id?: number } };
+        message?: { chat?: { id?: number; title?: string; type?: string } };
         from?: { id?: number };
       };
     }>;
@@ -65,6 +79,17 @@ async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
 
   for (const update of payload.result) {
     offset = Math.max(offset, update.update_id + 1);
+    rememberTelegramGroupChatFromUpdate(update);
+
+    if (await handleTelegramGroupChatWelcome(update, token)) {
+      handled += 1;
+      continue;
+    }
+
+    if (await handleTelegramGroupChatIdCommand(update, token)) {
+      handled += 1;
+      continue;
+    }
 
     const callback = update.callback_query;
     if (callback?.data && callback.id) {
@@ -120,9 +145,12 @@ async function pollTelegramActorLinks(db: AppDatabase): Promise<number> {
 }
 
 export function startTelegramLinkPoller(db: AppDatabase = getDb()): () => void {
-  if (!getTelegramBotToken()) {
+  const token = getTelegramBotToken();
+  if (!token) {
     return () => undefined;
   }
+
+  void ensureTelegramPollingMode(token);
 
   const tick = () => {
     void pollTelegramActorLinks(db).catch((error) => {

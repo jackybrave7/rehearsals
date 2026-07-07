@@ -2,12 +2,14 @@ import type { Express } from 'express';
 import { getDb } from './db.js';
 import { canEditTheater, requireAuth } from './auth.js';
 import {
+  discoverTelegramGroupChats,
   getTelegramBotInfo,
   getTelegramBotToken,
   getTheaterTelegramChatId,
   sendTelegramHtmlMessage,
   sendTelegramHtmlToTheater,
 } from './telegram.js';
+import { listRecentTelegramGroupChats } from './telegramGroupChatCache.js';
 import { getReminderSchedulerConfig } from './reminderScheduler.js';
 
 export function registerTelegramRoutes(app: Express) {
@@ -27,6 +29,30 @@ export function registerTelegramRoutes(app: Express) {
       reminderTickMinutes: scheduler.tickMinutes,
       reminderWindowMinutes: scheduler.windowMinutes,
     });
+  });
+
+  app.get('/api/telegram/group-chats', async (req, res) => {
+    const session = requireAuth(req, res);
+    if (!session) return;
+
+    const theaterId =
+      typeof req.query.theaterId === 'string' ? req.query.theaterId.trim() : '';
+    if (!theaterId || !canEditTheater(session, theaterId)) {
+      res.status(403).json({ error: 'FORBIDDEN' });
+      return;
+    }
+
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const chats = refresh
+        ? await discoverTelegramGroupChats()
+        : listRecentTelegramGroupChats();
+      res.json({ chats });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'DISCOVER_FAILED';
+      const status = message === 'BOT_NOT_CONFIGURED' ? 503 : 500;
+      res.status(status).json({ error: message, message });
+    }
   });
 
   app.post('/api/telegram/send', async (req, res) => {

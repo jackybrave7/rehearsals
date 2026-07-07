@@ -14,8 +14,10 @@ import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { Input, Select } from '../components/FormFields';
 import { Button } from '../components/Button';
 import {
+  fetchTelegramGroupChats,
   fetchTelegramStatus,
   sendTelegramTestMessage,
+  type TelegramGroupChat,
   type TelegramStatus,
 } from '../api/telegram';
 import {
@@ -82,6 +84,9 @@ export function SettingsPage() {
   const [telegramChatInput, setTelegramChatInput] = useState('');
   const [telegramTestPending, setTelegramTestPending] = useState(false);
   const [telegramTestMessage, setTelegramTestMessage] = useState<string | null>(null);
+  const [telegramGroupChats, setTelegramGroupChats] = useState<TelegramGroupChat[]>([]);
+  const [telegramGroupChatsPending, setTelegramGroupChatsPending] = useState(false);
+  const [telegramGroupChatsError, setTelegramGroupChatsError] = useState<string | null>(null);
 
   useEffect(() => {
     setProfileName(user?.name ?? '');
@@ -190,6 +195,32 @@ export function SettingsPage() {
     } finally {
       setTelegramTestPending(false);
     }
+  };
+
+  const discoverTelegramGroupChats = async () => {
+    if (!state.activeTheaterId || readOnly) return;
+    setTelegramGroupChatsPending(true);
+    setTelegramGroupChatsError(null);
+    try {
+      const chats = await fetchTelegramGroupChats(state.activeTheaterId, { refresh: true });
+      setTelegramGroupChats(chats);
+      if (chats.length === 0) {
+        setTelegramGroupChatsError(
+          'Чаты не найдены. Напишите в группу после добавления бота и нажмите снова.'
+        );
+      }
+    } catch (error) {
+      setTelegramGroupChats([]);
+      setTelegramGroupChatsError(error instanceof Error ? error.message : 'Не удалось получить чаты');
+    } finally {
+      setTelegramGroupChatsPending(false);
+    }
+  };
+
+  const pickTelegramGroupChat = (chat: TelegramGroupChat) => {
+    setTelegramChatInput(chat.id);
+    setTelegramTestMessage(`Выбран: ${chat.title}`);
+    window.setTimeout(() => setTelegramTestMessage(null), 2500);
   };
 
   const updateTheaterTimezone = (timezone: string) => {
@@ -578,11 +609,9 @@ export function SettingsPage() {
                   с карточки репетиции. Авто-напоминания участникам идут в личку, не сюда.
                 </p>
                 <p className="text-sm text-muted">
-                  Напишите в группу после добавления бота, затем откройте{' '}
-                  <code className="text-gold-light/80">getUpdates</code> и скопируйте{' '}
-                  <code className="text-gold-light/80">chat.id</code>. Если группа стала супергруппой, id
-                  обычно начинается с <code className="text-gold-light/80">-100</code> (старый id перестаёт
-                  работать).
+                  Добавьте бота в группу — он <strong className="text-white/80">сам пришлёт Chat ID</strong>.
+                  Если сообщения нет, напишите в группе <code className="text-gold-light/80">/chatid</code> или
+                  нажмите «Подтянуть чаты» ниже.
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                   <Input
@@ -600,6 +629,13 @@ export function SettingsPage() {
                       </Button>
                       <Button
                         variant="secondary"
+                        onClick={() => void discoverTelegramGroupChats()}
+                        disabled={telegramGroupChatsPending}
+                      >
+                        {telegramGroupChatsPending ? 'Поиск…' : 'Подтянуть чаты'}
+                      </Button>
+                      <Button
+                        variant="secondary"
                         onClick={() => void testTelegramChat()}
                         disabled={telegramTestPending || !telegramChatInput.trim()}
                       >
@@ -608,6 +644,25 @@ export function SettingsPage() {
                     </>
                   )}
                 </div>
+                {!readOnly && telegramGroupChats.length > 0 ? (
+                  <ul className="space-y-2 rounded-xl border border-gold/10 bg-black/20 p-3 text-sm">
+                    {telegramGroupChats.map((chat) => (
+                      <li key={chat.id}>
+                        <button
+                          type="button"
+                          onClick={() => pickTelegramGroupChat(chat)}
+                          className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-muted transition hover:bg-gold/10 hover:text-white/90"
+                        >
+                          <span className="truncate">{chat.title}</span>
+                          <code className="shrink-0 text-gold-light/80">{chat.id}</code>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {telegramGroupChatsError ? (
+                  <p className="text-sm text-amber-200">{telegramGroupChatsError}</p>
+                ) : null}
                 {telegramStatus.chatConfigured ? (
                   <p className="text-sm text-emerald-300/90">Чат подключён — можно отправлять напоминания</p>
                 ) : (
