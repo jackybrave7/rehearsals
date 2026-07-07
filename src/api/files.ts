@@ -7,6 +7,15 @@ export interface UploadedFile {
   size: number;
 }
 
+export function formatFileUploadError(error: unknown): string {
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'FILE_TOO_LARGE') return 'Файл слишком большой. Максимум — 5 МБ.';
+  if (code === 'UNAUTHORIZED') return 'Сессия истекла — обновите страницу и войдите снова.';
+  if (code === 'INVALID_BODY' || code === 'INVALID_BASE64') return 'Не удалось прочитать файл. Попробуйте другой формат.';
+  if (code.startsWith('UPLOAD_')) return 'Не удалось загрузить файл на сервер. Попробуйте ещё раз.';
+  return 'Не удалось загрузить файл. Проверьте формат и подключение.';
+}
+
 export async function uploadFile(file: File): Promise<UploadedFile> {
   const dataBase64 = await readFileBase64(file);
   const response = await fetch(`${API_BASE}/files`, {
@@ -22,6 +31,7 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
 
   if (!response.ok) {
     const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (response.status === 401) throw new Error('UNAUTHORIZED');
     if (data?.error === 'FILE_TOO_LARGE') throw new Error('FILE_TOO_LARGE');
     throw new Error(data?.error ?? `UPLOAD_${response.status}`);
   }

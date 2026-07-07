@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus, Archive, ArchiveRestore } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus, Archive, ArchiveRestore, Loader2 } from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
@@ -8,8 +8,9 @@ import { UpgradePrompt } from '../components/UpgradePrompt';
 import { generateId } from '../utils/id';
 import { formatFileSize } from '../utils/file';
 import { ImageCropField } from '../components/ImageCropField';
-import { uploadFile } from '../api/files';
+import { uploadFile, formatFileUploadError } from '../api/files';
 import { resolvePlayScriptUrl, resolveAssetUrl } from '../utils/fileUrls';
+import { isSupportedScriptImportFile } from '../utils/scriptDocument';
 import type { Play } from '../types';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { Button } from '../components/Button';
@@ -60,6 +61,8 @@ export function PlayPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [iconError, setIconError] = useState<string | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [scriptUploading, setScriptUploading] = useState(false);
+  const scriptInputRef = useRef<HTMLInputElement>(null);
   const [viewingPlayId, setViewingPlayId] = useState<string | null>(null);
   const theaterPlays = getTheaterPlays(state);
   const activePlays = getActiveTheaterPlays(state);
@@ -147,29 +150,52 @@ export function PlayPage() {
     setCoverError(null);
   };
 
-  const handleScriptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleScriptFile = async (file: File) => {
+    if (!isSupportedScriptImportFile(file.name, file.type)) {
+      setFileError(
+        'Поддерживаются файлы .txt и .docx. В Google Docs: Файл → Скачать → Microsoft Word (.docx).'
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFileError('Файл слишком большой. Максимум — 5 МБ.');
+      return;
+    }
 
     setFileError(null);
+    setScriptUploading(true);
     try {
       const uploaded = await uploadFile(file);
-      setForm((f) => ({
-        ...f,
+      const scriptFields = {
         scriptFileName: file.name,
         scriptFileUrl: uploaded.url,
         scriptFileDataUrl: undefined,
         scriptFileMimeType: uploaded.mimeType || file.type || undefined,
         scriptFileSize: uploaded.size,
-      }));
+        scriptImportSyncedAt: undefined,
+      };
+      setForm((current) => ({ ...current, ...scriptFields }));
+
+      if (editingId) {
+        const existing = state.plays.find((play) => play.id === editingId);
+        if (existing) {
+          dispatch({
+            type: 'UPDATE_PLAY',
+            payload: enrichPlayDocumentMeta({ ...existing, ...scriptFields }),
+          });
+        }
+      }
     } catch (error) {
-      setFileError(
-        error instanceof Error && error.message === 'FILE_TOO_LARGE'
-          ? 'Файл слишком большой. Максимум — 5 МБ.'
-          : 'Не удалось загрузить файл. Проверьте подключение к API.'
-      );
+      setFileError(formatFileUploadError(error));
+    } finally {
+      setScriptUploading(false);
     }
-    e.target.value = '';
+  };
+
+  const onScriptFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) void handleScriptFile(file);
   };
 
   const removeScriptFile = () => {
@@ -584,6 +610,10 @@ export function PlayPage() {
 
           <div className="space-y-2">
             <p className="text-sm text-muted">Файл с пьесой</p>
+            <p className="text-xs text-muted">
+              Форматы: .txt или .docx (до 5 МБ). Старый .doc и PDF не поддерживаются — в Word/Google Docs
+              сохраните как .docx.
+            </p>
             {form.scriptFileName ? (
               <div className="flex items-center justify-between rounded-lg border border-gold/20 bg-background/40 px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -597,18 +627,32 @@ export function PlayPage() {
                 </div>
                 <DeleteButton label="Убрать файл" onClick={removeScriptFile} />
               </div>
-            ) : (
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gold/25 px-4 py-4 text-sm text-muted transition-colors hover:border-gold/40 hover:bg-gold/5">
-                <Upload size={18} className="text-gold" />
-                Загрузить файл (PDF, DOC, DOCX, TXT — до 5 МБ)
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt,.rtf,application/pdf,text/plain"
-                  className="hidden"
-                  onChange={handleScriptFile}
-                />
-              </label>
-            )}
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={scriptInputRef}
+                type="file"
+                accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={onScriptFileInputChange}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={scriptUploading}
+                onClick={() => scriptInputRef.current?.click()}
+              >
+                {scriptUploading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Upload size={16} />
+                )}
+                {form.scriptFileName ? 'Заменить файл' : 'Загрузить файл'}
+              </Button>
+            </div>
+            {!editingId && form.scriptFileName ? (
+              <p className="text-xs text-muted">Нажмите «Сохранить», чтобы закрепить файл в постановке.</p>
+            ) : null}
             {fileError && <p className="text-sm text-red-400">{fileError}</p>}
           </div>
         </div>

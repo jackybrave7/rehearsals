@@ -4,7 +4,7 @@ import { FileText, Loader2, RefreshCw, Upload } from 'lucide-react';
 import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
-import { uploadFile } from '../api/files';
+import { uploadFile, formatFileUploadError } from '../api/files';
 import { parseScriptImport, resolveScriptImportError } from '../services/scriptImportClient';
 import {
   isFileSectionAnchor,
@@ -94,7 +94,7 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
           : `Файл «${file.name}» загружен. Нажмите «Сопоставить сцены», чтобы привязать заголовки.`
       );
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : 'Не удалось загрузить файл');
+      setSyncError(formatFileUploadError(error));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
