@@ -43,16 +43,17 @@ const publicBody = publicFromPrivate
   .replace(/\s/g, '');
 
 const dnsValue = `v=DKIM1; k=rsa; p=${publicBody}`;
-const envPrivate = privateKeyPem.trim().replace(/\n/g, '\\n');
 
 console.log('\n=== DNS (TimeWeb → Домены → rehears.ru → DNS → TXT) ===');
 console.log(`Хост: ${selector}._domainkey`);
 console.log(`Значение:\n${dnsValue}\n`);
 
-console.log('=== .env на сервере ===');
+console.log('=== .env на сервере (рекомендуется) ===');
 console.log(`SMTP_DKIM_DOMAIN=${domain}`);
 console.log(`SMTP_DKIM_SELECTOR=${selector}`);
-console.log(`SMTP_DKIM_PRIVATE_KEY="${envPrivate}"`);
+console.log(`SMTP_DKIM_PRIVATE_KEY_PATH=data/dkim/${domain}.private.pem`);
+console.log('');
+console.log('Не кладите приватный ключ в .env — Docker портит многострочные значения.');
 
 console.log('\n=== После добавления DNS ===');
 console.log('1. Подождите 15–60 минут');
@@ -67,13 +68,14 @@ if (writeEnv) {
   const lines = [
     `SMTP_DKIM_DOMAIN=${domain}`,
     `SMTP_DKIM_SELECTOR=${selector}`,
-    `SMTP_DKIM_PRIVATE_KEY="${envPrivate}"`,
+    `SMTP_DKIM_PRIVATE_KEY_PATH=data/dkim/${domain}.private.pem`,
   ];
   for (const line of lines) {
     const key = line.split('=')[0];
     const re = new RegExp(`^${key}=.*$`, 'm');
     envText = re.test(envText) ? envText.replace(re, line) : `${envText.trimEnd()}\n${line}\n`;
   }
+  envText = envText.replace(/^SMTP_DKIM_PRIVATE_KEY=.*\n?/m, '');
   writeFileSync(envPath, envText.endsWith('\n') ? envText : `${envText}\n`, 'utf8');
   console.log(`\n[dkim] Updated ${envPath}`);
 }

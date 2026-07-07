@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
-import { randomUUID } from 'node:crypto';
+import { createPrivateKey, randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface MailConfig {
   host: string;
@@ -26,11 +28,35 @@ function readMailConfig(): MailConfig | null {
   return { host, port, secure, user, pass, from };
 }
 
+function readDkimPrivateKey(): string | null {
+  const keyPath = process.env.SMTP_DKIM_PRIVATE_KEY_PATH?.trim();
+  if (keyPath) {
+    try {
+      const resolved = path.isAbsolute(keyPath) ? keyPath : path.resolve(process.cwd(), keyPath);
+      return fs.readFileSync(resolved, 'utf8').trim();
+    } catch (error) {
+      console.error('[mail] failed to read DKIM key file', keyPath, error);
+      return null;
+    }
+  }
+
+  const inline = process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
+  return inline || null;
+}
+
 function readDkimConfig(): nodemailer.SendMailOptions['dkim'] | undefined {
   const domainName = process.env.SMTP_DKIM_DOMAIN?.trim();
-  const keySelector = process.env.SMTP_DKIM_SELECTOR?.trim();
-  const privateKey = process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
-  if (!domainName || !keySelector || !privateKey) return undefined;
+  const keySelector = process.env.SMTP_DKIM_SELECTOR?.trim() || 'mail';
+  const privateKey = readDkimPrivateKey();
+  if (!domainName || !privateKey) return undefined;
+
+  try {
+    createPrivateKey(privateKey);
+  } catch (error) {
+    console.error('[mail] DKIM private key is invalid — sending without signature', error);
+    return undefined;
+  }
+
   return { domainName, keySelector, privateKey };
 }
 
@@ -132,6 +158,7 @@ export async function sendMail(options: {
   const config = readMailConfig();
   if (!config) throw new Error('MAIL_NOT_CONFIGURED');
 
+  const dkim = readDkimConfig();
   const transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -140,7 +167,7 @@ export async function sendMail(options: {
       user: config.user,
       pass: config.pass,
     },
-    dkim: readDkimConfig(),
+    dkim,
     tls: {
       minVersion: 'TLSv1.2',
     },
@@ -164,6 +191,7 @@ export async function sendMail(options: {
   const domain = options.to.split('@')[1] ?? 'unknown';
   console.log('[mail] sent', {
     domain,
+    dkim: dkim ? `${dkim.keySelector}._domainkey.${dkim.domainName}` : 'off',
     messageId: info.messageId,
     accepted: info.accepted,
     rejected: info.rejected,

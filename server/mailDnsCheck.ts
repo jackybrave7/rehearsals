@@ -117,8 +117,8 @@ export async function checkMailDeliverability(options: {
 
   const appDkimConfigured = Boolean(
     process.env.SMTP_DKIM_DOMAIN?.trim() &&
-      process.env.SMTP_DKIM_SELECTOR?.trim() &&
-      process.env.SMTP_DKIM_PRIVATE_KEY?.trim()
+      (process.env.SMTP_DKIM_PRIVATE_KEY_PATH?.trim() ||
+        process.env.SMTP_DKIM_PRIVATE_KEY?.trim())
   );
   checks.push({
     id: 'app-dkim',
