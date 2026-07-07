@@ -1,48 +1,72 @@
 # Доставляемость писем (Яндекс, Mail.ru)
 
-Письма регистрации уходят через SMTP TimeWeb (`support@rehears.ru`). Если на **Яндексе** письмо в «Спаме», а на **Mail.ru** не приходит — почти всегда не хватает **DKIM** и/или домен не добавлен в постмастеры.
+Письма регистрации уходят через SMTP TimeWeb (`support@rehears.ru`). **Mail.ru часто молча отбрасывает** письма без корректного **DKIM**.
 
-## Текущая проверка DNS (rehears.ru)
+## Диагностика (быстро)
 
-| Запись | Нужно | Статус |
-|--------|--------|--------|
-| SPF | `v=spf1 include:_spf.timeweb.ru ~all` | обычно есть |
-| DMARC | `v=DMARC1; p=none; rua=mailto:support@rehears.ru` | обычно есть |
-| **DKIM** | TXT `mail._domainkey.rehears.ru` (из панели TimeWeb) | **часто отсутствует** |
-
-Проверка с сервера:
+На сервере или локально:
 
 ```bash
-dig +short TXT rehears.ru
-dig +short TXT mail._domainkey.rehears.ru
-dig +short TXT _dmarc.rehears.ru
+node scripts/check-mail-dns.mjs rehears.ru
 ```
 
-## 1. DKIM в TimeWeb (обязательно)
+В админке: **Статистика платформы** → блок **«Доставка на Mail.ru»**.
 
-1. Панель TimeWeb → **Почта** → домен `rehears.ru` → **DKIM** (или «Аутентификация»).
-2. Включите DKIM для ящика `support@rehears.ru`.
-3. Скопируйте **TXT-запись** для поддомена `mail._domainkey` (или как указано в панели).
-4. DNS домена → добавьте запись → подождите 15–60 минут.
-5. В панели TimeWeb нажмите «Проверить».
+## Текущее состояние DNS (проверено)
 
-Без DKIM Mail.ru часто **молча отбрасывает** письма, Яндекс кладёт в спам.
+| Запись | Статус |
+|--------|--------|
+| SPF `v=spf1 include:_spf.timeweb.ru ~all` | ✓ есть |
+| DMARC `_dmarc.rehears.ru` | ✓ есть (`p=none`) |
+| DKIM `mail._domainkey` | ✗ **нужен для писем с VPS** |
+| DKIM `dkim._domainkey` | ⚠ есть, но **без `v=DKIM1`** — Mail.ru может не принять |
+
+Письма с API (nodemailer → smtp.timeweb.ru) **не подписываются** почтовым ящиком TimeWeb — нужна **своя DKIM-подпись** в приложении + TXT `mail._domainkey`.
+
+## 1. DKIM для писем с сервера (обязательно)
+
+На VPS в каталоге проекта:
+
+```bash
+cd /var/www/rehearsals
+node scripts/setup-smtp-dkim.mjs rehears.ru --write-env
+docker restart rehearsals-api
+```
+
+Скрипт выведет TXT для DNS. В **TimeWeb → Домены → rehears.ru → DNS**:
+
+- Тип: **TXT**
+- Хост: **`mail._domainkey`**
+- Значение: `v=DKIM1; k=rsa; p=…` (одной строкой, из вывода скрипта)
+
+Подождите 15–60 минут, затем:
+
+```bash
+node scripts/check-mail-dns.mjs
+node scripts/test-smtp.mjs ваш@mail.ru
+```
 
 ## 2. Постмастер Mail.ru
 
 1. https://postmaster.mail.ru/ → войти.
 2. **Добавить домен** `rehears.ru`.
-3. Подтвердить владение (файл уже на сайте):
-   - https://rehears.ru/mailru-verification120c4ec91218f839.html
-4. После проверки — смотреть статистику доставки и ошибки.
+3. Подтвердить файлом: https://rehears.ru/mailru-verification120c4ec91218f839.html
+4. В разделе защиты домена убедиться, что SPF и DKIM зелёные.
+5. API статистики: https://help.mail.ru/developers/postmaster/api/ (`/ext-api/troubles-list/`).
 
-## 3. Постмастер Яндекса
+## 3. Исправить старую запись `dkim._domainkey` (желательно)
 
-1. https://postmaster.yandex.ru/ → добавить `rehears.ru`.
-2. Подтвердить домен (DNS TXT или мета-тег).
-3. Убедиться, что SPF и DKIM «зелёные».
+В DNS сейчас значение начинается с `k=rsa;p=…` без `v=DKIM1`. В TimeWeb отредактируйте запись:
 
-## 4. Настройки `.env` на сервере
+```
+v=DKIM1; k=rsa; p=…тот же ключ…
+```
+
+## 4. DMARC (позже)
+
+Для «Надёжного отправителя» Mail.ru нужен `p=quarantine` или `p=reject`. Пока можно оставить `p=none`, если DKIM настроен.
+
+## 5. Настройки `.env`
 
 ```env
 SMTP_HOST=smtp.timeweb.ru
@@ -52,35 +76,19 @@ SMTP_USER=support@rehears.ru
 SMTP_PASS=...
 SMTP_FROM=support@rehears.ru
 APP_URL=https://rehears.ru
-```
 
-`SMTP_FROM` должен совпадать с `SMTP_USER` (тот же ящик).
-
-Опционально — подпись DKIM на стороне приложения (если TimeWeb выдал приватный ключ):
-
-```env
 SMTP_DKIM_DOMAIN=rehears.ru
 SMTP_DKIM_SELECTOR=mail
 SMTP_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-Обычно достаточно DKIM на стороне SMTP TimeWeb без переменных в `.env`.
+`SMTP_FROM` = `SMTP_USER`. После правок: `docker restart rehearsals-api`.
 
-После правок: `docker restart rehearsals-api`.
-
-## 5. Тест отправки
-
-На сервере (из каталога проекта, с загруженным `.env`):
+## 6. Тест
 
 ```bash
 node scripts/test-smtp.mjs ваш@yandex.ru
 node scripts/test-smtp.mjs ваш@mail.ru
 ```
 
-Смотрите логи API: `[mail] sent` с `accepted` / `rejected`.
-
-## 6. Если всё ещё спам на Яндексе
-
-- Попросите получателя: «Не спам» + добавить `support@rehears.ru` в контакты.
-- Не меняйте `SMTP_FROM` на другой домен.
-- Проверьте, что ссылка в письме ведёт на `https://rehears.ru/verify-email?...` (не localhost).
+В логах API: `[mail] sent` с `accepted`.

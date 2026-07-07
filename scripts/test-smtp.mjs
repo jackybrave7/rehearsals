@@ -56,11 +56,20 @@ if (!host || !user || !pass || !from) {
 }
 
 const domain = from.split('@')[1] ?? 'rehears.ru';
+const dkimDomain = process.env.SMTP_DKIM_DOMAIN?.trim();
+const dkimSelector = process.env.SMTP_DKIM_SELECTOR?.trim();
+const dkimKey = process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
+const dkim =
+  dkimDomain && dkimSelector && dkimKey
+    ? { domainName: dkimDomain, keySelector: dkimSelector, privateKey: dkimKey }
+    : undefined;
+
 const transporter = nodemailer.createTransport({
   host,
   port,
   secure,
   auth: { user, pass },
+  dkim,
   tls: { minVersion: 'TLSv1.2' },
 });
 
@@ -82,6 +91,7 @@ const info = await transporter.sendMail({
   text,
   headers: {
     'Message-ID': `<${randomUUID()}@${domain}>`,
+    'X-Mailru-Msgtype': 'test',
   },
   envelope: { from, to },
 });

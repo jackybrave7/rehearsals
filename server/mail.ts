@@ -39,17 +39,27 @@ function domainFromAddress(address: string): string {
   return match?.[1] ?? 'rehears.ru';
 }
 
-function buildMailHeaders(from: string): Record<string, string> {
+function buildMailHeaders(from: string, msgType?: string): Record<string, string> {
   const domain = domainFromAddress(from);
-  return {
+  const headers: Record<string, string> = {
     'Message-ID': `<${randomUUID()}@${domain}>`,
     'X-Mailer': 'Rehearsals',
     'X-Entity-Ref-ID': randomUUID(),
+    'List-Unsubscribe': `<mailto:support@${domain}?subject=unsubscribe>`,
   };
+  if (msgType) {
+    headers['X-Mailru-Msgtype'] = msgType;
+    headers['X-Postmaster-Msgtype'] = msgType;
+  }
+  return headers;
 }
 
 export function isMailConfigured(): boolean {
   return readMailConfig() !== null;
+}
+
+export function readMailFromAddress(): string | null {
+  return readMailConfig()?.from ?? null;
 }
 
 function formatFromAddress(from: string): string {
@@ -117,6 +127,7 @@ export async function sendMail(options: {
   subject: string;
   text: string;
   html?: string;
+  msgType?: string;
 }): Promise<void> {
   const config = readMailConfig();
   if (!config) throw new Error('MAIL_NOT_CONFIGURED');
@@ -143,7 +154,7 @@ export async function sendMail(options: {
     subject: options.subject,
     text: options.text,
     html: options.html ?? textToHtml(options.text),
-    headers: buildMailHeaders(config.from),
+    headers: buildMailHeaders(config.from, options.msgType),
     envelope: {
       from: config.from,
       to: options.to,
@@ -167,6 +178,7 @@ export async function sendProActivatedEmail(to: string, name: string): Promise<v
   await sendMail({
     to,
     subject: 'Тариф Pro подключён — Репетиции',
+    msgType: 'transaction',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
@@ -194,6 +206,7 @@ export async function sendRegistrationApprovedEmail(to: string, name: string): P
   await sendMail({
     to,
     subject: 'Доступ к Репетициям открыт',
+    msgType: 'transaction',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
@@ -229,6 +242,7 @@ export async function sendEmailVerificationEmail(
   await sendMail({
     to,
     subject: 'Подтверждение регистрации на rehears.ru',
+    msgType: 'registration',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
@@ -267,6 +281,7 @@ export async function sendEmailConfirmedEmail(
     await sendMail({
       to,
       subject: 'Email подтверждён — Репетиции',
+      msgType: 'transaction',
       text: [
         `Здравствуйте, ${greeting}!`,
         '',
@@ -283,6 +298,7 @@ export async function sendEmailConfirmedEmail(
   await sendMail({
     to,
     subject: 'Email подтверждён — можно войти',
+    msgType: 'transaction',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
@@ -304,6 +320,7 @@ export async function sendPasswordResetEmail(
   await sendMail({
     to,
     subject: 'Одноразовый пароль — Репетиции',
+    msgType: 'password-reset',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
@@ -341,6 +358,7 @@ export async function sendSupportTicketConfirmationEmail(options: {
   await sendMail({
     to: options.to,
     subject: `Обращение ${options.ticketNumber} — Репетиции`,
+    msgType: 'support',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
