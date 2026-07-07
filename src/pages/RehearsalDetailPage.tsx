@@ -56,7 +56,7 @@ import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actor
 import { ActorAvatar } from '../components/ActorAvatar';
 import { TheaterSceneListGrouped } from '../components/TheaterSceneListGrouped';
 import { TheaterScenePicker } from '../components/TheaterScenePicker';
-import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
+import { LinkifiedText } from '../components/LinkifiedText';
 import type {
   AttendanceStatus,
   Rehearsal,
@@ -665,7 +665,7 @@ export function RehearsalDetailPage() {
               </span>
             )}
           </div>
-          {rehearsal.notes && <p className="mt-3 text-muted">{rehearsal.notes}</p>}
+          {rehearsal.notes && <LinkifiedText text={rehearsal.notes} className="mt-3 text-muted" />}
         </div>
         <div className="shrink-0 self-start sm:self-auto">
         <RehearsalActionsMenu

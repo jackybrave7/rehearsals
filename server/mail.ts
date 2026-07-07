@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { randomUUID } from 'node:crypto';
 
 export interface MailConfig {
   host: string;
@@ -23,6 +24,28 @@ function readMailConfig(): MailConfig | null {
     port === 465;
 
   return { host, port, secure, user, pass, from };
+}
+
+function readDkimConfig(): nodemailer.SendMailOptions['dkim'] | undefined {
+  const domainName = process.env.SMTP_DKIM_DOMAIN?.trim();
+  const keySelector = process.env.SMTP_DKIM_SELECTOR?.trim();
+  const privateKey = process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
+  if (!domainName || !keySelector || !privateKey) return undefined;
+  return { domainName, keySelector, privateKey };
+}
+
+function domainFromAddress(address: string): string {
+  const match = address.match(/@([^>\s]+)/);
+  return match?.[1] ?? 'rehears.ru';
+}
+
+function buildMailHeaders(from: string): Record<string, string> {
+  const domain = domainFromAddress(from);
+  return {
+    'Message-ID': `<${randomUUID()}@${domain}>`,
+    'X-Mailer': 'Rehearsals',
+    'X-Entity-Ref-ID': randomUUID(),
+  };
 }
 
 export function isMailConfigured(): boolean {
@@ -106,18 +129,24 @@ export async function sendMail(options: {
       user: config.user,
       pass: config.pass,
     },
+    dkim: readDkimConfig(),
+    tls: {
+      minVersion: 'TLSv1.2',
+    },
   });
 
+  const fromAddress = formatFromAddress(config.from);
   const info = await transporter.sendMail({
-    from: formatFromAddress(config.from),
+    from: fromAddress,
     replyTo: config.from,
     to: options.to,
     subject: options.subject,
     text: options.text,
     html: options.html ?? textToHtml(options.text),
-    headers: {
-      'X-Mailer': 'Rehearsals',
-      'Auto-Submitted': 'auto-generated',
+    headers: buildMailHeaders(config.from),
+    envelope: {
+      from: config.from,
+      to: options.to,
     },
   });
 
@@ -199,7 +228,7 @@ export async function sendEmailVerificationEmail(
 
   await sendMail({
     to,
-    subject: 'Подтвердите email — Репетиции',
+    subject: 'Подтверждение регистрации на rehears.ru',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',

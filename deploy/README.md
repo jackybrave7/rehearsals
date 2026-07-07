@@ -62,6 +62,8 @@ APP_URL=https://rehears.ru
 
 После правки: `docker restart rehearsals-api`. Проверка: `curl -s https://rehears.ru/api/auth/config` — должно быть `"mailConfigured":true`.
 
+**Доставляемость на Яндекс / Mail.ru:** см. [`deploy/mail-deliverability.md`](mail-deliverability.md) (DKIM, постмастеры). Тест: `node scripts/test-smtp.mjs ваш@mail.ru`.
+
 **Google Docs (опционально):** `VITE_GOOGLE_CLIENT_ID` — только для синхронизации текста из Google Docs, не для входа в аккаунт. Подставляется **на этапе сборки**. Задайте в `.env` **до** `npm run build`.
 
 ## 4. Сборка и первый запуск API

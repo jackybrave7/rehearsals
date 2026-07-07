@@ -12,7 +12,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import type { Play, Rehearsal, Scene, ScheduleBlock, ScheduleBlockType, Task } from '../types';
+import { LinkifiedText } from './LinkifiedText';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getSceneCharacterNames } from '../utils/sceneLabels';
 import { Button } from './Button';
@@ -506,7 +506,7 @@ export function RehearsalScheduleEditor({
                           </div>
                         )}
                         {block.notes && (
-                          <p className="text-sm leading-relaxed text-muted">{block.notes}</p>
+                          <LinkifiedText text={block.notes} className="text-sm leading-relaxed text-muted" as="div" />
                         )}
                         {block.decidedNotes?.trim() && (
                           <div className="space-y-1 rounded-lg bg-gold/5 px-3 py-2 text-xs text-muted">
