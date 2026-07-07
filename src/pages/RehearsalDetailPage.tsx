@@ -73,6 +73,7 @@ import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
+import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { markGuidePlanExported } from '../utils/guidePlanExport';
 import { MentionTextarea } from '../components/MentionTextarea';

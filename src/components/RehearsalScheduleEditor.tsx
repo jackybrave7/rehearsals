@@ -48,6 +48,7 @@ import {
   isPastRehearsalDay,
   isScheduleBlockCompletable,
 } from '../utils/rehearsalScheduleCompletion';
+import type { Play, Rehearsal, Scene, ScheduleBlock, ScheduleBlockType, Task } from '../types';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
   scene: 'Сцена',
