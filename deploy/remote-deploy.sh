@@ -145,18 +145,10 @@ start_api_container() {
 
 restart_api() {
   if has_docker && docker ps -a --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
-    if api_container_needs_recreate; then
-      echo "[deploy] Replacing legacy API container (old entrypoint reinstalled deps on every restart)..."
-      docker stop "$DOCKER_CONTAINER" 2>/dev/null || true
-      docker rm "$DOCKER_CONTAINER" 2>/dev/null || true
-      start_api_container
-    elif ! docker ps --format '{{.Names}}' | grep -qx "$DOCKER_CONTAINER"; then
-      echo "[deploy] docker start $DOCKER_CONTAINER..."
-      docker start "$DOCKER_CONTAINER"
-    else
-      echo "[deploy] docker restart $DOCKER_CONTAINER..."
-      docker restart "$DOCKER_CONTAINER"
-    fi
+    echo "[deploy] Recreating $DOCKER_CONTAINER (reload .env)..."
+    docker stop "$DOCKER_CONTAINER" 2>/dev/null || true
+    docker rm "$DOCKER_CONTAINER" 2>/dev/null || true
+    start_api_container
     return
   fi
 
