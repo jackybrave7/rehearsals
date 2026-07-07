@@ -84,11 +84,15 @@ SMTP_DKIM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY---
 
 `SMTP_FROM` = `SMTP_USER`. После правок: `docker restart rehearsals-api`.
 
+**Не добавляйте `List-Unsubscribe`** в транзакционные письма (регистрация, сброс пароля) — Mail.ru может классифицировать их как рассылку и отклонять с `550 spam message rejected`.
+
 ## 6. Тест
 
 ```bash
 node scripts/test-smtp.mjs ваш@yandex.ru
 node scripts/test-smtp.mjs ваш@mail.ru
+node scripts/send-registration-test.mjs ваш@mail.ru
+node scripts/capture-dkim-message.mjs
 ```
 
 В логах API: `[mail] sent` с `accepted`.

@@ -70,8 +70,6 @@ function buildMailHeaders(from: string, msgType?: string): Record<string, string
   const headers: Record<string, string> = {
     'Message-ID': `<${randomUUID()}@${domain}>`,
     'X-Mailer': 'Rehearsals',
-    'X-Entity-Ref-ID': randomUUID(),
-    'List-Unsubscribe': `<mailto:support@${domain}?subject=unsubscribe>`,
   };
   if (msgType) {
     headers['X-Mailru-Msgtype'] = msgType;
@@ -264,29 +262,26 @@ export async function sendEmailVerificationEmail(
   const afterConfirm = betaMode
     ? 'После подтверждения заявка будет рассмотрена администратором. Мы сообщим на почту, когда доступ откроется.'
     : 'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.';
-  const spamHint =
-    'Если письма нет во входящих, проверьте папку «Спам» и отметьте его как «Не спам».';
 
   await sendMail({
     to,
-    subject: 'Подтверждение регистрации на rehears.ru',
+    subject: 'Подтвердите email — Репетиции',
     msgType: 'registration',
     text: [
       `Здравствуйте, ${greeting}!`,
       '',
       intro,
-      verifyUrl,
+      '',
+      `Подтвердить email: ${verifyUrl}`,
       '',
       afterConfirm,
-      '',
-      spamHint,
       ...(betaMode
         ? ['', 'Ссылка действует 48 часов. Если вы не регистрировались — просто проигнорируйте это письмо.']
         : []),
     ].join('\n'),
     html: buildActionEmailHtml({
       greeting,
-      paragraphs: [intro, afterConfirm, spamHint],
+      paragraphs: [intro, afterConfirm],
       actionLabel: 'Подтвердить email',
       actionUrl: verifyUrl,
       footer: betaMode

@@ -56,9 +56,18 @@ if (!host || !user || !pass || !from) {
 }
 
 const domain = from.split('@')[1] ?? 'rehears.ru';
+function readDkimPrivateKey() {
+  const keyPath = process.env.SMTP_DKIM_PRIVATE_KEY_PATH?.trim();
+  if (keyPath) {
+    const resolved = keyPath.startsWith('/') ? keyPath : resolve(root, keyPath);
+    return readFileSync(resolved, 'utf8').trim();
+  }
+  return process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim() ?? '';
+}
+
 const dkimDomain = process.env.SMTP_DKIM_DOMAIN?.trim();
 const dkimSelector = process.env.SMTP_DKIM_SELECTOR?.trim();
-const dkimKey = process.env.SMTP_DKIM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
+const dkimKey = readDkimPrivateKey();
 const dkim =
   dkimDomain && dkimSelector && dkimKey
     ? { domainName: dkimDomain, keySelector: dkimSelector, privateKey: dkimKey }
