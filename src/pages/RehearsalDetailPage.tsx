@@ -693,65 +693,6 @@ export function RehearsalDetailPage() {
         />
       )}
 
-      <RehearsalOutcomePhotosPanel rehearsal={rehearsal} readOnly={readOnly} />
-
-      <section className="rounded-2xl border border-gold/10 bg-surface/40 px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-muted">
-              Напоминания в Telegram
-            </p>
-            {!readOnly && (
-              <label className="flex cursor-pointer items-center gap-3 text-sm text-muted">
-                <input
-                  type="checkbox"
-                  checked={rehearsal.reminderOptOut ?? false}
-                  onChange={() =>
-                    dispatch({
-                      type: 'UPDATE_REHEARSAL',
-                      payload: { ...rehearsal, reminderOptOut: !rehearsal.reminderOptOut },
-                    })
-                  }
-                  className="h-4 w-4 rounded border-gold/30 accent-gold"
-                />
-                Не напоминать по этой репетиции
-              </label>
-            )}
-            {rehearsal.reminderOptOut && (
-              <p className="text-sm text-amber-200">Авто-напоминания отключены для этой репетиции</p>
-            )}
-            {(rehearsal.remindersSent ?? []).length > 0 ? (
-              <ul className="space-y-1 text-sm text-muted">
-                {(rehearsal.remindersSent ?? []).map((entry, index) => {
-                  const actorLabel = entry.actorId
-                    ? state.actors.find((actor) => actor.id === entry.actorId)?.name ?? 'участнику'
-                    : null;
-                  return (
-                    <li key={`${entry.kind}-${entry.actorId ?? ''}-${entry.at}-${index}`}>
-                      {actorLabel ? (
-                        <>
-                          {actorLabel}: напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)}{' '}
-                          отправлено в {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
-                        </>
-                      ) : (
-                        <>
-                          Напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)} отправлено в{' '}
-                          {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted">
-                Личные напоминания ещё не отправлялись. Включите в «Настройках» и подключите бота у участников.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
       <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
@@ -1044,6 +985,67 @@ export function RehearsalDetailPage() {
             readOnly={readOnly}
           />
         </div>
+      </div>
+
+      <div className="space-y-4">
+        <RehearsalOutcomePhotosPanel rehearsal={rehearsal} readOnly={readOnly} />
+
+        <section className="rounded-2xl border border-gold/10 bg-surface/40 px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm font-medium uppercase tracking-wide text-muted">
+                Напоминания в Telegram
+              </p>
+              {!readOnly && (
+                <label className="flex cursor-pointer items-center gap-3 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    checked={rehearsal.reminderOptOut ?? false}
+                    onChange={() =>
+                      dispatch({
+                        type: 'UPDATE_REHEARSAL',
+                        payload: { ...rehearsal, reminderOptOut: !rehearsal.reminderOptOut },
+                      })
+                    }
+                    className="h-4 w-4 rounded border-gold/30 accent-gold"
+                  />
+                  Не напоминать по этой репетиции
+                </label>
+              )}
+              {rehearsal.reminderOptOut && (
+                <p className="text-sm text-amber-200">Авто-напоминания отключены для этой репетиции</p>
+              )}
+              {(rehearsal.remindersSent ?? []).length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted">
+                  {(rehearsal.remindersSent ?? []).map((entry, index) => {
+                    const actorLabel = entry.actorId
+                      ? state.actors.find((actor) => actor.id === entry.actorId)?.name ?? 'участнику'
+                      : null;
+                    return (
+                      <li key={`${entry.kind}-${entry.actorId ?? ''}-${entry.at}-${index}`}>
+                        {actorLabel ? (
+                          <>
+                            {actorLabel}: напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)}{' '}
+                            отправлено в {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
+                          </>
+                        ) : (
+                          <>
+                            Напоминание {formatReminderKindLabel(entry.kind, entry.offsetHours)} отправлено в{' '}
+                            {format(parseISO(entry.at), 'HH:mm', { locale: ru })}
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted">
+                  Личные напоминания ещё не отправлялись. Включите в «Настройках» и подключите бота у участников.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
 
       <Modal
