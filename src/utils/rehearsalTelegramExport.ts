@@ -303,7 +303,7 @@ function buildPlanSummaryLine(state: AppState, rehearsal: Rehearsal): string | n
 }
 
 function formatBlockPrefix(blockNumber: number): string {
-  return `${blockNumber}. `;
+  return `👉 ${blockNumber}. `;
 }
 
 function formatBlockPrefixHtml(blockNumber: number): string {
@@ -333,6 +333,10 @@ function formatSceneBlock(
       ? `${prefixHtml}<a href="${escapeHtml(scriptUrl)}">${escapeHtml(heading)}</a>${escapeHtml(`${characters}${tail}`)}`
       : `${prefixHtml}${html}`,
   ];
+
+  if (scriptUrl) {
+    plainLines.push(indent(`🔗 ${scriptUrl}`));
+  }
 
   if (scene.description?.trim()) {
     const excerpt = truncateTelegramText(scene.description, 140);
