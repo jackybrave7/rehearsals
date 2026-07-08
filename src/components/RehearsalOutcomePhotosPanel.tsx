@@ -6,6 +6,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { UpgradePrompt } from './UpgradePrompt';
 import { Button } from './Button';
 import {
+  MAX_OUTCOME_PHOTOS_PER_REHEARSAL,
   deleteRehearsalOutcomePhoto,
   formatOutcomePhotoUploadError,
   uploadRehearsalOutcomePhoto,
@@ -25,11 +26,16 @@ export function RehearsalOutcomePhotosPanel({
   const { isPro } = useSubscription();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
 
   const photos = rehearsal.outcomePhotoUrls ?? [];
+  const slotsLeft = MAX_OUTCOME_PHOTOS_PER_REHEARSAL - photos.length;
+  const atLimit = slotsLeft <= 0;
 
   const updatePhotos = (outcomePhotoUrls: string[]) => {
     dispatch({
@@ -38,24 +44,55 @@ export function RehearsalOutcomePhotosPanel({
     });
   };
 
-  const handleUpload = async (file: File) => {
-    const validationError = validateOutcomePhotoFile(file);
-    if (validationError) {
-      setError(validationError);
+  const handleUploadFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+
+    if (atLimit) {
+      setError(`Достигнут лимит: ${MAX_OUTCOME_PHOTOS_PER_REHEARSAL} фото на репетицию.`);
       return;
     }
 
-    setUploading(true);
-    setError(null);
-    try {
-      const uploaded = await uploadRehearsalOutcomePhoto(rehearsal.id, file);
-      updatePhotos([...photos, uploaded.url]);
-    } catch (uploadError) {
-      setError(formatOutcomePhotoUploadError(uploadError));
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
+    const allowedCount = Math.min(files.length, slotsLeft);
+    const filesToUpload = files.slice(0, allowedCount);
+    if (files.length > allowedCount) {
+      setError(
+        `Выбрано ${files.length} фото — загрузим ${allowedCount} (лимит ${MAX_OUTCOME_PHOTOS_PER_REHEARSAL}).`
+      );
+    } else {
+      setError(null);
     }
+
+    setUploading(true);
+    let nextUrls = [...photos];
+    let firstError: string | null = null;
+
+    for (let index = 0; index < filesToUpload.length; index += 1) {
+      const file = filesToUpload[index]!;
+      setUploadProgress({ current: index + 1, total: filesToUpload.length });
+
+      const validationError = validateOutcomePhotoFile(file);
+      if (validationError) {
+        firstError = `${file.name}: ${validationError}`;
+        continue;
+      }
+
+      try {
+        const uploaded = await uploadRehearsalOutcomePhoto(rehearsal.id, file);
+        if (!nextUrls.includes(uploaded.url)) {
+          nextUrls = [...nextUrls, uploaded.url];
+          updatePhotos(nextUrls);
+        }
+      } catch (uploadError) {
+        firstError = formatOutcomePhotoUploadError(uploadError);
+        break;
+      }
+    }
+
+    if (firstError) setError(firstError);
+    setUploading(false);
+    setUploadProgress(null);
+    if (inputRef.current) inputRef.current.value = '';
   };
 
   const handleDelete = async (url: string) => {
@@ -93,7 +130,16 @@ export function RehearsalOutcomePhotosPanel({
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
             Итог репетиции
           </h2>
-          <p className="mt-1 text-xs text-muted">Фото до 10 МБ, сжимаются при загрузке</p>
+          <p className="mt-1 text-xs text-muted">
+            До {MAX_OUTCOME_PHOTOS_PER_REHEARSAL} фото, каждое до 10 МБ. Можно выбрать несколько
+            сразу.
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            {photos.length} / {MAX_OUTCOME_PHOTOS_PER_REHEARSAL}
+            {uploadProgress
+              ? ` · загрузка ${uploadProgress.current} из ${uploadProgress.total}`
+              : ''}
+          </p>
         </div>
         {!readOnly && (
           <>
@@ -101,21 +147,28 @@ export function RehearsalOutcomePhotosPanel({
               ref={inputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
               className="sr-only"
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void handleUpload(file);
+                const files = event.target.files;
+                if (files && files.length > 0) void handleUploadFiles(files);
               }}
             />
             <Button
               type="button"
               variant="secondary"
               className="shrink-0"
-              disabled={uploading}
+              disabled={uploading || atLimit}
               onClick={() => inputRef.current?.click()}
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-              {uploading ? 'Загрузка…' : 'Добавить фото'}
+              {uploading
+                ? uploadProgress
+                  ? `Загрузка ${uploadProgress.current}/${uploadProgress.total}…`
+                  : 'Загрузка…'
+                : atLimit
+                  ? 'Лимит фото'
+                  : 'Добавить фото'}
             </Button>
           </>
         )}

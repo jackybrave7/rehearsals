@@ -15,7 +15,35 @@ import {
   uploadOutcomePhotoToS3,
 } from './s3Storage.js';
 
-const MAX_PHOTOS_PER_REHEARSAL = 30;
+const MAX_PHOTOS_PER_REHEARSAL = 50;
+
+function parsePhotoUrls(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function readOutcomePhotoUrls(db: ReturnType<typeof getDb>, rehearsalId: string): string[] {
+  const row = db
+    .prepare(`SELECT outcome_photo_urls FROM rehearsals WHERE id = ?`)
+    .get(rehearsalId) as { outcome_photo_urls: string | null } | undefined;
+  return parsePhotoUrls(row?.outcome_photo_urls);
+}
+
+function writeOutcomePhotoUrls(
+  db: ReturnType<typeof getDb>,
+  rehearsalId: string,
+  urls: string[]
+): void {
+  db.prepare(`UPDATE rehearsals SET outcome_photo_urls = ? WHERE id = ?`).run(
+    JSON.stringify(urls),
+    rehearsalId
+  );
+}
 
 export function registerRehearsalOutcomePhotoRoutes(app: Express): void {
   app.post('/api/rehearsals/:rehearsalId/outcome-photos', async (req, res) => {
@@ -52,8 +80,8 @@ export function registerRehearsalOutcomePhotoRoutes(app: Express): void {
       return;
     }
 
-    const existingCount = rehearsal.outcomePhotoUrls?.length ?? 0;
-    if (existingCount >= MAX_PHOTOS_PER_REHEARSAL) {
+    const existingUrls = readOutcomePhotoUrls(db, rehearsalId);
+    if (existingUrls.length >= MAX_PHOTOS_PER_REHEARSAL) {
       res.status(413).json({ error: 'TOO_MANY_PHOTOS' });
       return;
     }
@@ -91,6 +119,9 @@ export function registerRehearsalOutcomePhotoRoutes(app: Express): void {
       const fileId = uuidv4();
       const key = buildOutcomePhotoKey(rehearsal.theaterId, rehearsalId, fileId);
       const url = await uploadOutcomePhotoToS3(compressed, key);
+      if (!existingUrls.includes(url)) {
+        writeOutcomePhotoUrls(db, rehearsalId, [...existingUrls, url]);
+      }
 
       res.status(201).json({
         url,
@@ -140,13 +171,19 @@ export function registerRehearsalOutcomePhotoRoutes(app: Express): void {
       return;
     }
 
-    if (!rehearsal.outcomePhotoUrls?.includes(url)) {
+    const existingUrls = readOutcomePhotoUrls(db, rehearsalId);
+    if (!existingUrls.includes(url)) {
       res.status(404).json({ error: 'PHOTO_NOT_FOUND' });
       return;
     }
 
     try {
       await deleteOutcomePhotoFromS3(url);
+      writeOutcomePhotoUrls(
+        db,
+        rehearsalId,
+        existingUrls.filter((item) => item !== url)
+      );
       res.json({ ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'DELETE_FAILED';

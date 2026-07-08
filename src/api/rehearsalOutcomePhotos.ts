@@ -1,5 +1,7 @@
 import { API_BASE } from './apiBase';
 
+export const MAX_OUTCOME_PHOTOS_PER_REHEARSAL = 50;
+
 export interface UploadedOutcomePhoto {
   url: string;
   mimeType: string;
@@ -12,7 +14,9 @@ export function formatOutcomePhotoUploadError(error: unknown): string {
   if (code === 'FILE_TOO_LARGE') return 'Фото слишком большое. Максимум — 10 МБ.';
   if (code === 'INVALID_IMAGE_TYPE') return 'Поддерживаются только JPEG, PNG, WebP и GIF.';
   if (code === 'SUBSCRIPTION_PRO_REQUIRED') return 'Итоговые фото доступны на тарифе Pro.';
-  if (code === 'TOO_MANY_PHOTOS') return 'Слишком много фото для одной репетиции.';
+  if (code === 'TOO_MANY_PHOTOS') {
+    return `Слишком много фото для одной репетиции (максимум ${MAX_OUTCOME_PHOTOS_PER_REHEARSAL}).`;
+  }
   if (code === 'S3_NOT_CONFIGURED') return 'Хранилище фото не настроено на сервере.';
   if (code === 'UNAUTHORIZED') return 'Сессия истекла — обновите страницу и войдите снова.';
   return 'Не удалось загрузить фото. Проверьте формат и подключение.';
