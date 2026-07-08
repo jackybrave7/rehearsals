@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { ImagePlus, Loader2, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2, X } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -30,12 +30,62 @@ export function RehearsalOutcomePhotosPanel({
     null
   );
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
 
   const photos = rehearsal.outcomePhotoUrls ?? [];
   const slotsLeft = MAX_OUTCOME_PHOTOS_PER_REHEARSAL - photos.length;
   const atLimit = slotsLeft <= 0;
+  const viewerOpen = viewerIndex !== null && photos[viewerIndex] !== undefined;
+  const viewerUrl = viewerOpen ? photos[viewerIndex]! : null;
+
+  const closeViewer = () => {
+    setViewerIndex(null);
+    setIsFullscreen(false);
+  };
+
+  const openViewer = (index: number) => {
+    setViewerIndex(index);
+    setIsFullscreen(false);
+  };
+
+  const showPrev = () => {
+    if (viewerIndex === null || photos.length === 0) return;
+    setViewerIndex((viewerIndex - 1 + photos.length) % photos.length);
+    setIsFullscreen(false);
+  };
+
+  const showNext = () => {
+    if (viewerIndex === null || photos.length === 0) return;
+    setViewerIndex((viewerIndex + 1) % photos.length);
+    setIsFullscreen(false);
+  };
+
+  useEffect(() => {
+    if (!viewerOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (isFullscreen) setIsFullscreen(false);
+        else closeViewer();
+        return;
+      }
+      if (isFullscreen) return;
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        showPrev();
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        showNext();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [viewerOpen, isFullscreen, viewerIndex, photos.length]);
 
   const updatePhotos = (outcomePhotoUrls: string[]) => {
     dispatch({
@@ -95,12 +145,22 @@ export function RehearsalOutcomePhotosPanel({
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const handleDelete = async (url: string) => {
+  const handleDelete = async (url: string, index: number) => {
     setDeletingUrl(url);
     setError(null);
     try {
       await deleteRehearsalOutcomePhoto(rehearsal.id, url);
-      updatePhotos(photos.filter((item) => item !== url));
+      const nextPhotos = photos.filter((item) => item !== url);
+      updatePhotos(nextPhotos);
+
+      if (viewerIndex !== null) {
+        if (nextPhotos.length === 0) closeViewer();
+        else if (index === viewerIndex) {
+          setViewerIndex(Math.min(viewerIndex, nextPhotos.length - 1));
+        } else if (index < viewerIndex) {
+          setViewerIndex(viewerIndex - 1);
+        }
+      }
     } catch (deleteError) {
       setError(formatOutcomePhotoUploadError(deleteError));
     } finally {
@@ -131,14 +191,12 @@ export function RehearsalOutcomePhotosPanel({
             Итог репетиции
           </h2>
           <p className="mt-1 text-xs text-muted">
-            До {MAX_OUTCOME_PHOTOS_PER_REHEARSAL} фото, каждое до 10 МБ. Можно выбрать несколько
-            сразу.
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
             {photos.length} / {MAX_OUTCOME_PHOTOS_PER_REHEARSAL}
             {uploadProgress
               ? ` · загрузка ${uploadProgress.current} из ${uploadProgress.total}`
-              : ''}
+              : photos.length > 0
+                ? ' · листайте, клик — просмотр'
+                : ' · до 10 МБ, пакетом'}
           </p>
         </div>
         {!readOnly && (
@@ -164,11 +222,11 @@ export function RehearsalOutcomePhotosPanel({
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
               {uploading
                 ? uploadProgress
-                  ? `Загрузка ${uploadProgress.current}/${uploadProgress.total}…`
-                  : 'Загрузка…'
+                  ? `${uploadProgress.current}/${uploadProgress.total}`
+                  : '…'
                 : atLimit
-                  ? 'Лимит фото'
-                  : 'Добавить фото'}
+                  ? 'Лимит'
+                  : 'Добавить'}
             </Button>
           </>
         )}
@@ -179,21 +237,18 @@ export function RehearsalOutcomePhotosPanel({
       {photos.length === 0 ? (
         <p className="text-sm text-muted">Пока нет фото итога репетиции.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {photos.map((url) => (
-            <div
-              key={url}
-              className="group relative overflow-hidden rounded-xl border border-gold/15 bg-black/20"
-            >
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scroll-smooth snap-x snap-mandatory">
+          {photos.map((url, index) => (
+            <div key={url} className="group relative shrink-0 snap-start">
               <button
                 type="button"
-                className="block w-full"
-                onClick={() => setPreviewUrl(url)}
+                className="block overflow-hidden rounded-lg border border-gold/15 bg-black/20 transition hover:border-gold/35"
+                onClick={() => openViewer(index)}
               >
                 <img
                   src={url}
-                  alt="Итог репетиции"
-                  className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]"
+                  alt={`Итог репетиции ${index + 1}`}
+                  className="h-16 w-24 object-cover sm:h-20 sm:w-28"
                   loading="lazy"
                 />
               </button>
@@ -201,14 +256,17 @@ export function RehearsalOutcomePhotosPanel({
                 <button
                   type="button"
                   disabled={deletingUrl === url}
-                  onClick={() => void handleDelete(url)}
-                  className="absolute right-2 top-2 rounded-lg bg-black/70 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100 disabled:opacity-60"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleDelete(url, index);
+                  }}
+                  className="absolute right-1 top-1 rounded-md bg-black/75 p-1 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100 disabled:opacity-60"
                   aria-label="Удалить фото"
                 >
                   {deletingUrl === url ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={12} className="animate-spin" />
                   ) : (
-                    <Trash2 size={14} />
+                    <Trash2 size={12} />
                   )}
                 </button>
               )}
@@ -217,24 +275,91 @@ export function RehearsalOutcomePhotosPanel({
         </div>
       )}
 
-      {previewUrl && (
+      {viewerOpen && viewerUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setPreviewUrl(null)}
+          className={`fixed inset-0 z-50 flex items-center justify-center ${
+            isFullscreen ? 'bg-black' : 'bg-black/85 p-4'
+          }`}
+          onClick={() => {
+            if (isFullscreen) setIsFullscreen(false);
+            else closeViewer();
+          }}
         >
-          <button
-            type="button"
-            className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white"
-            onClick={() => setPreviewUrl(null)}
-            aria-label="Закрыть"
-          >
-            <X size={20} />
-          </button>
+          {!isFullscreen && (
+            <>
+              <button
+                type="button"
+                className="absolute right-4 top-4 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeViewer();
+                }}
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+
+              {photos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 sm:left-4"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showPrev();
+                    }}
+                    aria-label="Предыдущее фото"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 sm:right-4"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showNext();
+                    }}
+                    aria-label="Следующее фото"
+                  >
+                    <ChevronRight size={24} />
+                  </button>
+                </>
+              )}
+
+              <p className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white/90">
+                {(viewerIndex ?? 0) + 1} / {photos.length}
+                <span className="ml-2 text-white/60">Esc — закрыть · клик — на весь экран</span>
+              </p>
+            </>
+          )}
+
+          {isFullscreen && (
+            <button
+              type="button"
+              className="absolute right-4 top-4 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsFullscreen(false);
+              }}
+              aria-label="Выйти из полноэкранного режима"
+            >
+              <X size={20} />
+            </button>
+          )}
+
           <img
-            src={previewUrl}
-            alt="Итог репетиции"
-            className="max-h-[90vh] max-w-full rounded-xl object-contain"
-            onClick={(event) => event.stopPropagation()}
+            src={viewerUrl}
+            alt={`Итог репетиции ${(viewerIndex ?? 0) + 1}`}
+            className={
+              isFullscreen
+                ? 'h-full w-full cursor-zoom-out object-contain'
+                : 'max-h-[85vh] max-w-full cursor-zoom-in rounded-xl object-contain'
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              if (isFullscreen) setIsFullscreen(false);
+              else setIsFullscreen(true);
+            }}
           />
         </div>
       )}
