@@ -72,6 +72,7 @@ import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
+import { RehearsalOutcomePhotosPanel } from '../components/RehearsalOutcomePhotosPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
@@ -439,16 +440,17 @@ export function RehearsalDetailPage() {
             ...base,
             taskId: f.taskId,
             title: task?.title ?? blockTypeLabels.task,
+            decidedNotes: f.decidedNotes,
           };
         }
         case 'break':
-          return { ...base, title: blockTypeLabels.break };
+          return { ...base, title: blockTypeLabels.break, decidedNotes: undefined };
         case 'warmup':
-          return { ...base, title: blockTypeLabels.warmup };
+          return { ...base, title: blockTypeLabels.warmup, decidedNotes: f.decidedNotes };
         case 'custom':
-          return { ...base, title: f.title || '' };
+          return { ...base, title: f.title || '', decidedNotes: f.decidedNotes };
         default:
-          return { ...base, title: f.title };
+          return { ...base, title: f.title, decidedNotes: f.decidedNotes };
       }
     });
   };
@@ -690,6 +692,8 @@ export function RehearsalDetailPage() {
           onDismiss={dismissRehearsalWarningItem}
         />
       )}
+
+      <RehearsalOutcomePhotosPanel rehearsal={rehearsal} readOnly={readOnly} />
 
       <section className="rounded-2xl border border-gold/10 bg-surface/40 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1263,9 +1267,9 @@ export function RehearsalDetailPage() {
             value={blockForm.notes ?? ''}
             onChange={(e) => setBlockForm({ ...blockForm, notes: e.target.value })}
           />
-          {blockForm.type === 'scene' && (
+          {blockForm.type !== 'break' && (
             <MentionTextarea
-              label="Решения и корректировки"
+              label="Решения и заметки"
               value={blockForm.decidedNotes ?? ''}
               onChange={(decidedNotes) => setBlockForm({ ...blockForm, decidedNotes })}
               options={buildMentionOptions(state, rehearsal, blockForm.sceneId)}

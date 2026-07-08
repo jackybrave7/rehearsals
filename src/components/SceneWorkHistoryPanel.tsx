@@ -59,7 +59,7 @@ export function SceneWorkHistoryPanel({ history }: SceneWorkHistoryPanelProps) {
               )}
               {block.decidedNotes?.trim() && (
                 <p>
-                  Решения: <DecidedNotesDisplay text={block.decidedNotes.trim()} />
+                  Решения и заметки: <DecidedNotesDisplay text={block.decidedNotes.trim()} />
                 </p>
               )}
             </div>

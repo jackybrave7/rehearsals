@@ -156,3 +156,22 @@ export function validateSubscriptionLimits(
     throw new Error('SUBSCRIPTION_PLAY_LIMIT');
   }
 }
+
+export function stripProOnlyRehearsalFields(
+  db: AppDatabase,
+  userId: string,
+  email: string,
+  state: AppState
+): AppState {
+  if (getUserSubscriptionPlan(db, userId, email) === 'pro') return state;
+
+  let changed = false;
+  const rehearsals = state.rehearsals.map((rehearsal) => {
+    if (!rehearsal.outcomePhotoUrls?.length) return rehearsal;
+    changed = true;
+    const { outcomePhotoUrls: _removed, ...rest } = rehearsal;
+    return rest;
+  });
+
+  return changed ? { ...state, rehearsals } : state;
+}

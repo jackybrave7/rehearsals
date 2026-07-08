@@ -194,7 +194,7 @@ export interface ScheduleBlock {
   /** Для этюда: участники */
   actorIds?: string[];
   notes?: string;
-  /** Решения и корректировки по сцене (с @-упоминаниями актёров/ролей) */
+  /** Решения и заметки по блоку (с @-упоминаниями актёров/ролей) */
   decidedNotes?: string;
   /** Для этюда: итог — что получилось, что взять в спектакль */
   outcomeNotes?: string;
@@ -242,6 +242,8 @@ export interface Rehearsal {
   reminderOptOut?: boolean;
   /** Когда план последний раз отправляли в чат театра Telegram */
   telegramPlanSentAt?: string;
+  /** Итоговые фото репетиции (Pro), URL на S3 */
+  outcomePhotoUrls?: string[];
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'substitute';

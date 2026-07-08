@@ -15,7 +15,7 @@ import {
   wouldLoseUserData,
 } from './stateRepository.js';
 import { migrateEmbeddedFilesIfNeeded } from './fileMigration.js';
-import { validateSubscriptionLimits } from './subscription.js';
+import { validateSubscriptionLimits, stripProOnlyRehearsalFields } from './subscription.js';
 import { syncDecidedNotesToActorNotes } from '../src/utils/decidedNotesMentions.js';
 
 function getEditableTheaterIds(session: AuthSessionPayload): Set<string> {
@@ -168,7 +168,12 @@ export function saveStateForUser(
     backupState(dbState);
   }
 
-  const syncedClientState = syncDecidedNotesToActorNotes(clientState);
+  const syncedClientState = stripProOnlyRehearsalFields(
+    db,
+    session.user.id,
+    session.user.email,
+    syncDecidedNotesToActorNotes(clientState)
+  );
   const clientTheaterIds = new Set(syncedClientState.theaters.map((t) => t.id));
   const editablePayload = filterStateByTheaters(syncedClientState, editableIds);
 

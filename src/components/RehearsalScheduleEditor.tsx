@@ -512,7 +512,7 @@ export function RehearsalScheduleEditor({
                         {block.decidedNotes?.trim() && (
                           <div className="space-y-1 rounded-lg bg-gold/5 px-3 py-2 text-xs text-muted">
                             <p>
-                              <span className="font-medium text-gold-light">Решения:</span>{' '}
+                              <span className="font-medium text-gold-light">Решения и заметки:</span>{' '}
                               <DecidedNotesDisplay text={block.decidedNotes.trim()} />
                             </p>
                           </div>

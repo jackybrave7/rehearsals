@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Filter, Search } from 'lucide-react';
 import type { PlayRole, Scene, ScenePriority, SceneStatus } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActorNamesForRoleInPerformance, getSceneRoles } from '../store/selectors';
@@ -66,6 +66,7 @@ export function ScenePicker({
   const [actFilter, setActFilter] = useState<Set<string>>(new Set());
   const [characterFilter, setCharacterFilter] = useState<Set<string>>(new Set());
   const [characterFilterOnlySelected, setCharacterFilterOnlySelected] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const grouped = useMemo(() => groupScenesByAct(scenes), [scenes]);
@@ -146,6 +147,13 @@ export function ScenePicker({
     actFilter.size > 0 ||
     characterFilter.size > 0 ||
     characterFilterOnlySelected;
+
+  const activePanelFilterCount =
+    (statusFilter.size > 0 ? 1 : 0) +
+    (priorityFilter.size > 0 ? 1 : 0) +
+    (actFilter.size > 0 ? 1 : 0) +
+    (characterFilter.size > 0 ? 1 : 0) +
+    (characterFilterOnlySelected ? 1 : 0);
 
   const visibleCharacterRoles =
     characterFilterOnlySelected && characterFilter.size > 0
@@ -237,20 +245,43 @@ export function ScenePicker({
         </p>
       </div>
 
-      <div className="relative">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск по номеру, месту, акту..."
-          className="w-full rounded-lg border border-gold/15 bg-background/40 py-2 pl-9 pr-3 text-sm text-white placeholder:text-muted focus:border-gold/30 focus:outline-none"
-        />
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Поиск по номеру, месту, акту..."
+            className="w-full rounded-lg border border-gold/15 bg-background/40 py-2 pl-9 pr-3 text-sm text-white placeholder:text-muted focus:border-gold/30 focus:outline-none"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((open) => !open)}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+            filtersOpen || activePanelFilterCount > 0
+              ? 'border-gold/30 bg-gold/10 text-gold-light'
+              : 'border-gold/15 bg-background/40 text-muted hover:border-gold/25 hover:text-white'
+          }`}
+          aria-expanded={filtersOpen}
+        >
+          <Filter size={16} />
+          Фильтр
+          {activePanelFilterCount > 0 && (
+            <span className="rounded-full bg-gold/25 px-1.5 py-0.5 text-[10px] font-semibold">
+              {activePanelFilterCount}
+            </span>
+          )}
+          {filtersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
       </div>
 
+      {filtersOpen && (
+        <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted">Статус:</span>
         <button
@@ -409,6 +440,24 @@ export function ScenePicker({
         </div>
       )}
 
+          {activePanelFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter(new Set());
+                setPriorityFilter(new Set());
+                setActFilter(new Set());
+                setCharacterFilter(new Set());
+                setCharacterFilterOnlySelected(false);
+              }}
+              className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
+            >
+              Сбросить фильтры
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {!singleSelect && (
           <>
@@ -435,22 +484,6 @@ export function ScenePicker({
             className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
           >
             Без конкретной сцены
-          </button>
-        )}
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery('');
-              setStatusFilter(new Set());
-              setPriorityFilter(new Set());
-              setActFilter(new Set());
-              setCharacterFilter(new Set());
-              setCharacterFilterOnlySelected(false);
-            }}
-            className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-muted transition-colors hover:bg-white/10 hover:text-white"
-          >
-            Сбросить фильтры
           </button>
         )}
       </div>

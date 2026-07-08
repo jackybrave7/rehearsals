@@ -195,7 +195,8 @@ CREATE TABLE IF NOT EXISTS rehearsals (
   reminders_sent TEXT NOT NULL DEFAULT '[]',
   reminder_opt_out INTEGER NOT NULL DEFAULT 0,
   rsvp TEXT NOT NULL DEFAULT '{}',
-  telegram_plan_sent_at TEXT
+  telegram_plan_sent_at TEXT,
+  outcome_photo_urls TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS schedule_blocks (

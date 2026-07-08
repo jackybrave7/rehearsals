@@ -136,6 +136,7 @@ export function getDb(): AppDatabase {
     `ALTER TABLE plays ADD COLUMN cover_url TEXT`,
     `ALTER TABLE plays ADD COLUMN icon_url TEXT`,
     `ALTER TABLE plays ADD COLUMN icon_color TEXT`,
+    `ALTER TABLE rehearsals ADD COLUMN outcome_photo_urls TEXT NOT NULL DEFAULT '[]'`,
     `ALTER TABLE play_roles ADD COLUMN script_aliases TEXT`,
     `CREATE TABLE IF NOT EXISTS rehearsal_actor_notes (
       id TEXT PRIMARY KEY,
