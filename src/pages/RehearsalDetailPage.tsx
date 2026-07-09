@@ -74,7 +74,6 @@ import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalOutcomePhotosPanel } from '../components/RehearsalOutcomePhotosPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
-import { RehearsalSoundPanel } from '../components/RehearsalSoundPanel';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { markGuidePlanExported } from '../utils/guidePlanExport';
@@ -710,7 +709,6 @@ export function RehearsalDetailPage() {
       <div className="grid gap-4 sm:gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
-          <RehearsalSoundPanel rehearsalId={rehearsal.id} />
 
           {linkedScenes.length > 0 && (
             <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">

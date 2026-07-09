@@ -163,6 +163,13 @@ async function parseAuthError(
   errorCode?: string,
   preloaded?: { error?: string; message?: string } | null
 ): Promise<string> {
+  if (response.status === 503) {
+    return 'Сервер временно недоступен. API не запущен — на VPS выполните: bash deploy/recreate-api-container.sh';
+  }
+  if (response.status === 502 || response.status === 504) {
+    return 'Сервер не отвечает. Подождите минуту или перезапустите API на сервере.';
+  }
+
   try {
     const data = preloaded ?? ((await response.json()) as { error?: string; message?: string });
     const code = errorCode ?? data.error;
@@ -197,10 +204,6 @@ async function parseAuthError(
     if (data.message) return data.message;
   } catch {
     // ignore JSON parse errors
-  }
-
-  if (response.status === 503) {
-    return 'Сервер временно недоступен (API не отвечает). Попробуйте через минуту или перезапустите API на сервере.';
   }
 
   if (response.status === 404) {
