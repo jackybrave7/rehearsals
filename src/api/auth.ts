@@ -199,6 +199,10 @@ async function parseAuthError(
     // ignore JSON parse errors
   }
 
+  if (response.status === 503) {
+    return 'Сервер временно недоступен (API не отвечает). Попробуйте через минуту или перезапустите API на сервере.';
+  }
+
   if (response.status === 404) {
     return 'Сервис авторизации недоступен. Перезапустите API (restart.bat) — возможно, порт 3001 занят другим приложением.';
   }

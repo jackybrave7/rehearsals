@@ -20,7 +20,7 @@ export function saveLastRehearsalVisit(theaterId: string, rehearsalId: string): 
 }
 
 export function getLastRehearsalVisit(
-  theaterId: string | undefined
+  theaterId: string | null | undefined
 ): { rehearsalId: string; visitedAt: string } | null {
   if (!theaterId) return null;
   try {

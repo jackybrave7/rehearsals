@@ -35,7 +35,7 @@ export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBott
       aria-label="Основная навигация"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5 items-stretch">
-        {items.map(({ to, icon: Icon, label, shortLabel }) => (
+        {items.map(({ to, icon: Icon, shortLabel }) => (
           <NavLink
             key={to}
             to={to}

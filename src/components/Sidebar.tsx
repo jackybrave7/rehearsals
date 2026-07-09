@@ -6,7 +6,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useActorNavMode } from '../hooks/useActorNavMode';
 import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
-import { getMainNavLabel, getNavItemsForUser, getPrimaryNavItems, getSecondaryNavItems } from '../navigation/mainNav';
+import { getMainNavLabel, getNavItemsForUser, getSecondaryNavItems } from '../navigation/mainNav';
 import { appPaths } from '../navigation/appPaths';
 
 const SIDEBAR_COLLAPSED_KEY = 'rehearsals-sidebar-collapsed';
