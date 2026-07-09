@@ -74,6 +74,7 @@ import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalOutcomePhotosPanel } from '../components/RehearsalOutcomePhotosPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
+import { RehearsalSoundPanel } from '../components/RehearsalSoundPanel';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { markGuidePlanExported } from '../utils/guidePlanExport';
@@ -86,6 +87,7 @@ import {
   getVenueScheduleConflicts,
 } from '../utils/rehearsalInsights';
 import { appPaths } from '../navigation/appPaths';
+import { saveLastRehearsalVisit } from '../utils/lastRehearsalVisit';
 import {
   countRsvpSummary,
   formatRsvpSummaryLine,
@@ -146,6 +148,13 @@ export function RehearsalDetailPage() {
     title: '',
     notes: '',
   });
+
+  useEffect(() => {
+    if (!id) return;
+    const theaterId = rehearsal?.theaterId ?? state.activeTheaterId;
+    if (!theaterId) return;
+    saveLastRehearsalVisit(theaterId, id);
+  }, [id, rehearsal?.theaterId, state.activeTheaterId]);
 
   useEffect(() => {
     const theaterId = rehearsal?.theaterId ?? state.activeTheaterId;
@@ -640,19 +649,24 @@ export function RehearsalDetailPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-5 sm:space-y-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <Link
             to={appPaths.rehearsals}
-            className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-gold"
+            className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-gold sm:mb-3 sm:text-sm"
           >
             <ArrowLeft size={16} /> К календарю
           </Link>
           <h1 className={`${pageTitleClass} capitalize`}>
-            {format(parseISO(rehearsal.date), 'EEEE, d MMMM yyyy', { locale: ru })}
+            <span className="sm:hidden">
+              {format(parseISO(rehearsal.date), 'EEE, d MMM yyyy', { locale: ru })}
+            </span>
+            <span className="hidden sm:inline">
+              {format(parseISO(rehearsal.date), 'EEEE, d MMMM yyyy', { locale: ru })}
+            </span>
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-muted">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted sm:mt-2 sm:gap-4 sm:text-sm">
             <span className="flex items-center gap-1">
               <Clock size={16} />
               {rehearsal.startTime} – {rehearsal.endTime}
@@ -693,9 +707,10 @@ export function RehearsalDetailPage() {
         />
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
+          <RehearsalSoundPanel rehearsalId={rehearsal.id} />
 
           {linkedScenes.length > 0 && (
             <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">

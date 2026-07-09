@@ -4,14 +4,14 @@ import { appPaths } from '../navigation/appPaths';
 import { useActorNavMode } from '../hooks/useActorNavMode';
 
 const directorItems = [
-  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', end: true },
-  { to: appPaths.scenes, icon: Film, label: 'Сцены', end: false },
-  { to: appPaths.actors, icon: Users, label: 'Участники', end: false },
-  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', end: false },
+  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', shortLabel: 'Репет.' },
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', shortLabel: 'Обзор' },
+  { to: appPaths.scenes, icon: Film, label: 'Сцены', shortLabel: 'Сцены' },
+  { to: appPaths.actors, icon: Users, label: 'Участники', shortLabel: 'Люди' },
 ] as const;
 
 const actorItems = [
-  { to: appPaths.my, icon: UserCircle, label: 'Моё', end: true },
+  { to: appPaths.my, icon: UserCircle, label: 'Моё', shortLabel: 'Моё' },
 ] as const;
 
 interface MobileBottomNavProps {
@@ -34,14 +34,14 @@ export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBott
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Основная навигация"
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-around">
-        {items.map(({ to, icon: Icon, label, end }) => (
+      <div className="mx-auto grid max-w-lg grid-cols-5 items-stretch">
+        {items.map(({ to, icon: Icon, label, shortLabel }) => (
           <NavLink
             key={to}
             to={to}
-            end={end}
+            end={to === appPaths.home || to === appPaths.my}
             className={({ isActive }) =>
-              `flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] transition-colors ${
+              `flex min-h-[3rem] min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[9px] leading-tight transition-colors sm:text-[10px] ${
                 isActive
                   ? isZen
                     ? 'font-semibold text-foreground'
@@ -50,17 +50,17 @@ export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBott
               }`
             }
           >
-            <Icon size={20} strokeWidth={1.75} />
-            <span className="truncate">{label}</span>
+            <Icon size={22} strokeWidth={1.75} className="shrink-0" />
+            <span className="max-w-full truncate px-0.5">{shortLabel}</span>
           </NavLink>
         ))}
         <button
           type="button"
           onClick={onMoreClick}
-          className="flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] text-muted transition-colors hover:text-foreground"
+          className="flex min-h-[3rem] min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[9px] leading-tight text-muted transition-colors hover:text-foreground sm:text-[10px]"
           aria-label="Ещё разделы"
         >
-          <MoreHorizontal size={20} strokeWidth={1.75} />
+          <MoreHorizontal size={22} strokeWidth={1.75} className="shrink-0" />
           <span>Ещё</span>
         </button>
       </div>

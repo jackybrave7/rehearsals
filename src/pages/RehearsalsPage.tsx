@@ -202,25 +202,25 @@ export function RehearsalsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <header className={pageHeaderClass}>
-        <div>
+        <div className="min-w-0">
           <h1 className={pageTitleClass}>Репетиции</h1>
-          <p className="mt-1 text-muted">
+          <p className="mt-0.5 hidden text-sm text-muted sm:block">
             {activeTheater
               ? `${activeTheater.name} — календарь и расписание`
               : 'Календарь и расписание'}
           </p>
         </div>
         {!readOnly && (
-          <Button onClick={openCreate}>
+          <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto">
             <Plus size={18} />
             Новая репетиция
           </Button>
         )}
       </header>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         {theaterPlays.length > 1 && (
           <Select
             label="Постановка"
@@ -247,7 +247,7 @@ export function RehearsalsPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setCalendarMode('month')}
@@ -272,7 +272,7 @@ export function RehearsalsPage() {
             </button>
             <Link
               to={appPaths.availability}
-              className="ml-auto self-center text-xs text-gold-light hover:underline"
+              className="w-full text-xs text-gold-light hover:underline sm:ml-auto sm:w-auto sm:self-center"
             >
               Доступность труппы →
             </Link>

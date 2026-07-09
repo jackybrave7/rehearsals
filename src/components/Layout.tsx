@@ -9,9 +9,13 @@ import { useDesign } from '../store/DesignContext';
 import { Button } from './Button';
 import { NoTheaterGate } from './NoTheaterGate';
 import { MobileBottomNav } from './MobileBottomNav';
+import { useMaxLg } from '../hooks/useMaxLg';
 import { ReminderSchedulerBanner } from './ReminderSchedulerBanner';
+import { RehearsalQuickAccessBar } from './RehearsalQuickAccessBar';
 
-function StatusBar({ compact = false }: { compact?: boolean }) {
+function StatusBar({ forceCompact = false }: { forceCompact?: boolean }) {
+  const isMobile = useMaxLg();
+  const compact = forceCompact || isMobile;
   const { theaters } = useAuth();
   const { saveError, saveStatus, readOnly, isActorRole } = useRehearsalStore();
 
@@ -104,7 +108,7 @@ export function Layout() {
   if (isZen) {
     return (
       <ZenShell
-        statusBar={<StatusBar compact />}
+        statusBar={<StatusBar forceCompact />}
         reminderBanner={<ReminderSchedulerBanner />}
         recoveryBar={<RecoveryBar />}
       />
@@ -120,8 +124,9 @@ export function Layout() {
           <ReminderSchedulerBanner />
           <RecoveryBar />
           <WorkContextBar variant="theater" onMenuClick={() => setMenuOpen(true)} />
+          <RehearsalQuickAccessBar variant="theater" />
         </div>
-        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:pb-6">
+        <div className="mx-auto w-full max-w-7xl flex-1 px-3 py-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-6 lg:px-8 lg:pb-6">
           <NoTheaterGate />
         </div>
       </main>

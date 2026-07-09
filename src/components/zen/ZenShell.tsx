@@ -8,9 +8,10 @@ import { useActorNavMode } from '../../hooks/useActorNavMode';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
 import { MobileBottomNav } from '../MobileBottomNav';
+import { RehearsalQuickAccessBar } from '../RehearsalQuickAccessBar';
 import { NoTheaterGate } from '../NoTheaterGate';
 import { appPaths } from '../../navigation/appPaths';
-import { getMainNavLabel, getNavItemsForUser } from '../../navigation/mainNav';
+import { getMainNavLabel, getNavItemsForUser, getPrimaryNavItems, getSecondaryNavItems } from '../../navigation/mainNav';
 import { getTheaterPlays } from '../../store/selectors';
 
 export function ZenShell({
@@ -28,6 +29,8 @@ export function ZenShell({
   const { state } = useRehearsalStore();
   const actorOnly = useActorNavMode();
   const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly);
+  const primaryNavItems = getPrimaryNavItems(visibleNavItems);
+  const secondaryNavItems = getSecondaryNavItems(visibleNavItems);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -47,10 +50,11 @@ export function ZenShell({
         {reminderBanner}
         {recoveryBar}
         <WorkContextBar variant="zen" onMenuClick={() => setMenuOpen(true)} />
+        <RehearsalQuickAccessBar variant="zen" />
       </header>
 
-      <main className="zen-main flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div key={`${design}-${location.pathname}`} className="zen-page mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-6">
+      <main className="zen-main flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <div key={`${design}-${location.pathname}`} className="zen-page mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
           <NoTheaterGate />
         </div>
       </main>
@@ -68,7 +72,7 @@ export function ZenShell({
           <aside className="zen-drawer absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <Link
-                to={actorOnly ? appPaths.my : appPaths.home}
+                to={actorOnly ? appPaths.my : appPaths.rehearsals}
                 onClick={() => setMenuOpen(false)}
                 className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-80"
               >
@@ -85,11 +89,12 @@ export function ZenShell({
             <TheaterSwitcher variant="zen" onTheaterChange={() => setMenuOpen(false)} />
             <div className="px-4 pb-2 pt-1 text-xs font-medium uppercase tracking-[0.12em] text-muted">Разделы</div>
             <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-              {visibleNavItems.map(({ to, icon: Icon, label, zenLabel }) => (
+              {primaryNavItems.map(({ to, icon: Icon, label, zenLabel }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={to === appPaths.home || to === appPaths.my}
+                  onClick={() => setMenuOpen(false)}
                   className={({ isActive }) =>
                     `zen-nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all ${
                       isActive ? 'zen-nav-link-active' : 'text-muted hover:bg-black/[0.03] hover:text-foreground'
@@ -100,6 +105,29 @@ export function ZenShell({
                   {getMainNavLabel({ to, icon: Icon, label, zenLabel }, 'zen')}
                 </NavLink>
               ))}
+              {secondaryNavItems.length > 0 ? (
+                <>
+                  <div className="px-1 pb-1 pt-3 text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                    Ещё
+                  </div>
+                  {secondaryNavItems.map(({ to, icon: Icon, label, zenLabel }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={to === appPaths.home || to === appPaths.my}
+                      onClick={() => setMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `zen-nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all ${
+                          isActive ? 'zen-nav-link-active' : 'text-muted hover:bg-black/[0.03] hover:text-foreground'
+                        }`
+                      }
+                    >
+                      <Icon size={18} className="shrink-0" />
+                      {getMainNavLabel({ to, icon: Icon, label, zenLabel }, 'zen')}
+                    </NavLink>
+                  ))}
+                </>
+              ) : null}
             </nav>
           </aside>
         </div>

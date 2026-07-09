@@ -44,6 +44,7 @@ import { sendTelegramHtmlMessage } from '../../api/telegram';
 import { buildRehearsalTelegramBotMessage } from '../../utils/rehearsalTelegramExport';
 import { markGuidePlanExported } from '../../utils/guidePlanExport';
 import { getRehearsalEventLabel } from '../../utils/rehearsalCalendarMarkers';
+import { getLastRehearsalVisit } from '../../utils/lastRehearsalVisit';
 
 const paceStyles = {
   theater: {
@@ -166,6 +167,14 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
   const activeActors = getActiveActors(state);
 
   const nextRehearsal = useMemo(() => getNextTheaterRehearsal(state), [state]);
+  const continueRehearsal = useMemo(() => {
+    const lastVisit = getLastRehearsalVisit(state.activeTheaterId);
+    if (!lastVisit) return null;
+    const rehearsal = theaterRehearsals.find((item) => item.id === lastVisit.rehearsalId);
+    if (!rehearsal) return null;
+    if (nextRehearsal?.id === rehearsal.id) return null;
+    return rehearsal;
+  }, [state.activeTheaterId, theaterRehearsals, nextRehearsal]);
   const premiereAlerts = useMemo(() => buildPremiereAlerts(state), [state]);
   const attentionItems = useMemo(() => buildAttentionItems(state), [state]);
   const premiereStrip = useMemo(() => buildPremiereStrip(state), [state]);
@@ -220,20 +229,41 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
   const planSent = nextRehearsal ? wasTelegramPlanSent(nextRehearsal) : false;
 
   return (
-    <div className={variant === 'zen' ? 'space-y-7' : 'space-y-6'}>
+    <div className={variant === 'zen' ? 'space-y-5 sm:space-y-7' : 'space-y-4 sm:space-y-6'}>
       {variant === 'theater' && (
         <header>
           <h1 className={pageTitleClass}>Обзор</h1>
-          <p className="mt-1 text-muted">Рабочий стол режиссёра</p>
+          <p className="mt-0.5 hidden text-sm text-muted sm:block">Рабочий стол режиссёра</p>
         </header>
       )}
 
       <TheaterSetupChecklist variant={variant} />
 
+      {continueRehearsal ? (
+        <Link
+          to={appPaths.rehearsal(continueRehearsal.id)}
+          className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-xs transition-colors sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm ${
+            variant === 'zen'
+              ? 'border-border/60 bg-black/[0.02] hover:bg-black/[0.04]'
+              : 'border-gold/15 bg-gold/5 hover:bg-gold/10'
+          }`}
+        >
+          <span className="min-w-0 truncate">
+            Продолжить:{' '}
+            <span className="font-medium capitalize">
+              {format(parseISO(continueRehearsal.date), 'EEE, d MMM', { locale: ru })}
+            </span>
+            {' · '}
+            {continueRehearsal.startTime}
+          </span>
+          <ChevronRight size={16} className="shrink-0 opacity-70 sm:h-[18px] sm:w-[18px]" />
+        </Link>
+      ) : null}
+
       {/* 1. Ближайшая репетиция */}
       <section className={cardClass(variant)}>
         {nextRehearsal ? (
-          <div className="p-5 sm:p-6">
+          <div className="p-4 sm:p-6">
             <p
               className={`text-xs font-semibold uppercase tracking-[0.12em] ${
                 variant === 'zen' ? 'text-muted' : 'text-gold-light/80'
@@ -246,7 +276,7 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
               className="mt-2 block transition-opacity hover:opacity-90"
             >
               <p
-                className={`text-2xl font-bold capitalize sm:text-3xl ${
+                className={`text-xl font-bold capitalize sm:text-2xl lg:text-3xl ${
                   variant === 'zen' ? 'text-foreground' : 'text-white'
                 }`}
               >

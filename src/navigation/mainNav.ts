@@ -26,9 +26,10 @@ export type MainNavItem = {
   minPlays?: number;
 };
 
-/** Единый порядок: обзор → все постановки → постановка → сцены → … */
+/** Единый порядок: обзор → репетиции → … */
 export const mainNavItems: MainNavItem[] = [
   { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', zenLabel: 'Сейчас' },
+  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции' },
   {
     to: appPaths.overview,
     icon: LayoutGrid,
@@ -41,7 +42,6 @@ export const mainNavItems: MainNavItem[] = [
   { to: appPaths.readiness, icon: Flame, label: 'Готовность', zenLabel: 'Готовность' },
   { to: appPaths.actors, icon: Users, label: 'Участники' },
   { to: appPaths.availability, icon: CalendarOff, label: 'Доступность', zenLabel: 'Доступность' },
-  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции' },
   { to: appPaths.venues, icon: MapPin, label: 'Площадки' },
   { to: appPaths.tasks, icon: CheckSquare, label: 'Задачи' },
   { to: appPaths.guide, icon: BookMarked, label: 'Руководство' },
@@ -82,4 +82,21 @@ export function getMainNavLabel(item: MainNavItem, variant: 'theater' | 'zen'): 
 
 export function getVisibleMainNavItems(playCount: number): MainNavItem[] {
   return mainNavItems.filter((item) => !item.minPlays || playCount >= item.minPlays);
+}
+
+const primaryNavPaths = new Set<string>([
+  appPaths.home,
+  appPaths.rehearsals,
+  appPaths.scenes,
+  appPaths.actors,
+]);
+
+/** Основные разделы — нижняя навигация и верх выезжающего меню. */
+export function getPrimaryNavItems(items: MainNavItem[]): MainNavItem[] {
+  return items.filter((item) => primaryNavPaths.has(item.to));
+}
+
+/** Редкие разделы — блок «Ещё» в мобильном меню. */
+export function getSecondaryNavItems(items: MainNavItem[]): MainNavItem[] {
+  return items.filter((item) => !primaryNavPaths.has(item.to));
 }
