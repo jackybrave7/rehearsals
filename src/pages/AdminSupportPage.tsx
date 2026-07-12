@@ -55,8 +55,8 @@ function TicketRow({
           {format(parseISO(ticket.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })}
         </td>
         <td className="px-3 py-3">
-          <div className="text-white">{ticket.userName}</div>
-          <div className="text-xs text-muted">{ticket.userEmail}</div>
+          <div className="font-medium text-foreground">{ticket.userName}</div>
+          <div className="text-xs text-foreground/70">{ticket.userEmail}</div>
         </td>
         <td className="px-3 py-3 text-muted">{getSupportCategoryLabel(ticket.category)}</td>
         <td className="max-w-[12rem] truncate px-3 py-3 text-muted" title={subjectPreview}>
@@ -86,18 +86,18 @@ function TicketRow({
         </td>
       </tr>
       {expanded ? (
-        <tr className="border-b border-gold/10 bg-surface/20">
+        <tr className="border-b border-gold/10">
           <td colSpan={7} className="px-3 py-4">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border border-gold/15 bg-background/90 p-4">
               {ticket.subject ? (
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted">Тема</p>
-                  <p className="mt-1 text-white">{ticket.subject}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-foreground/65">Тема</p>
+                  <p className="mt-1 font-medium text-foreground">{ticket.subject}</p>
                 </div>
               ) : null}
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted">Сообщение</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/90">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground/65">Сообщение</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                   {ticket.message}
                 </p>
               </div>
