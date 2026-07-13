@@ -6,8 +6,10 @@ import { isMailConfigured, sendRegistrationApprovedEmail } from './mail.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import {
   approveUserRegistration,
-  getRegistrationMode,
+  getPlatformSettings,
+  isValidNotificationEmail,
   setRegistrationMode,
+  setRegistrationNotificationSettings,
   type RegistrationMode,
 } from './platformSettings.js';
 
@@ -15,21 +17,72 @@ function parseRegistrationMode(value: unknown): RegistrationMode | null {
   return value === 'normal' || value === 'beta' ? value : null;
 }
 
+function parseBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (value === 1 || value === '1' || value === 'true') return true;
+  if (value === 0 || value === '0' || value === 'false') return false;
+  return null;
+}
+
 export function registerAdminPlatformSettingsRoutes(app: Express): void {
   app.get('/api/admin/platform-settings', (req, res) => {
     if (!requirePlatformAdmin(req, res)) return;
-    res.json({ registrationMode: getRegistrationMode() });
+    res.json(getPlatformSettings());
   });
 
   app.patch('/api/admin/platform-settings', (req, res) => {
     if (!requirePlatformAdmin(req, res)) return;
-    const mode = parseRegistrationMode(req.body?.registrationMode);
-    if (!mode) {
-      res.status(400).json({ error: 'INVALID_MODE' });
+
+    const mode = req.body?.registrationMode;
+    const notifyEnabled = req.body?.registrationNotifyEnabled;
+    const notifyEmail = req.body?.registrationNotifyEmail;
+
+    const hasMode = mode !== undefined;
+    const hasNotifyEnabled = notifyEnabled !== undefined;
+    const hasNotifyEmail = notifyEmail !== undefined;
+
+    if (!hasMode && !hasNotifyEnabled && !hasNotifyEmail) {
+      res.status(400).json({ error: 'INVALID_BODY' });
       return;
     }
-    setRegistrationMode(mode);
-    res.json({ registrationMode: mode });
+
+    if (hasMode) {
+      const parsedMode = parseRegistrationMode(mode);
+      if (!parsedMode) {
+        res.status(400).json({ error: 'INVALID_MODE' });
+        return;
+      }
+      setRegistrationMode(parsedMode);
+    }
+
+    if (hasNotifyEnabled || hasNotifyEmail) {
+      const current = getPlatformSettings();
+      const nextEnabled = hasNotifyEnabled
+        ? parseBoolean(notifyEnabled)
+        : current.registrationNotify.enabled;
+      if (nextEnabled === null) {
+        res.status(400).json({ error: 'INVALID_NOTIFY_ENABLED' });
+        return;
+      }
+
+      const nextEmail = hasNotifyEmail
+        ? typeof notifyEmail === 'string'
+          ? notifyEmail.trim().toLowerCase()
+          : ''
+        : current.registrationNotify.email;
+
+      if (nextEnabled && !isValidNotificationEmail(nextEmail)) {
+        res.status(400).json({ error: 'INVALID_NOTIFY_EMAIL' });
+        return;
+      }
+
+      setRegistrationNotificationSettings({
+        enabled: nextEnabled,
+        email: nextEmail,
+      });
+    }
+
+    res.json(getPlatformSettings());
   });
 
   app.post('/api/admin/users/:userId/approve-registration', async (req: Request, res: Response) => {

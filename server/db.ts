@@ -45,6 +45,32 @@ export function getDbPath(): string {
   return dbPath;
 }
 
+function seedRegistrationNotificationFromEnv(db: DatabaseSync): void {
+  const row = db
+    .prepare(
+      `SELECT registration_notify_email, registration_notify_enabled
+       FROM platform_settings WHERE id = 1`
+    )
+    .get() as
+    | { registration_notify_email: string | null; registration_notify_enabled: number | null }
+    | undefined;
+
+  if (!row || row.registration_notify_email?.trim()) return;
+
+  const firstAdminEmail = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .find(Boolean);
+
+  if (!firstAdminEmail) return;
+
+  db.prepare(
+    `UPDATE platform_settings
+     SET registration_notify_email = ?, registration_notify_enabled = 1
+     WHERE id = 1`
+  ).run(firstAdminEmail);
+}
+
 export function getDb(): AppDatabase {
   if (dbInstance) return dbInstance;
 
@@ -127,6 +153,8 @@ export function getDb(): AppDatabase {
       registration_mode TEXT NOT NULL DEFAULT 'beta' CHECK (registration_mode IN ('normal', 'beta'))
     )`,
     `ALTER TABLE platform_settings ADD COLUMN legacy_registration_backfill_at TEXT`,
+    `ALTER TABLE platform_settings ADD COLUMN registration_notify_enabled INTEGER DEFAULT 0`,
+    `ALTER TABLE platform_settings ADD COLUMN registration_notify_email TEXT`,
     `ALTER TABLE rehearsals ADD COLUMN rsvp TEXT DEFAULT '{}'`,
     `ALTER TABLE schedule_blocks ADD COLUMN play_id TEXT`,
     `ALTER TABLE schedule_blocks ADD COLUMN actor_ids TEXT`,
@@ -183,6 +211,8 @@ export function getDb(): AppDatabase {
   db.prepare(
     `INSERT OR IGNORE INTO platform_settings (id, registration_mode) VALUES (1, 'beta')`
   ).run();
+
+  seedRegistrationNotificationFromEnv(db);
 
   // Однократно: старые пользователи до бета-одобрения считаются одобренными.
   // Не запускать на каждом старте — иначе новые заявки в бете тоже авто-одобряются.

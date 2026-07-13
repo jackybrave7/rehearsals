@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
-import { enrichSessionPayload, getPlatformAdminEmails } from './platformAdmin.js';
+import { enrichSessionPayload } from './platformAdmin.js';
 import { getUserSubscriptionPlan, getUserSubscriptionProExpiresAt } from './subscription.js';
 import { isMailConfigured, sendEmailVerificationEmail, sendEmailConfirmedEmail, sendPasswordResetEmail, sendAdminNewUserRegistrationEmail } from './mail.js';
 import {
@@ -11,7 +11,7 @@ import {
   isEmailVerified,
   verifyEmailByToken,
 } from './emailVerification.js';
-import { getRegistrationMode, isRegistrationApproved } from './platformSettings.js';
+import { getRegistrationMode, getRegistrationNotificationRecipients, isRegistrationApproved } from './platformSettings.js';
 import { normalizeActorEmail, normalizeActorName } from '../src/utils/actorProfile.js';
 import { deleteUserCompletely } from './adminDeleteUser.js';
 
@@ -364,7 +364,7 @@ export function registerAuthRoutes(app: import('express').Express) {
       await sendEmailVerificationEmail(email, name || email, token, { betaMode });
 
       try {
-        const adminEmails = getPlatformAdminEmails();
+        const adminEmails = getRegistrationNotificationRecipients(db);
         const adminMailSent = await sendAdminNewUserRegistrationEmail({
           adminEmails,
           userId,
@@ -373,8 +373,8 @@ export function registerAuthRoutes(app: import('express').Express) {
           registrationMode: betaMode ? 'beta' : 'normal',
           registeredAt: now,
         });
-        if (adminMailSent === 0 && adminEmails.length === 0) {
-          console.warn('[auth] admin registration notify skipped: ADMIN_EMAILS not set');
+        if (adminMailSent === 0) {
+          console.info(`[auth] admin registration notify skipped for ${email}`);
         } else {
           console.info(`[auth] admin registration notify sent to ${adminMailSent} recipient(s) for ${email}`);
         }

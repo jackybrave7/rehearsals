@@ -1,5 +1,15 @@
 export type RegistrationMode = 'normal' | 'beta';
 
+export interface RegistrationNotificationSettings {
+  enabled: boolean;
+  email: string;
+}
+
+export interface PlatformSettings {
+  registrationMode: RegistrationMode;
+  registrationNotify: RegistrationNotificationSettings;
+}
+
 export interface PlatformStats {
   generatedAt: string;
   registrationMode: 'normal' | 'beta';

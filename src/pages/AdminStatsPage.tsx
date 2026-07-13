@@ -19,6 +19,7 @@ import { fetchAdminSupportTickets } from '../api/adminSupport';
 import type { PlatformStats } from '../types/admin';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel';
+import { AdminNotificationsPanel } from '../components/admin/AdminNotificationsPanel';
 import { AdminMailDeliverabilityPanel } from '../components/admin/AdminMailDeliverabilityPanel';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
 import { appPaths } from '../navigation/appPaths';
@@ -117,6 +118,8 @@ export function AdminStatsPage() {
           pendingRegistrations={stats.pendingRegistrations}
         />
       ) : null}
+
+      <AdminNotificationsPanel />
 
       <AdminMailDeliverabilityPanel />
 
