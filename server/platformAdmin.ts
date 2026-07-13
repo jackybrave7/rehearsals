@@ -12,6 +12,10 @@ function parseAdminEmails(): Set<string> {
   );
 }
 
+export function getPlatformAdminEmails(): string[] {
+  return [...parseAdminEmails()];
+}
+
 export function isPlatformAdminEmail(email: string): boolean {
   const admins = parseAdminEmails();
   if (admins.size === 0) return false;

@@ -3,9 +3,9 @@ import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, type AppDatabase } from './db.js';
 import type { AuthSessionPayload, AuthUser, TheaterAccessInfo, TheaterAccessRole } from './authTypes.js';
-import { enrichSessionPayload } from './platformAdmin.js';
+import { enrichSessionPayload, getPlatformAdminEmails } from './platformAdmin.js';
 import { getUserSubscriptionPlan, getUserSubscriptionProExpiresAt } from './subscription.js';
-import { isMailConfigured, sendEmailVerificationEmail, sendEmailConfirmedEmail, sendPasswordResetEmail } from './mail.js';
+import { isMailConfigured, sendEmailVerificationEmail, sendEmailConfirmedEmail, sendPasswordResetEmail, sendAdminNewUserRegistrationEmail } from './mail.js';
 import {
   createEmailVerificationToken,
   isEmailVerified,
@@ -362,6 +362,26 @@ export function registerAuthRoutes(app: import('express').Express) {
       const token = createEmailVerificationToken(db, userId);
       const betaMode = getRegistrationMode(db) === 'beta';
       await sendEmailVerificationEmail(email, name || email, token, { betaMode });
+
+      try {
+        const adminEmails = getPlatformAdminEmails();
+        const adminMailSent = await sendAdminNewUserRegistrationEmail({
+          adminEmails,
+          userId,
+          email,
+          name: name || email,
+          registrationMode: betaMode ? 'beta' : 'normal',
+          registeredAt: now,
+        });
+        if (adminMailSent === 0 && adminEmails.length === 0) {
+          console.warn('[auth] admin registration notify skipped: ADMIN_EMAILS not set');
+        } else {
+          console.info(`[auth] admin registration notify sent to ${adminMailSent} recipient(s) for ${email}`);
+        }
+      } catch (error) {
+        console.error('[auth] admin registration notify failed', error);
+      }
+
       res.json({
         ok: true,
         needsEmailVerification: true,

@@ -333,6 +333,89 @@ export async function sendEmailConfirmedEmail(
   });
 }
 
+export async function sendAdminNewUserRegistrationEmail(options: {
+  adminEmails: string[];
+  userId: string;
+  email: string;
+  name: string;
+  registrationMode: 'normal' | 'beta';
+  registeredAt: string;
+}): Promise<number> {
+  const admins = options.adminEmails.map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+  if (admins.length === 0) return 0;
+
+  const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
+  const adminUserUrl = `${appUrl.replace(/\/$/, '')}/app/admin/users/${encodeURIComponent(options.userId)}`;
+  const displayName = options.name.trim() || options.email;
+  const registeredAt = new Date(options.registeredAt).toLocaleString('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    dateStyle: 'long',
+    timeStyle: 'short',
+  });
+
+  const modeNote =
+    options.registrationMode === 'beta'
+      ? 'Режим бета-тестирования: после подтверждения email заявку нужно одобрить в админке.'
+      : 'Обычная регистрация: после подтверждения email пользователь сможет войти.';
+
+  const subject = 'Новая регистрация — Репетиции';
+  const text = [
+    'Новый пользователь зарегистрировался в «Репетициях».',
+    '',
+    `Имя: ${displayName}`,
+    `Email: ${options.email}`,
+    `Дата: ${registeredAt}`,
+    '',
+    modeNote,
+    '',
+    `Карточка в админке: ${adminUserUrl}`,
+  ].join('\n');
+
+  const html = `<!DOCTYPE html>
+<html>
+  <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
+    <p style="margin:0 0 12px;line-height:1.5;">Новый пользователь зарегистрировался в «Репетициях».</p>
+    <p style="margin:0 0 12px;line-height:1.5;">
+      <strong>Имя:</strong> ${escapeHtml(displayName)}<br>
+      <strong>Email:</strong> ${escapeHtml(options.email)}<br>
+      <strong>Дата:</strong> ${escapeHtml(registeredAt)}
+    </p>
+    <p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(modeNote)}</p>
+    <p style="margin:20px 0;">
+      <a href="${escapeHtml(adminUserUrl)}" style="display:inline-block;padding:12px 20px;background:#b8860b;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">
+        Открыть в админке
+      </a>
+    </p>
+  </body>
+</html>`;
+
+  const results = await Promise.allSettled(
+    admins.map((to) =>
+      sendMail({
+        to,
+        subject,
+        msgType: 'admin-notification',
+        text,
+        html,
+      })
+    )
+  );
+
+  let sent = 0;
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      sent += 1;
+    } else {
+      console.error('[mail] admin registration notify failed', {
+        to: admins[index],
+        error: result.reason,
+      });
+    }
+  }
+
+  return sent;
+}
+
 export async function sendPasswordResetEmail(
   to: string,
   name: string,
