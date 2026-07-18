@@ -53,7 +53,7 @@ export function ZenShell({
         <RehearsalQuickAccessBar variant="zen" />
       </header>
 
-      <main className="zen-main flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <main className="zen-main flex-1 overflow-x-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div key={`${design}-${location.pathname}`} className="zen-page mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
           <NoTheaterGate />
         </div>

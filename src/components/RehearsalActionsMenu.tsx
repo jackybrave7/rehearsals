@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CalendarPlus, Download, MoreVertical, Pencil, Send, Trash2 } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import { downloadRehearsalIcs, openGoogleCalendar } from '../utils/rehearsalCalendar';
+import { useMaxLg } from '../hooks/useMaxLg';
 
 interface RehearsalActionsMenuProps {
   rehearsal: Rehearsal;
@@ -51,6 +52,7 @@ export function RehearsalActionsMenu({
 }: RehearsalActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMaxLg();
 
   useEffect(() => {
     if (!open) return;
@@ -112,7 +114,9 @@ export function RehearsalActionsMenu({
         {open ? (
           <div
             role="menu"
-            className="absolute right-0 top-full z-30 mt-1 min-w-[11.5rem] overflow-hidden rounded-xl border border-gold/15 bg-surface py-1 shadow-lg shadow-black/30"
+            className={`absolute right-0 z-50 min-w-[11.5rem] overflow-hidden rounded-xl border border-gold/15 bg-surface py-1 shadow-lg shadow-black/30 ${
+              isMobile ? 'bottom-full mb-1' : 'top-full mt-1'
+            }`}
           >
             <MenuItem
               icon={<CalendarPlus size={16} />}

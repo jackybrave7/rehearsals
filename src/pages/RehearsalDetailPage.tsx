@@ -648,7 +648,7 @@ export function RehearsalDetailPage() {
   };
 
   return (
-    <div className="space-y-5 sm:space-y-8">
+    <div className="min-w-0 space-y-5 overflow-x-hidden sm:space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <Link
@@ -706,12 +706,12 @@ export function RehearsalDetailPage() {
         />
       )}
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-        <div className="space-y-4">
+      <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="order-2 min-w-0 space-y-4 xl:order-1">
           <RehearsalPlanningPanel rehearsal={rehearsal} />
 
           {linkedScenes.length > 0 && (
-            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-3 sm:p-5">
               <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
                 Сцены ({linkedScenes.length})
               </h2>
@@ -725,7 +725,7 @@ export function RehearsalDetailPage() {
             </section>
           )}
 
-          <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
+          <section className="rounded-2xl border border-gold/10 bg-surface/40 p-3 sm:p-4">
             <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
               Участники
             </h2>
@@ -944,7 +944,7 @@ export function RehearsalDetailPage() {
           </section>
 
           {linkedTasks.length > 0 && (
-            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+            <section className="rounded-2xl border border-gold/10 bg-surface/40 p-3 sm:p-5">
               <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted">
                 Задачи
               </h2>
@@ -982,7 +982,7 @@ export function RehearsalDetailPage() {
 
         </div>
 
-        <div className="min-w-0">
+        <div className="order-1 min-w-0 xl:order-2">
           <div className="mb-2 flex justify-end">
             <GuideContextHelp anchor="репетиция" label="Справка: репетиция и план" />
           </div>

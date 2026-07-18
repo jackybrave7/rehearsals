@@ -370,7 +370,7 @@ export function ScenesPage() {
   const timingSettings = resolveSceneTimingSettings(state.appMeta);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <header className={pageHeaderClass}>
         <div>
           <div className="flex items-center gap-2">
@@ -392,10 +392,10 @@ export function ScenesPage() {
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
           <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
-          <Button onClick={openCreate} disabled={playReadOnly}>
+          <Button onClick={openCreate} disabled={playReadOnly} className="w-full sm:w-auto">
             <Plus size={18} />
             Добавить сцену
           </Button>
@@ -675,7 +675,7 @@ export function ScenesPage() {
               key={group}
               className="rounded-2xl border border-gold/10 bg-surface/40"
             >
-              <div className="flex items-start justify-between gap-3 border-b border-gold/10 bg-background/30 px-5 py-3">
+              <div className="flex flex-col gap-2 border-b border-gold/10 bg-background/30 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5">
                 <div>
                   <h2 className="text-sm font-semibold text-gold-light">{group}</h2>
                   <p className="text-xs text-muted">{groupScenes.length} сцен</p>
@@ -691,15 +691,16 @@ export function ScenesPage() {
                   return (
                     <div
                       key={scene.id}
-                      className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                      className="group flex flex-col gap-2 px-3 py-3 transition-colors hover:bg-white/[0.02] sm:flex-row sm:items-start sm:gap-3 sm:px-4"
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-xs font-bold text-gold">
-                        {scene.number}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-medium text-white">
-                          {getSceneShortLabel(scene)}
-                        </h3>
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-xs font-bold text-gold">
+                          {scene.number}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-medium leading-snug text-white break-words">
+                            {getSceneShortLabel(scene)}
+                          </h3>
                         <div className="mt-1 flex flex-wrap gap-1">
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] ${priorityColors[priority]}`}
@@ -708,7 +709,7 @@ export function ScenesPage() {
                           </span>
                           {readiness && readiness.heat !== 'recent' && (
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${heatLevelColors(readiness.heat, heatVariant)}`}
+                              className={`max-w-full whitespace-normal rounded-full border px-2 py-0.5 text-center text-[10px] font-semibold leading-tight sm:whitespace-nowrap ${heatLevelColors(readiness.heat, heatVariant)}`}
                               title={heatLevelLabel(readiness.heat)}
                             >
                               {heatLevelLabel(readiness.heat)}
@@ -716,14 +717,14 @@ export function ScenesPage() {
                           )}
                         </div>
                         {scene.description && (
-                          <p className="mt-1 text-xs leading-relaxed text-muted">
+                          <p className="mt-1 text-xs leading-relaxed text-muted break-words">
                             {scene.description}
                           </p>
                         )}
                         {(() => {
                           const memorizationSummary = buildSceneMemorizationSummary(state, scene.id);
                           return memorizationSummary ? (
-                            <p className="mt-1 text-xs text-gold-light/90">
+                            <p className="mt-1 text-xs text-gold-light/90 break-words">
                               Заучивание: {memorizationSummary}
                             </p>
                           ) : null;
@@ -760,8 +761,9 @@ export function ScenesPage() {
                           </div>
                         )}
                         {history.length > 0 && <SceneWorkHistoryPanel history={history} />}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 border-t border-gold/5 pt-2 pl-11 sm:shrink-0 sm:border-0 sm:pt-0 sm:pl-0">
                         <SceneScriptLink play={activePlay} scene={scene} compact />
                         <span
                           className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted"

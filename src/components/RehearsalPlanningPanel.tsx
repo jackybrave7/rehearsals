@@ -119,7 +119,7 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
 
   return (
     <>
-      <section className="rounded-2xl border border-gold/10 bg-surface/40 p-4">
+      <section className="rounded-2xl border border-gold/10 bg-surface/40 p-3 sm:p-4">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
           Планирование
         </h2>

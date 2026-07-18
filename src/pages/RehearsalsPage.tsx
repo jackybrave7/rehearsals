@@ -202,7 +202,7 @@ export function RehearsalsPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="min-w-0 space-y-4 overflow-x-hidden sm:space-y-6">
       <header className={pageHeaderClass}>
         <div className="min-w-0">
           <h1 className={pageTitleClass}>Репетиции</h1>
@@ -245,8 +245,8 @@ export function RehearsalsPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-5">
+        <div className="order-2 min-w-0 space-y-6 lg:order-1 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -363,7 +363,7 @@ export function RehearsalsPage() {
           </section>
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="order-1 min-w-0 lg:order-2 lg:col-span-3">
           <div className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
             <h2 className="mb-4 text-lg font-semibold capitalize text-white">
               {selectedDate
