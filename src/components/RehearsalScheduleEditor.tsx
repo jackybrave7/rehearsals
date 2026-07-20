@@ -12,7 +12,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import { LinkifiedText } from './LinkifiedText';
+import { ExpandableText } from './ExpandableText';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getSceneCharacterNames } from '../utils/sceneLabels';
 import { Button } from './Button';
@@ -507,14 +507,17 @@ export function RehearsalScheduleEditor({
                           </div>
                         )}
                         {block.notes && (
-                          <LinkifiedText text={block.notes} className="text-sm leading-relaxed text-muted" as="div" />
+                          <ExpandableText
+                            text={block.notes}
+                            className="text-sm leading-relaxed text-muted"
+                          />
                         )}
                         {block.decidedNotes?.trim() && (
                           <div className="space-y-1 rounded-lg bg-gold/5 px-3 py-2 text-xs text-muted">
-                            <p>
-                              <span className="font-medium text-gold-light">Решения и заметки:</span>{' '}
+                            <p className="font-medium text-gold-light">Решения и заметки</p>
+                            <ExpandableText text={block.decidedNotes.trim()}>
                               <DecidedNotesDisplay text={block.decidedNotes.trim()} />
-                            </p>
+                            </ExpandableText>
                           </div>
                         )}
                       </div>
