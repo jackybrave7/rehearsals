@@ -137,7 +137,7 @@ app.put('/api/state', (req, res) => {
   try {
     saveStateForUser(state, session, getDb());
     console.log(
-      `[api] saved for ${session.user.email}: ${state.rehearsals.length} rehearsals, ${state.scenes.length} scenes`
+      `[api] saved for ${session.user.email}: ${state.rehearsals.length} rehearsals, ${state.scenes.length} scenes, ${state.rehearsals.reduce((sum, rehearsal) => sum + rehearsal.schedule.length, 0)} schedule blocks`
     );
     res.json({ ok: true });
   } catch (error) {

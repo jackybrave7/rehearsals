@@ -1,4 +1,6 @@
-import type { AppState } from '../types';
+import type { AppState, ScheduleBlock } from '../types';
+import { getSceneIdsFromSchedule } from './scheduleSync';
+import { scoreAppState } from './appStateScore';
 
 export function createEmptyAppState(appMeta: AppState['appMeta'] = {}): AppState {
   return {
@@ -90,6 +92,39 @@ export function filterAppStateByTheaterIds(state: AppState, theaterIds: Set<stri
   };
 }
 
+/** Берёт самый полный план по каждой репетиции из всех источников (SQLite, localStorage, бэкап). */
+export function mergeRehearsalSchedulesFromSources(
+  base: AppState,
+  ...sources: Array<AppState | null | undefined>
+): AppState {
+  const bestScheduleByRehearsalId = new Map<string, ScheduleBlock[]>();
+
+  for (const source of [base, ...sources]) {
+    if (!source) continue;
+    for (const rehearsal of source.rehearsals) {
+      const schedule = rehearsal.schedule ?? [];
+      const current = bestScheduleByRehearsalId.get(rehearsal.id);
+      if (!current || schedule.length > current.length) {
+        bestScheduleByRehearsalId.set(rehearsal.id, schedule);
+      }
+    }
+  }
+
+  let changed = false;
+  const rehearsals = base.rehearsals.map((rehearsal) => {
+    const schedule = bestScheduleByRehearsalId.get(rehearsal.id);
+    if (!schedule || schedule.length <= (rehearsal.schedule?.length ?? 0)) {
+      return rehearsal;
+    }
+    changed = true;
+    const sceneIds =
+      rehearsal.sceneIds.length > 0 ? rehearsal.sceneIds : getSceneIdsFromSchedule(schedule);
+    return { ...rehearsal, schedule, sceneIds };
+  });
+
+  return changed ? { ...base, rehearsals } : base;
+}
+
 export function pickAccessibleAppState(
   accessibleTheaterIds: Set<string>,
   remote: AppState | null,
@@ -103,24 +138,30 @@ export function pickAccessibleAppState(
   const filteredLocal = filter(local);
   const filteredBackup = filter(backup);
 
+  let picked: AppState | null = null;
+
   if (filteredRemote && !isScopedAppStateEmpty(filteredRemote)) {
-    return filteredRemote;
-  }
-
-  let best: AppState | null = null;
-  let bestScore = -1;
-  for (const candidate of [filteredLocal, filteredBackup]) {
-    if (!candidate || isScopedAppStateEmpty(candidate)) continue;
-    const score =
-      candidate.rehearsals.length * 10_000 +
-      candidate.scenes.length * 5 +
-      candidate.plays.length * 100 +
-      candidate.theaters.length;
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
+    picked = filteredRemote;
+  } else {
+    let best: AppState | null = null;
+    let bestScore = -1;
+    for (const candidate of [filteredLocal, filteredBackup]) {
+      if (!candidate || isScopedAppStateEmpty(candidate)) continue;
+      const score = scoreAppState(candidate);
+      if (score > bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
     }
+    picked = best;
   }
 
-  return best;
+  if (!picked) return null;
+
+  return mergeRehearsalSchedulesFromSources(
+    picked,
+    filteredRemote,
+    filteredLocal,
+    filteredBackup
+  );
 }

@@ -55,7 +55,9 @@ import {
 import {
   getSceneIdsFromSchedule,
   removeDeselectedScenesFromSchedule,
+  syncRehearsalSceneIdsFromSchedule,
 } from '../utils/scheduleSync';
+import { recalculateScheduleStartTimes } from '../utils/schedulePlan';
 import { fetchAppState, fetchBackupList, fetchLatestBackupState, restoreBackupState, saveAppStateWithRetry, checkApiHealth, type SaveStatus } from '../api/storage';
 import { scoreAppState } from '../utils/appStateScore';
 import { pickAccessibleAppState, createEmptyAppState } from '../utils/appStateScope';
@@ -200,8 +202,11 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
     const bootstrapped = bootstrapAppState(best);
     const source =
       best === remote ? 'SQLite' : best === local ? 'браузера' : 'резервной копии';
+    const remoteBootstrapped = remote ? bootstrapAppState(remote) : null;
     const shouldPushToServer =
-      best !== remote || scenesNumbersChanged(best.scenes, bootstrapped.scenes);
+      !remoteBootstrapped ||
+      scoreAppState(bootstrapped) > scoreAppState(remoteBootstrapped) ||
+      scenesNumbersChanged(best.scenes, bootstrapped.scenes);
 
     if (remote && best !== remote && scoreAppState(best) > scoreAppState(remote)) {
       console.info(`[rehearsals] В SQLite менее полные данные — восстановление из ${source}`);
@@ -1112,11 +1117,27 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'UPDATE_REHEARSAL': {
       const previous = state.rehearsals.find((r) => r.id === action.payload.id);
-      const schedule = removeDeselectedScenesFromSchedule(
-        { schedule: action.payload.schedule, startTime: action.payload.startTime },
-        action.payload.sceneIds
-      );
-      const sceneIds = action.payload.sceneIds;
+      const previousSchedule = previous?.schedule ?? [];
+      const payloadSchedule = action.payload.schedule ?? previousSchedule;
+
+      const sceneIdsFromSchedule = getSceneIdsFromSchedule(payloadSchedule);
+      let sceneIds = action.payload.sceneIds;
+      if (sceneIds.length === 0 && sceneIdsFromSchedule.length > 0) {
+        sceneIds = sceneIdsFromSchedule;
+      }
+
+      const sceneIdsChanged =
+        !previous ||
+        previous.sceneIds.length !== sceneIds.length ||
+        previous.sceneIds.some((id, index) => id !== sceneIds[index]);
+
+      const schedule = sceneIdsChanged
+        ? removeDeselectedScenesFromSchedule(
+            { schedule: payloadSchedule, startTime: action.payload.startTime },
+            sceneIds
+          )
+        : recalculateScheduleStartTimes(payloadSchedule, action.payload.startTime);
+
       const actorIds = previous
         ? mergeActorsForNewScenes(state, action.payload, previous.sceneIds, sceneIds)
         : action.payload.actorIds;
@@ -1192,7 +1213,11 @@ function reducer(state: AppState, action: Action): AppState {
         rehearsals: state.rehearsals.map((r) => {
           if (r.id !== action.payload.rehearsalId) return r;
           const actorIds = mergeActorsForNewScheduleBlocks(state, r, action.payload.schedule);
-          const rehearsalDraft = { ...r, schedule: action.payload.schedule, actorIds };
+          const rehearsalDraft = syncRehearsalSceneIdsFromSchedule({
+            ...r,
+            schedule: action.payload.schedule,
+            actorIds,
+          });
           return {
             ...rehearsalDraft,
             participantOrder: resolveParticipantOrder(state, rehearsalDraft),
@@ -1326,7 +1351,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
       persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
-    }, 200);
+    }, 50);
 
     return () => {
       if (saveTimerRef.current !== null) {

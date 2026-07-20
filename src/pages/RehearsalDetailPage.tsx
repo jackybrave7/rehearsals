@@ -31,7 +31,7 @@ import {
 import { formatReminderKindLabel } from '../utils/reminders';
 import { getSceneShortLabel } from '../utils/sceneLabels';
 import {
-  removeDeselectedScenesFromSchedule,
+  applySceneIdsToSchedule,
   getSceneDurationsFromSchedule,
   getSceneIdsFromSchedule,
   updateSceneDurationInSchedule,
@@ -348,7 +348,14 @@ export function RehearsalDetailPage() {
 
   const saveRehearsal = () => {
     if (readOnly || !editForm) return;
-    dispatch({ type: 'UPDATE_REHEARSAL', payload: { ...editForm, id: rehearsal.id } });
+    const schedule =
+      rehearsal.schedule.length > editForm.schedule.length
+        ? rehearsal.schedule
+        : editForm.schedule;
+    dispatch({
+      type: 'UPDATE_REHEARSAL',
+      payload: { ...editForm, schedule, id: rehearsal.id },
+    });
     setEditModalOpen(false);
   };
 
@@ -398,7 +405,15 @@ export function RehearsalDetailPage() {
 
   const handleEditScenesChange = (sceneIds: string[]) => {
     if (!editForm) return;
-    const schedule = removeDeselectedScenesFromSchedule(editForm, sceneIds);
+    const scenes = state.scenes.filter((scene) =>
+      theaterPlays.some((play) => play.id === scene.playId)
+    );
+    const schedule = applySceneIdsToSchedule(
+      editForm,
+      sceneIds,
+      scenes,
+      getSceneDurationsFromSchedule(editForm.schedule)
+    );
     setEditForm({
       ...editForm,
       sceneIds,
