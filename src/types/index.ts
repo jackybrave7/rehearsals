@@ -128,8 +128,8 @@ export interface Play {
   archivedAt?: string;
   /** Якоря заголовков актов/действий в тексте (ключ — подпись группы, напр. «Действие первое») */
   actScriptAnchors?: Record<string, SceneScriptAnchor>;
-  /** Google-якоря сцен по порядку в документе (для ссылок после импорта из .docx) */
-  scriptGoogleSceneAnchors?: SceneScriptAnchor[];
+  /** Google-заголовки сцен из документа (с текстом, для ссылок после импорта из .docx) */
+  scriptGoogleSceneAnchors?: Array<SceneScriptAnchor & { text?: string; index?: number }>;
 }
 
 export type SceneStatus = 'not_started' | 'in_progress' | 'ready';

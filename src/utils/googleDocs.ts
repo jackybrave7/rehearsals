@@ -77,25 +77,6 @@ export function resolvePlayGoogleDocsUrl(play: Play | undefined): string | null 
   return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
 }
 
-export function resolveSceneLinkAnchor(play: Play, scene: Scene): SceneScriptAnchor | null {
-  const anchor = scene.scriptAnchor;
-  if (anchor && !anchor.id.startsWith('file-')) return anchor;
-
-  const ordinals = play.scriptGoogleSceneAnchors;
-  if (!ordinals?.length) return null;
-
-  let index = scene.number - 1;
-  if (anchor?.id.startsWith('file-')) {
-    const fileOrdinal = Number.parseInt(anchor.id.slice('file-'.length), 10);
-    if (Number.isFinite(fileOrdinal) && fileOrdinal >= 0 && fileOrdinal < ordinals.length) {
-      index = fileOrdinal;
-    }
-  }
-
-  if (index < 0 || index >= ordinals.length) return null;
-  return ordinals[index];
-}
-
 export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): string | null {
   if (!play) return null;
 
@@ -388,6 +369,80 @@ function scoreSceneHeadingMatch(sceneTitle: string, anchorText: string): number 
   return 0;
 }
 
+function isValidSceneAnchorMatch(scene: Scene, match: SceneAnchorMatch): boolean {
+  const sceneKey = parseActScene(scene.title);
+  const anchorKey = parseActScene(match.anchorText);
+  if (sceneKey.scene !== undefined && anchorKey.scene !== undefined) {
+    return sceneKey.scene === anchorKey.scene && !actSceneNumbersConflict(sceneKey, anchorKey);
+  }
+  return match.score >= 70;
+}
+
+export function findGoogleAnchorForScene(
+  scene: Scene,
+  docAnchors: DocTextAnchor[]
+): SceneScriptAnchor | null {
+  const importable = listImportableScenesWithActGroups(docAnchors).map((item) => item.anchor);
+  const sceneKey = parseActScene(scene.title);
+
+  if (sceneKey.scene !== undefined) {
+    const candidates = importable.filter((anchor) => {
+      const anchorKey = parseActScene(anchor.text);
+      if (anchorKey.scene !== sceneKey.scene) return false;
+      return !actSceneNumbersConflict(sceneKey, anchorKey);
+    });
+
+    if (candidates.length === 1) {
+      return { type: candidates[0].type, id: candidates[0].id };
+    }
+
+    if (candidates.length > 1) {
+      let best: DocTextAnchor | null = null;
+      let bestScore = 0;
+      for (const anchor of candidates) {
+        const score = scoreSceneHeadingMatch(scene.title, anchor.text);
+        if (score > bestScore) {
+          bestScore = score;
+          best = anchor;
+        }
+      }
+      if (best && bestScore >= 70) {
+        return { type: best.type, id: best.id };
+      }
+    }
+  }
+
+  const match = matchScenesToDocAnchors([scene], docAnchors).find((item) => item.score >= 70);
+  return match ? match.anchor : null;
+}
+
+export function resolveSceneLinkAnchor(play: Play, scene: Scene): SceneScriptAnchor | null {
+  const stored = scene.scriptAnchor;
+  const docAnchors = (play.scriptGoogleSceneAnchors ?? []).filter(
+    (anchor): anchor is DocTextAnchor => Boolean(anchor.text)
+  );
+
+  if (stored && !stored.id.startsWith('file-')) {
+    if (docAnchors.length > 0) {
+      const docAnchor = docAnchors.find((item) => item.id === stored.id);
+      if (docAnchor) {
+        const match: SceneAnchorMatch = {
+          sceneId: scene.id,
+          anchor: stored,
+          anchorText: docAnchor.text,
+          score: 100,
+        };
+        if (isValidSceneAnchorMatch(scene, match)) return stored;
+      }
+    } else {
+      return stored;
+    }
+  }
+
+  if (docAnchors.length === 0) return null;
+  return findGoogleAnchorForScene(scene, docAnchors);
+}
+
 interface GoogleDocsParagraphElement {
   textRun?: {
     content?: string;
@@ -626,19 +681,16 @@ export function matchScenesToDocAnchors(
   );
 }
 
-export function buildGoogleSceneAnchorsByImportOrder(anchors: DocTextAnchor[]): SceneScriptAnchor[] {
-  return listImportableScenesWithActGroups(anchors).map(({ anchor }) => ({
-    type: anchor.type,
-    id: anchor.id,
-  }));
+export function buildGoogleDocAnchorsForLinking(anchors: DocTextAnchor[]): DocTextAnchor[] {
+  return listImportableScenesWithActGroups(anchors).map(({ anchor }) => anchor);
 }
 
 export function augmentGoogleSceneAnchorMatches(
   scenes: Scene[],
   googleMatches: SceneAnchorMatch[],
-  googleSceneAnchorsByOrder: SceneScriptAnchor[]
+  googleDocAnchors: DocTextAnchor[]
 ): SceneAnchorMatch[] {
-  if (googleSceneAnchorsByOrder.length === 0) return googleMatches;
+  if (googleDocAnchors.length === 0) return googleMatches;
 
   const matchedSceneIds = new Set(googleMatches.map((match) => match.sceneId));
   const usedAnchorKeys = new Set(
@@ -650,25 +702,18 @@ export function augmentGoogleSceneAnchorMatches(
   for (const scene of sortedScenes) {
     if (matchedSceneIds.has(scene.id)) continue;
 
-    let index = scene.number - 1;
-    if (scene.scriptAnchor?.id.startsWith('file-')) {
-      const fileOrdinal = Number.parseInt(scene.scriptAnchor.id.slice('file-'.length), 10);
-      if (Number.isFinite(fileOrdinal) && fileOrdinal >= 0) {
-        index = fileOrdinal;
-      }
-    }
-
-    const anchor = googleSceneAnchorsByOrder[index];
+    const anchor = findGoogleAnchorForScene(scene, googleDocAnchors);
     if (!anchor) continue;
 
     const anchorKey = `${anchor.type}:${anchor.id}`;
     if (usedAnchorKeys.has(anchorKey)) continue;
 
+    const docAnchor = googleDocAnchors.find((item) => item.id === anchor.id);
     result.push({
       sceneId: scene.id,
       anchor,
-      anchorText: scene.title,
-      score: 90,
+      anchorText: docAnchor?.text ?? scene.title,
+      score: 95,
     });
     matchedSceneIds.add(scene.id);
     usedAnchorKeys.add(anchorKey);
@@ -683,15 +728,20 @@ export function prepareGoogleSceneLinkMatches(
   titleMatches: SceneAnchorMatch[]
 ): {
   matches: SceneAnchorMatch[];
-  scriptGoogleSceneAnchors: SceneScriptAnchor[];
+  scriptGoogleSceneAnchors: DocTextAnchor[];
 } {
-  const scriptGoogleSceneAnchors = buildGoogleSceneAnchorsByImportOrder(anchors);
+  const scriptGoogleSceneAnchors = buildGoogleDocAnchorsForLinking(anchors);
   if (scriptGoogleSceneAnchors.length === 0) {
     return { matches: titleMatches, scriptGoogleSceneAnchors };
   }
 
+  const validTitleMatches = titleMatches.filter((match) => {
+    const scene = scenes.find((item) => item.id === match.sceneId);
+    return scene ? isValidSceneAnchorMatch(scene, match) : false;
+  });
+
   return {
-    matches: augmentGoogleSceneAnchorMatches(scenes, titleMatches, scriptGoogleSceneAnchors),
+    matches: augmentGoogleSceneAnchorMatches(scenes, validTitleMatches, scriptGoogleSceneAnchors),
     scriptGoogleSceneAnchors,
   };
 }
