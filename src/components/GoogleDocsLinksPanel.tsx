@@ -208,18 +208,20 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
 
       const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
         targetScenes,
-        anchors,
-        matches
+        anchors
       );
       const actGroups = mapActGroupsToMatchedScenes(anchors, linkMatches);
       const actScriptAnchors = mapActAnchorsFromDocument(anchors);
+      const keepFileSceneAnchors = Boolean(play.scriptFileUrl);
 
       if (linkMatches.length === 0) {
         if (!options?.silent) {
           setSyncError(
             anchorCount === 0
               ? 'В документе не найдены заголовки. Оформите названия сцен как заголовки (H1–H6) в Google Docs.'
-              : 'Не удалось сопоставить заголовки документа со сценами. Проверьте названия.'
+              : keepFileSceneAnchors
+                ? 'Не удалось сопоставить сцены с заголовками Google Docs. Проверьте, что каждая сцена оформлена как заголовок (H1–H6), например «Сцена 1. Метро».'
+                : 'Не удалось сопоставить заголовки документа со сценами. Проверьте названия.'
           );
         }
         return;
@@ -232,24 +234,28 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           payload: { ...play, scriptGoogleSceneAnchors },
         });
       }
-      dispatch({
-        type: 'APPLY_SCENE_SCRIPT_ANCHORS',
-        payload: {
-          playId: play.id,
-          syncedAt,
-          importSource: 'google',
-          actScriptAnchors,
-          updates: linkMatches.map((match) => ({
-            sceneId: match.sceneId,
-            scriptAnchor: match.anchor,
-            actGroup: actGroups.get(match.sceneId),
-          })),
-        },
-      });
+
+      if (!keepFileSceneAnchors) {
+        dispatch({
+          type: 'APPLY_SCENE_SCRIPT_ANCHORS',
+          payload: {
+            playId: play.id,
+            syncedAt,
+            importSource: 'google',
+            actScriptAnchors,
+            updates: linkMatches.map((match) => ({
+              sceneId: match.sceneId,
+              scriptAnchor: match.anchor,
+              actGroup: actGroups.get(match.sceneId),
+            })),
+          },
+        });
+      }
 
       const scenesWithAnchors = targetScenes.map((scene) => {
         const match = linkMatches.find((item) => item.sceneId === scene.id);
-        return match ? { ...scene, scriptAnchor: match.anchor } : scene;
+        if (!match) return scene;
+        return keepFileSceneAnchors ? scene : { ...scene, scriptAnchor: match.anchor };
       });
       const { counted, described, rostered } = await applySceneInsights(scenesWithAnchors, token);
 

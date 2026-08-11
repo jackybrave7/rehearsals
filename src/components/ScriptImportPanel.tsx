@@ -273,31 +273,12 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
           );
           const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
             targetScenes,
-            googleSync.anchors,
-            googleSync.matches
+            googleSync.anchors
           );
-          if (linkMatches.length > 0) {
-            const googleActGroups = mapActGroupsToMatchedScenes(googleSync.anchors, linkMatches);
-            const googleActAnchors = mapActAnchorsFromDocument(googleSync.anchors);
-            if (scriptGoogleSceneAnchors.length > 0) {
-              dispatch({
-                type: 'UPDATE_PLAY',
-                payload: { ...play, scriptGoogleSceneAnchors },
-              });
-            }
+          if (scriptGoogleSceneAnchors.length > 0) {
             dispatch({
-              type: 'APPLY_SCENE_SCRIPT_ANCHORS',
-              payload: {
-                playId: play.id,
-                syncedAt: new Date().toISOString(),
-                importSource: 'google',
-                actScriptAnchors: googleActAnchors,
-                updates: linkMatches.map((match) => ({
-                  sceneId: match.sceneId,
-                  scriptAnchor: match.anchor,
-                  actGroup: googleActGroups.get(match.sceneId),
-                })),
-              },
+              type: 'UPDATE_PLAY',
+              payload: { ...play, scriptGoogleSceneAnchors },
             });
             googleLinkCount = linkMatches.length;
           }
