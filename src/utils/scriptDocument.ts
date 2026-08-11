@@ -2,9 +2,12 @@ import type { Scene } from '../types';
 import {
   type DocTextAnchor,
   isImportableSceneHeading,
+  listImportableScenesWithActGroups,
   matchScenesToDocAnchors,
   type SceneAnchorMatch,
 } from './googleDocs';
+import { generateId } from './id';
+import { DEFAULT_SCENE_REHEARSAL_MINUTES } from './sceneDefaults';
 import {
   buildSceneDescriptionsFromTexts,
   extractSceneBodyTextsFromPlainText,
@@ -120,6 +123,68 @@ export function countSceneCharactersFromPlainText(
   }
 
   return counts;
+}
+
+export function mergeMissingScenesFromImport(
+  playId: string,
+  existingScenes: Scene[],
+  anchors: DocTextAnchor[],
+  matches: SceneAnchorMatch[]
+): { toAdd: Scene[]; toUpdate: Scene[]; allScenes: Scene[] } {
+  const importable = listImportableScenesWithActGroups(anchors);
+  const sceneById = new Map(existingScenes.map((scene) => [scene.id, scene]));
+  const matchByAnchorKey = new Map(
+    matches.map((match) => [`${match.anchor.type}:${match.anchor.id}`, match])
+  );
+
+  const toAdd: Scene[] = [];
+  const toUpdate: Scene[] = [];
+  const updatedById = new Map<string, Scene>();
+
+  importable.forEach(({ anchor, actGroup }, index) => {
+    const anchorKey = `${anchor.type}:${anchor.id}`;
+    const existingMatch = matchByAnchorKey.get(anchorKey);
+    const number = index + 1;
+
+    if (existingMatch) {
+      const scene = sceneById.get(existingMatch.sceneId);
+      if (!scene) return;
+      const updated: Scene = {
+        ...scene,
+        number,
+        title: anchor.text,
+        actGroup: actGroup ?? scene.actGroup,
+      };
+      if (
+        updated.number !== scene.number ||
+        updated.title !== scene.title ||
+        updated.actGroup !== scene.actGroup
+      ) {
+        toUpdate.push(updated);
+        updatedById.set(scene.id, updated);
+      }
+      return;
+    }
+
+    toAdd.push({
+      id: generateId(),
+      playId,
+      number,
+      title: anchor.text,
+      actGroup,
+      status: 'not_started',
+      priority: 'medium',
+      roleIds: [],
+      estimatedMinutes: DEFAULT_SCENE_REHEARSAL_MINUTES,
+    });
+  });
+
+  const allScenes = [
+    ...existingScenes.map((scene) => updatedById.get(scene.id) ?? scene),
+    ...toAdd,
+  ].sort((a, b) => a.number - b.number);
+
+  return { toAdd, toUpdate, allScenes };
 }
 
 export function syncScenesFromScriptText(

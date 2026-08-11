@@ -6,6 +6,7 @@ import { useDesign } from '../store/DesignContext';
 import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import { syncSceneAnchorsFromGoogleDoc, fetchGoogleDocAnchors, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
 import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
+import { mergeMissingScenesFromImport } from '../utils/scriptDocument';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
@@ -179,11 +180,32 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         createdCount = createdScenes.length;
       }
 
-      const { matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
+      let { matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
         play.documentUrl,
         targetScenes,
         token
       );
+
+      if (targetScenes.length > 0) {
+        const { toAdd, toUpdate, allScenes } = mergeMissingScenesFromImport(
+          play.id,
+          targetScenes,
+          anchors,
+          matches
+        );
+        if (toAdd.length > 0 || toUpdate.length > 0) {
+          toAdd.forEach((scene) => dispatch({ type: 'ADD_SCENE', payload: scene }));
+          toUpdate.forEach((scene) => dispatch({ type: 'UPDATE_SCENE', payload: scene }));
+          createdCount += toAdd.length;
+          targetScenes = allScenes;
+          ({ matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
+            play.documentUrl,
+            targetScenes,
+            token
+          ));
+        }
+      }
+
       const actGroups = mapActGroupsToMatchedScenes(anchors, matches);
       const actScriptAnchors = mapActAnchorsFromDocument(anchors);
 

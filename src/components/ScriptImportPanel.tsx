@@ -9,6 +9,7 @@ import { parseScriptImport, resolveScriptImportError } from '../services/scriptI
 import {
   isFileSectionAnchor,
   isSupportedScriptImportFile,
+  mergeMissingScenesFromImport,
   parseScriptFileId,
 } from '../utils/scriptDocument';
 import { listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
@@ -145,8 +146,25 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         createdCount = createdScenes.length;
       }
 
-      const { matches, anchorCount, characterCounts, descriptions, roleIds, anchors } =
+      let { matches, anchorCount, characterCounts, descriptions, roleIds, anchors } =
         await parseScriptImport(currentFileId, targetScenes, characterRoles);
+
+      if (targetScenes.length > 0) {
+        const { toAdd, toUpdate, allScenes } = mergeMissingScenesFromImport(
+          play.id,
+          targetScenes,
+          anchors,
+          matches
+        );
+        if (toAdd.length > 0 || toUpdate.length > 0) {
+          toAdd.forEach((scene) => dispatch({ type: 'ADD_SCENE', payload: scene }));
+          toUpdate.forEach((scene) => dispatch({ type: 'UPDATE_SCENE', payload: scene }));
+          createdCount += toAdd.length;
+          targetScenes = allScenes;
+          ({ matches, anchorCount, characterCounts, descriptions, roleIds, anchors } =
+            await parseScriptImport(currentFileId, targetScenes, characterRoles));
+        }
+      }
 
       if (matches.length === 0) {
         setSyncError(
