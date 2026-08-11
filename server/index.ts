@@ -24,6 +24,7 @@ import {
   loadLatestBackupState,
 } from './backup.js';
 import { handleFetchGoogleDocument } from './googleDocs.js';
+import { handleFetchGoogleDocAnchors } from './googleDocsAnchors.js';
 import { handleParseScriptImport, handleSceneBodyText } from './scriptImport.js';
 import { startReminderScheduler } from './reminderScheduler.js';
 import { startTelegramLinkPoller } from './telegramLinkPoller.js';
@@ -114,6 +115,10 @@ app.get('/api/state', (req, res) => {
 
 app.get('/api/google-docs/documents/:documentId', (req, res) => {
   void handleFetchGoogleDocument(req, res);
+});
+
+app.get('/api/google-docs/documents/:documentId/anchors', (req, res) => {
+  void handleFetchGoogleDocAnchors(req, res);
 });
 
 app.post('/api/script-import/parse', (req, res) => {

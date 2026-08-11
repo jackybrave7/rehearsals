@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
+    "test": "tsx --test src/**/*.test.ts",
     "start": "tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",

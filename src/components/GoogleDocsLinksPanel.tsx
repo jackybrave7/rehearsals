@@ -4,9 +4,10 @@ import type { Play, Scene } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
-import { syncSceneAnchorsFromGoogleDoc, fetchGoogleDocAnchors, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
-import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes, prepareGoogleSceneLinkMatches } from '../utils/googleDocs';
+import { fetchGoogleDocAnchorsWithFallback, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
+import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes, matchScenesToDocAnchors, prepareGoogleSceneLinkMatches } from '../utils/googleDocs';
 import { mergeMissingScenesFromImport } from '../utils/scriptDocument';
+import { buildSceneNumberUpdates, resolveSceneNumberFromTitle } from '../utils/sceneNumbering';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
@@ -141,17 +142,32 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         if (!options?.silent) setSyncError('У постановки не указан Google Docs URL.');
         return;
       }
-      const token = await auth.getAccessToken({ interactive: true });
-      if (!token) {
-        if (!options?.silent) setSyncError('Не удалось получить доступ Google.');
-        return;
+      let token = await auth.getAccessToken({ interactive: false });
+      let anchors: Awaited<ReturnType<typeof fetchGoogleDocAnchorsWithFallback>>['anchors'];
+      let anchorCount = 0;
+
+      try {
+        const anchorPayload = await fetchGoogleDocAnchorsWithFallback(play.documentUrl, token);
+        anchors = anchorPayload.anchors;
+        anchorCount = anchorPayload.anchorCount;
+      } catch {
+        if (options?.silent) return;
+        token = await auth.getAccessToken({ interactive: true });
+        if (!token) {
+          setSyncError(
+            'Не удалось получить заголовки из Google Docs. Сделайте документ доступным по ссылке (чтение) или войдите в Google.'
+          );
+          return;
+        }
+        const anchorPayload = await fetchGoogleDocAnchorsWithFallback(play.documentUrl, token);
+        anchors = anchorPayload.anchors;
+        anchorCount = anchorPayload.anchorCount;
       }
 
       let targetScenes = scenes;
       let createdCount = 0;
 
       if (targetScenes.length === 0) {
-        const { anchors } = await fetchGoogleDocAnchors(play.documentUrl, token);
         const sceneAnchors = listImportableScenesWithActGroups(anchors);
         if (sceneAnchors.length === 0) {
           if (!options?.silent) {
@@ -167,7 +183,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
           id: generateId(),
           playId: play.id,
-          number: index + 1,
+          number: resolveSceneNumberFromTitle(anchor.text, index + 1),
           title: anchor.text,
           actGroup,
           status: 'not_started',
@@ -180,11 +196,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         createdCount = createdScenes.length;
       }
 
-      let { matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
-        play.documentUrl,
-        targetScenes,
-        token
-      );
+      let matches = matchScenesToDocAnchors(targetScenes, anchors);
 
       if (targetScenes.length > 0) {
         const { toAdd, toUpdate, allScenes } = mergeMissingScenesFromImport(
@@ -198,11 +210,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           toUpdate.forEach((scene) => dispatch({ type: 'UPDATE_SCENE', payload: scene }));
           createdCount += toAdd.length;
           targetScenes = allScenes;
-          ({ matches, anchorCount, anchors } = await syncSceneAnchorsFromGoogleDoc(
-            play.documentUrl,
-            targetScenes,
-            token
-          ));
+          matches = matchScenesToDocAnchors(targetScenes, anchors);
         }
       }
 
@@ -257,7 +265,27 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         if (!match) return scene;
         return keepFileSceneAnchors ? scene : { ...scene, scriptAnchor: match.anchor };
       });
-      const { counted, described, rostered } = await applySceneInsights(scenesWithAnchors, token);
+
+      const latestPlayScenes = [
+        ...targetScenes,
+        ...state.scenes.filter(
+          (scene) =>
+            scene.playId === play.id && !targetScenes.some((item) => item.id === scene.id)
+        ),
+      ];
+      for (const scene of buildSceneNumberUpdates(scenes, latestPlayScenes, play.id)) {
+        dispatch({ type: 'UPDATE_SCENE', payload: scene });
+      }
+
+      let counted = 0;
+      let described = 0;
+      let rostered = 0;
+      if (!token && !options?.silent) {
+        token = await auth.getAccessToken({ interactive: true });
+      }
+      if (token) {
+        ({ counted, described, rostered } = await applySceneInsights(scenesWithAnchors, token));
+      }
 
       setSyncMessage(
         (createdCount > 0 ? `Создано ${createdCount} сцен из документа. ` : '') +

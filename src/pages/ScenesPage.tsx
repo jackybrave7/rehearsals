@@ -27,6 +27,7 @@ import { SceneScriptLink, ActScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { PremiereBanner } from '../components/PremiereBanner';
 import { parseAnchorFromGoogleDocsUrl } from '../utils/googleDocs';
+import { compareScenesByScriptOrder } from '../utils/sceneNumbering';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { buildSceneWorkHistory } from '../utils/sceneRehearsalHistory';
 import { buildPlayReadinessReport, heatLevelColors, heatLevelLabel } from '../utils/sceneReadiness';
@@ -160,7 +161,7 @@ export function ScenesPage() {
     dispatch({ type: 'UPDATE_SCENE', payload: { ...scene, status } });
   };
 
-  const sorted = [...playScenes].sort((a, b) => a.number - b.number);
+  const sorted = [...playScenes].sort(compareScenesByScriptOrder);
 
   const statusCounts = useMemo(() => {
     const counts: Record<SceneStatus, number> = {

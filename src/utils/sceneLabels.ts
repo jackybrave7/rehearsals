@@ -1,4 +1,5 @@
 import type { AppState, Scene } from '../types';
+import { compareScenesByScriptOrder } from './sceneNumbering';
 import { getSceneRoles } from '../store/selectors';
 
 const ACT_GROUP_RE = /^Акт\s+\d+(?:,\s*\d+\s*часть)?/i;
@@ -43,7 +44,7 @@ export function getSceneCharacterNames(state: AppState, scene: Scene): string[] 
 }
 
 export function groupScenesByAct(scenes: Scene[]): { group: string; scenes: Scene[] }[] {
-  const sorted = [...scenes].sort((a, b) => a.number - b.number);
+  const sorted = [...scenes].sort(compareScenesByScriptOrder);
   const groups = new Map<string, Scene[]>();
 
   for (const scene of sorted) {

@@ -147,7 +147,7 @@ function normalizeTitle(value: string): string {
 
 const ACT_SCENE_BOUNDARY = String.raw`(?=\s|,|\.|$|[-—–])`;
 
-function parseActScene(value: string): { act?: number; scene?: number } {
+export function parseActScene(value: string): { act?: number; scene?: number } {
   const actBeforeMatch = value.match(
     new RegExp(`(\\d+)\\s*(?:акт|действие)${ACT_SCENE_BOUNDARY}`, 'i')
   );
@@ -598,6 +598,69 @@ export function extractDocTextAnchors(document: GoogleDocsDocument): DocTextAnch
   return [...unique.values()].sort((a, b) => a.index - b.index);
 }
 
+function stripInlineHtml(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Якоря из публичного HTML-экспорта Google Docs (без OAuth пользователя). */
+export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor[] {
+  const anchors: DocTextAnchor[] = [];
+  const seen = new Set<string>();
+  let index = 0;
+
+  const blockRe =
+    /<(?:p|h[1-6]|div)[^>]*\sid="(h\.[^"]+)"[^>]*>([\s\S]*?)<\/(?:p|h[1-6]|div)>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(html)) !== null) {
+    const id = match[1];
+    const text = stripInlineHtml(match[2]);
+    if (!text || seen.has(id)) continue;
+    if (!isImportableSceneHeading(text)) continue;
+    seen.add(id);
+    anchors.push({ type: 'heading', id, text, index: index++ });
+  }
+
+  if (anchors.length === 0) {
+    const idRe = /\sid="(h\.[^"]+)"/gi;
+    while ((match = idRe.exec(html)) !== null) {
+      const id = match[1];
+      if (seen.has(id)) continue;
+      const slice = html.slice(match.index, match.index + 1200);
+      const textMatch = slice.match(/>([^<]{2,200})</);
+      const text = textMatch ? stripInlineHtml(textMatch[1]) : '';
+      if (!text || !isImportableSceneHeading(text)) continue;
+      seen.add(id);
+      anchors.push({ type: 'heading', id, text, index: index++ });
+    }
+  }
+
+  return anchors.sort((a, b) => a.index - b.index);
+}
+
+function compareScenesForMatching(
+  a: Pick<Scene, 'title' | 'number'>,
+  b: Pick<Scene, 'title' | 'number'>
+): number {
+  const aKey = parseActScene(a.title);
+  const bKey = parseActScene(b.title);
+  if (aKey.act !== undefined && bKey.act !== undefined && aKey.act !== bKey.act) {
+    return aKey.act - bKey.act;
+  }
+  const aScene = aKey.scene ?? a.number;
+  const bScene = bKey.scene ?? b.number;
+  if (aScene !== bScene) return aScene - bScene;
+  return a.number - b.number;
+}
+
 export interface SceneAnchorMatch {
   sceneId: string;
   anchor: SceneScriptAnchor;
@@ -609,7 +672,7 @@ export function matchScenesToDocAnchors(
   scenes: Scene[],
   docAnchors: DocTextAnchor[]
 ): SceneAnchorMatch[] {
-  const sortedScenes = [...scenes].sort((a, b) => a.number - b.number);
+  const sortedScenes = [...scenes].sort(compareScenesForMatching);
   const usedAnchorIds = new Set<string>();
   const matches: SceneAnchorMatch[] = [];
 
@@ -719,7 +782,7 @@ export function prepareGoogleSceneLinkMatches(
   const matches: SceneAnchorMatch[] = [];
   const usedAnchorKeys = new Set<string>();
 
-  for (const scene of [...scenes].sort((a, b) => a.number - b.number)) {
+  for (const scene of [...scenes].sort(compareScenesForMatching)) {
     const anchor = findGoogleAnchorForScene(scene, scriptGoogleSceneAnchors);
     if (!anchor) continue;
 

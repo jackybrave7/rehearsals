@@ -58,6 +58,62 @@ export async function fetchGoogleDocument(
   return response.json();
 }
 
+export async function fetchGoogleDocAnchorsForLinks(
+  documentUrl: string
+): Promise<{
+  anchors: DocTextAnchor[];
+  anchorCount: number;
+  source: 'server-api' | 'public-export' | 'user-oauth';
+}> {
+  const documentId = parseGoogleDocumentId(documentUrl);
+  if (!documentId) {
+    throw new GoogleDocsClientError('INVALID_URL');
+  }
+
+  try {
+    const response = await fetch(
+      `/api/google-docs/documents/${encodeURIComponent(documentId)}/anchors`,
+      { credentials: 'include' }
+    );
+    if (response.ok) {
+      const body = (await response.json()) as {
+        anchors?: DocTextAnchor[];
+        anchorCount?: number;
+        source?: 'server-api' | 'public-export';
+      };
+      return {
+        anchors: body.anchors ?? [],
+        anchorCount: body.anchorCount ?? body.anchors?.length ?? 0,
+        source: body.source ?? 'public-export',
+      };
+    }
+  } catch {
+    // fall through to user OAuth
+  }
+
+  throw new GoogleDocsClientError(
+    'PUBLIC_ANCHORS_UNAVAILABLE',
+    'Не удалось получить якоря без входа в Google. Сделайте документ доступным по ссылке (чтение) или настройте GOOGLE_DOCS_REFRESH_TOKEN на сервере.'
+  );
+}
+
+export async function fetchGoogleDocAnchorsWithFallback(
+  documentUrl: string,
+  accessToken?: string | null
+): Promise<{
+  anchors: DocTextAnchor[];
+  anchorCount: number;
+  source: 'server-api' | 'public-export' | 'user-oauth';
+}> {
+  try {
+    return await fetchGoogleDocAnchorsForLinks(documentUrl);
+  } catch {
+    if (!accessToken) throw new GoogleDocsClientError('AUTH_REQUIRED');
+    const result = await fetchGoogleDocAnchors(documentUrl, accessToken);
+    return { ...result, source: 'user-oauth' };
+  }
+}
+
 export async function fetchGoogleDocAnchors(
   documentUrl: string,
   accessToken: string
@@ -143,6 +199,11 @@ export function resolveGoogleDocsSyncError(error: unknown): string {
 
   switch (error.code) {
     case 'AUTH_EXPIRED':
+    case 'PUBLIC_ANCHORS_UNAVAILABLE':
+      return (
+        error.details ??
+        'Не удалось обновить ссылки на Google Docs без входа. Откройте доступ к документу по ссылке (чтение) или войдите в Google.'
+      );
     case 'AUTH_REQUIRED':
       return 'Сессия Google истекла. Войдите снова и повторите синхронизацию.';
     case 'ACCESS_DENIED':

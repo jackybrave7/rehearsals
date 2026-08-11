@@ -6,6 +6,7 @@ import {
   matchScenesToDocAnchors,
   type SceneAnchorMatch,
 } from './googleDocs';
+import { resolveSceneNumberFromTitle } from './sceneNumbering';
 import { generateId } from './id';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from './sceneDefaults';
 import {
@@ -144,7 +145,7 @@ export function mergeMissingScenesFromImport(
   importable.forEach(({ anchor, actGroup }, index) => {
     const anchorKey = `${anchor.type}:${anchor.id}`;
     const existingMatch = matchByAnchorKey.get(anchorKey);
-    const number = index + 1;
+    const number = resolveSceneNumberFromTitle(anchor.text, index + 1);
 
     if (existingMatch) {
       const scene = sceneById.get(existingMatch.sceneId);
@@ -182,7 +183,11 @@ export function mergeMissingScenesFromImport(
   const allScenes = [
     ...existingScenes.map((scene) => updatedById.get(scene.id) ?? scene),
     ...toAdd,
-  ].sort((a, b) => a.number - b.number);
+  ].sort((a, b) => {
+    const numberCmp = a.number - b.number;
+    if (numberCmp !== 0) return numberCmp;
+    return a.title.localeCompare(b.title, 'ru');
+  });
 
   return { toAdd, toUpdate, allScenes };
 }

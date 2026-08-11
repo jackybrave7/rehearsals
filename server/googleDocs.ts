@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { getServerGoogleAccessToken } from './googleDocsAnchors.js';
 
 const GOOGLE_DOCS_API = 'https://docs.googleapis.com/v1/documents';
 
@@ -83,7 +84,7 @@ export async function handleFetchGoogleDocument(req: Request, res: Response): Pr
     return;
   }
 
-  const accessToken = readBearerToken(req);
+  const accessToken = readBearerToken(req) ?? (await getServerGoogleAccessToken());
   if (!accessToken) {
     res.status(401).json({ error: 'AUTH_REQUIRED' });
     return;

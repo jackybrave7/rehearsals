@@ -6,8 +6,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { uploadFile, formatFileUploadError } from '../api/files';
 import { parseScriptImport, resolveScriptImportError } from '../services/scriptImportClient';
-import { syncSceneAnchorsFromGoogleDoc } from '../services/googleDocsClient';
-import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
+import { fetchGoogleDocAnchorsWithFallback } from '../services/googleDocsClient';
 import {
   isFileSectionAnchor,
   isSupportedScriptImportFile,
@@ -25,6 +24,7 @@ import {
 } from '../utils/googleDocs';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
+import { buildSceneNumberUpdates, resolveSceneNumberFromTitle } from '../utils/sceneNumbering';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
@@ -52,7 +52,6 @@ function formatSyncDate(value: string | undefined): string | null {
 export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImportPanelProps) {
   const { state, dispatch } = useRehearsalStore();
   const { isZen } = useDesign();
-  const googleAuth = useGoogleDocsAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -144,7 +143,7 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
           id: generateId(),
           playId: play.id,
-          number: index + 1,
+          number: resolveSceneNumberFromTitle(anchor.text, index + 1),
           title: anchor.text,
           actGroup,
           status: 'not_started',
@@ -253,6 +252,17 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         });
       }
 
+      const latestPlayScenes = [
+        ...targetScenes,
+        ...state.scenes.filter(
+          (scene) =>
+            scene.playId === play.id && !targetScenes.some((item) => item.id === scene.id)
+        ),
+      ];
+      for (const scene of buildSceneNumberUpdates(scenes, latestPlayScenes, play.id)) {
+        dispatch({ type: 'UPDATE_SCENE', payload: scene });
+      }
+
       let googleLinkCount = 0;
       let googleLinkHint = '';
       const canLinkGoogleDocs =
@@ -261,19 +271,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         !isLikelyUploadedOfficeDoc(play.documentUrl);
 
       if (canLinkGoogleDocs) {
-        let token = await googleAuth.getAccessToken({ interactive: false });
-        if (!token) {
-          token = await googleAuth.getAccessToken({ interactive: true });
-        }
-        if (token) {
-          const googleSync = await syncSceneAnchorsFromGoogleDoc(
-            play.documentUrl!,
-            targetScenes,
-            token
-          );
+        try {
+          const googleAnchors = await fetchGoogleDocAnchorsWithFallback(play.documentUrl!);
           const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
             targetScenes,
-            googleSync.anchors
+            googleAnchors.anchors
           );
           if (scriptGoogleSceneAnchors.length > 0) {
             dispatch({
@@ -282,9 +284,9 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
             });
             googleLinkCount = linkMatches.length;
           }
-        } else {
+        } catch {
           googleLinkHint =
-            ' Для ссылок на блоки в Google Docs войдите в Google и нажмите «Сопоставить» в панели Google Docs.';
+            ' Ссылки на Google Docs: сделайте документ доступным по ссылке (чтение) или настройте серверный доступ.';
         }
       }
 
