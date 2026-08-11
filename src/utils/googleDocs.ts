@@ -66,10 +66,21 @@ export function buildGoogleDocsAnchorUrl(
   return `${base}${hash}`;
 }
 
+export function resolvePlayGoogleDocsUrl(play: Play | undefined): string | null {
+  if (!play) return null;
+
+  const documentId =
+    play.googleDocumentId ??
+    (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
+  if (!documentId || !isGoogleDocsUrl(play.documentUrl)) return null;
+
+  return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
+}
+
 export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): string | null {
   if (!play) return null;
 
-  const scriptUrl = resolvePlayScriptUrl(play);
+  const googleDocsUrl = resolvePlayGoogleDocsUrl(play);
   const documentId =
     play.googleDocumentId ??
     (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
@@ -82,6 +93,9 @@ export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): str
     return buildGoogleDocsAnchorUrl(documentId, scene.scriptAnchor);
   }
 
+  if (googleDocsUrl) return googleDocsUrl;
+
+  const scriptUrl = resolvePlayScriptUrl(play);
   if (scriptUrl) return scriptUrl;
 
   if (!documentId) return null;
@@ -106,7 +120,7 @@ export function resolveActScriptUrl(play: Play | undefined, actGroup: string): s
   if (!play || actGroup === 'Сцены') return null;
 
   const anchor = play.actScriptAnchors?.[actGroup];
-  const scriptUrl = resolvePlayScriptUrl(play);
+  const googleDocsUrl = resolvePlayGoogleDocsUrl(play);
   const documentId =
     play.googleDocumentId ??
     (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
@@ -115,6 +129,9 @@ export function resolveActScriptUrl(play: Play | undefined, actGroup: string): s
     return buildGoogleDocsAnchorUrl(documentId, anchor);
   }
 
+  if (googleDocsUrl) return googleDocsUrl;
+
+  const scriptUrl = resolvePlayScriptUrl(play);
   if (scriptUrl) return scriptUrl;
 
   if (!documentId) return null;

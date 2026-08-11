@@ -6,13 +6,22 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { uploadFile, formatFileUploadError } from '../api/files';
 import { parseScriptImport, resolveScriptImportError } from '../services/scriptImportClient';
+import { syncSceneAnchorsFromGoogleDoc } from '../services/googleDocsClient';
+import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import {
   isFileSectionAnchor,
   isSupportedScriptImportFile,
   mergeMissingScenesFromImport,
   parseScriptFileId,
 } from '../utils/scriptDocument';
-import { listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
+import {
+  isGoogleDocsUrl,
+  isLikelyUploadedOfficeDoc,
+  listImportableScenesWithActGroups,
+  mapActAnchorsFromDocument,
+  mapActGroupsToMatchedScenes,
+  resolvePlayGoogleDocsUrl,
+} from '../utils/googleDocs';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { resolveSceneTimingSettings } from '../utils/sceneTiming';
@@ -42,6 +51,7 @@ function formatSyncDate(value: string | undefined): string | null {
 export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImportPanelProps) {
   const { state, dispatch } = useRehearsalStore();
   const { isZen } = useDesign();
+  const googleAuth = useGoogleDocsAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -242,6 +252,49 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         });
       }
 
+      let googleLinkCount = 0;
+      let googleLinkHint = '';
+      const canLinkGoogleDocs =
+        Boolean(resolvePlayGoogleDocsUrl(play)) &&
+        isGoogleDocsUrl(play.documentUrl) &&
+        !isLikelyUploadedOfficeDoc(play.documentUrl);
+
+      if (canLinkGoogleDocs) {
+        let token = await googleAuth.getAccessToken({ interactive: false });
+        if (!token) {
+          token = await googleAuth.getAccessToken({ interactive: true });
+        }
+        if (token) {
+          const googleSync = await syncSceneAnchorsFromGoogleDoc(
+            play.documentUrl!,
+            targetScenes,
+            token
+          );
+          if (googleSync.matches.length > 0) {
+            const googleActGroups = mapActGroupsToMatchedScenes(googleSync.anchors, googleSync.matches);
+            const googleActAnchors = mapActAnchorsFromDocument(googleSync.anchors);
+            dispatch({
+              type: 'APPLY_SCENE_SCRIPT_ANCHORS',
+              payload: {
+                playId: play.id,
+                syncedAt: new Date().toISOString(),
+                importSource: 'google',
+                actScriptAnchors: googleActAnchors,
+                updates: googleSync.matches.map((match) => ({
+                  sceneId: match.sceneId,
+                  scriptAnchor: match.anchor,
+                  actGroup: googleActGroups.get(match.sceneId),
+                })),
+              },
+            });
+            googleLinkCount = googleSync.matches.length;
+          }
+        } else {
+          googleLinkHint =
+            ' Для ссылок на блоки в Google Docs войдите в Google и нажмите «Сопоставить» в панели Google Docs.';
+        }
+      }
+
       setSyncMessage(
         (createdCount > 0
           ? `Создано ${createdCount} сцен из файла. `
@@ -253,7 +306,10 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
           (descriptionEntries.length > 0
             ? ` Краткие описания для ${descriptionEntries.length} сцен.`
             : '') +
-          (roleEntries.length > 0 ? ` Персонажи для ${roleEntries.length} сцен.` : '')
+          (roleEntries.length > 0 ? ` Персонажи для ${roleEntries.length} сцен.` : '') +
+          (googleLinkCount > 0
+            ? ` Ссылки на ${googleLinkCount} сцен ведут в Google Docs.`
+            : googleLinkHint)
       );
     } catch (error) {
       setSyncError(resolveScriptImportError(error));
