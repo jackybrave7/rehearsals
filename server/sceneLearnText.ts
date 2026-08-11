@@ -6,13 +6,18 @@ import {
   paragraphsToLearnScriptText,
 } from '../src/utils/docxLearnText.js';
 import { extractSceneBodyTextsFromPlainText } from '../src/utils/sceneDescription.js';
-import { isImportableSceneHeading, matchScenesToDocAnchors } from '../src/utils/googleDocs.js';
+import { isDocxAnchorHeading, isImportableSceneHeading, matchScenesToDocAnchors } from '../src/utils/googleDocs.js';
 import { parseScriptFileId } from '../src/utils/scriptDocument.js';
 import { getDb } from './db.js';
 import { getFileRecord, getFileStoragePath } from './fileStorage.js';
 import { parseScriptFileBuffer } from './scriptImport.js';
 import fs from 'node:fs';
 import mammoth from 'mammoth';
+
+function isSceneBodyBoundary(paragraph: { isHeading?: boolean; plainText: string }): boolean {
+  if (paragraph.isHeading && isDocxAnchorHeading(paragraph.plainText)) return true;
+  return isImportableSceneHeading(paragraph.plainText);
+}
 
 function isDocxFile(fileName: string, mimeType: string): boolean {
   const lower = fileName.toLowerCase();
@@ -64,7 +69,7 @@ export async function resolveSceneBodyFromScriptFile(
         const bodyParagraphs = [];
         for (let index = headingIndex + 1; index < paragraphs.length; index += 1) {
           const paragraph = paragraphs[index];
-          if (paragraph.isHeading || isImportableSceneHeading(paragraph.plainText)) break;
+          if (isSceneBodyBoundary(paragraph)) break;
           bodyParagraphs.push(paragraph);
         }
         const merged = paragraphsToLearnScriptText(bodyParagraphs).trim();

@@ -9,7 +9,7 @@ import {
 } from '../src/utils/scriptDocument.js';
 import { buildSceneRoleIdsFromTexts } from '../src/utils/sceneRoleAssignment.js';
 import { extractSceneBodyTextsFromPlainText } from '../src/utils/sceneDescription.js';
-import { matchScenesToDocAnchors, type DocTextAnchor } from '../src/utils/googleDocs.js';
+import { matchScenesToDocAnchors, type DocTextAnchor, isDocxAnchorHeading } from '../src/utils/googleDocs.js';
 import { getDb } from './db.js';
 import { getFileRecord, getFileStoragePath } from './fileStorage.js';
 import { requireAuth } from './auth.js';
@@ -25,7 +25,7 @@ async function extractDocxHeadingAnchors(buffer: Buffer): Promise<DocTextAnchor[
 
   while ((match = headingPattern.exec(html)) !== null) {
     const text = stripHtmlTags(match[1]).replace(/\s+/g, ' ').trim();
-    if (!text) continue;
+    if (!text || !isDocxAnchorHeading(text)) continue;
     anchors.push({
       type: 'heading',
       id: `file-${index}`,

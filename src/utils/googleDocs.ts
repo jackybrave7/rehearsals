@@ -241,6 +241,13 @@ export function isImportableSceneHeading(text: string): boolean {
   return isSceneLikeHeading(trimmed);
 }
 
+/** Заголовки Word/Google Docs, попадающие в список якорей импорта (без «Действующие лица» и т.п.). */
+export function isDocxAnchorHeading(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  if (lower === 'персонажи' || lower === 'действующие лица') return false;
+  return isImportableSceneHeading(text) || isStructuralActHeading(text);
+}
+
 export function filterImportableSceneAnchors<T extends { text: string }>(anchors: T[]): T[] {
   return anchors.filter((anchor) => isImportableSceneHeading(anchor.text));
 }

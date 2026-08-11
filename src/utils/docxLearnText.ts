@@ -1,5 +1,5 @@
 import { stripHtmlTags } from './scriptDocument';
-import { isImportableSceneHeading, matchScenesToDocAnchors, type DocTextAnchor } from './googleDocs';
+import { isImportableSceneHeading, isDocxAnchorHeading, matchScenesToDocAnchors, type DocTextAnchor } from './googleDocs';
 import { CHARACTER_CUE_LINE_RE, CHARACTER_DIALOGUE_INLINE_RE } from './scriptTextLines';
 import type { Scene } from '../types';
 
@@ -188,11 +188,9 @@ export function htmlToDocxParagraphs(html: string): DocxScriptParagraph[] {
 }
 
 function isParagraphSceneHeading(paragraph: DocxScriptParagraph): boolean {
-  const lower = paragraph.plainText.toLowerCase();
-  if (lower === 'персонажи' || lower === 'действующие лица') return false;
+  if (paragraph.isHeading && isDocxAnchorHeading(paragraph.plainText)) return true;
 
   return (
-    Boolean(paragraph.isHeading) ||
     isImportableSceneHeading(paragraph.plainText) ||
     /\d+\s*акт\b.*\d+\s*сцен/i.test(paragraph.plainText)
   );
@@ -274,7 +272,7 @@ export function extractLearnTextFromDocxParagraphs(
   const bodyParagraphs: DocxScriptParagraph[] = [];
   for (let index = headingIndex + 1; index < paragraphs.length; index += 1) {
     const paragraph = paragraphs[index];
-    if (paragraph.isHeading || isImportableSceneHeading(paragraph.plainText)) break;
+    if (isParagraphSceneHeading(paragraph)) break;
     bodyParagraphs.push(paragraph);
   }
 
