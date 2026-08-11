@@ -5,7 +5,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import { syncSceneAnchorsFromGoogleDoc, fetchGoogleDocAnchors, loadGoogleDocumentSceneInsights, resolveGoogleDocsSyncError, GoogleDocsClientError } from '../services/googleDocsClient';
-import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes } from '../utils/googleDocs';
+import { isGoogleDocsUrl, isLikelyUploadedOfficeDoc, listImportableScenesWithActGroups, mapActAnchorsFromDocument, mapActGroupsToMatchedScenes, prepareGoogleSceneLinkMatches } from '../utils/googleDocs';
 import { mergeMissingScenesFromImport } from '../utils/scriptDocument';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
@@ -206,10 +206,15 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
         }
       }
 
-      const actGroups = mapActGroupsToMatchedScenes(anchors, matches);
+      const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
+        targetScenes,
+        anchors,
+        matches
+      );
+      const actGroups = mapActGroupsToMatchedScenes(anchors, linkMatches);
       const actScriptAnchors = mapActAnchorsFromDocument(anchors);
 
-      if (matches.length === 0) {
+      if (linkMatches.length === 0) {
         if (!options?.silent) {
           setSyncError(
             anchorCount === 0
@@ -221,6 +226,12 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
       }
 
       const syncedAt = new Date().toISOString();
+      if (scriptGoogleSceneAnchors.length > 0) {
+        dispatch({
+          type: 'UPDATE_PLAY',
+          payload: { ...play, scriptGoogleSceneAnchors },
+        });
+      }
       dispatch({
         type: 'APPLY_SCENE_SCRIPT_ANCHORS',
         payload: {
@@ -228,7 +239,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           syncedAt,
           importSource: 'google',
           actScriptAnchors,
-          updates: matches.map((match) => ({
+          updates: linkMatches.map((match) => ({
             sceneId: match.sceneId,
             scriptAnchor: match.anchor,
             actGroup: actGroups.get(match.sceneId),
@@ -237,16 +248,16 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
       });
 
       const scenesWithAnchors = targetScenes.map((scene) => {
-        const match = matches.find((item) => item.sceneId === scene.id);
+        const match = linkMatches.find((item) => item.sceneId === scene.id);
         return match ? { ...scene, scriptAnchor: match.anchor } : scene;
       });
       const { counted, described, rostered } = await applySceneInsights(scenesWithAnchors, token);
 
       setSyncMessage(
         (createdCount > 0 ? `Создано ${createdCount} сцен из документа. ` : '') +
-          (matches.length === targetScenes.length
-          ? `Сопоставлено ${matches.length} из ${targetScenes.length} сцен (в документе ${anchorCount} заголовков).`
-          : `Сопоставлено ${matches.length} из ${targetScenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`) +
+          (linkMatches.length === targetScenes.length
+          ? `Сопоставлено ${linkMatches.length} из ${targetScenes.length} сцен (в документе ${anchorCount} заголовков).`
+          : `Сопоставлено ${linkMatches.length} из ${targetScenes.length} сцен. В документе ${anchorCount} заголовков — часть из них не сцены (например, «Действие первое»). Проверьте названия несопоставленных сцен.`) +
           (counted > 0 ? ` Подсчитаны знаки для ${counted} сцен.` : '') +
           (described > 0 ? ` Краткие описания для ${described} сцен.` : '') +
           (rostered > 0 ? ` Персонажи для ${rostered} сцен.` : '')

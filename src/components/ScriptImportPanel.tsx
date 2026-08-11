@@ -20,6 +20,7 @@ import {
   listImportableScenesWithActGroups,
   mapActAnchorsFromDocument,
   mapActGroupsToMatchedScenes,
+  prepareGoogleSceneLinkMatches,
   resolvePlayGoogleDocsUrl,
 } from '../utils/googleDocs';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
@@ -270,9 +271,20 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
             targetScenes,
             token
           );
-          if (googleSync.matches.length > 0) {
-            const googleActGroups = mapActGroupsToMatchedScenes(googleSync.anchors, googleSync.matches);
+          const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
+            targetScenes,
+            googleSync.anchors,
+            googleSync.matches
+          );
+          if (linkMatches.length > 0) {
+            const googleActGroups = mapActGroupsToMatchedScenes(googleSync.anchors, linkMatches);
             const googleActAnchors = mapActAnchorsFromDocument(googleSync.anchors);
+            if (scriptGoogleSceneAnchors.length > 0) {
+              dispatch({
+                type: 'UPDATE_PLAY',
+                payload: { ...play, scriptGoogleSceneAnchors },
+              });
+            }
             dispatch({
               type: 'APPLY_SCENE_SCRIPT_ANCHORS',
               payload: {
@@ -280,14 +292,14 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
                 syncedAt: new Date().toISOString(),
                 importSource: 'google',
                 actScriptAnchors: googleActAnchors,
-                updates: googleSync.matches.map((match) => ({
+                updates: linkMatches.map((match) => ({
                   sceneId: match.sceneId,
                   scriptAnchor: match.anchor,
                   actGroup: googleActGroups.get(match.sceneId),
                 })),
               },
             });
-            googleLinkCount = googleSync.matches.length;
+            googleLinkCount = linkMatches.length;
           }
         } else {
           googleLinkHint =

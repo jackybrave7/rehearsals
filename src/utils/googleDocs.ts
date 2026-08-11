@@ -77,6 +77,25 @@ export function resolvePlayGoogleDocsUrl(play: Play | undefined): string | null 
   return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
 }
 
+export function resolveSceneLinkAnchor(play: Play, scene: Scene): SceneScriptAnchor | null {
+  const anchor = scene.scriptAnchor;
+  if (anchor && !anchor.id.startsWith('file-')) return anchor;
+
+  const ordinals = play.scriptGoogleSceneAnchors;
+  if (!ordinals?.length) return null;
+
+  let index = scene.number - 1;
+  if (anchor?.id.startsWith('file-')) {
+    const fileOrdinal = Number.parseInt(anchor.id.slice('file-'.length), 10);
+    if (Number.isFinite(fileOrdinal) && fileOrdinal >= 0 && fileOrdinal < ordinals.length) {
+      index = fileOrdinal;
+    }
+  }
+
+  if (index < 0 || index >= ordinals.length) return null;
+  return ordinals[index];
+}
+
 export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): string | null {
   if (!play) return null;
 
@@ -85,12 +104,9 @@ export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): str
     play.googleDocumentId ??
     (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
 
-  if (
-    scene.scriptAnchor &&
-    documentId &&
-    !scene.scriptAnchor.id.startsWith('file-')
-  ) {
-    return buildGoogleDocsAnchorUrl(documentId, scene.scriptAnchor);
+  const linkAnchor = resolveSceneLinkAnchor(play, scene);
+  if (linkAnchor && documentId) {
+    return buildGoogleDocsAnchorUrl(documentId, linkAnchor);
   }
 
   if (googleDocsUrl) return googleDocsUrl;
@@ -608,6 +624,76 @@ export function matchScenesToDocAnchors(
       sortedScenes.findIndex((scene) => scene.id === a.sceneId) -
       sortedScenes.findIndex((scene) => scene.id === b.sceneId)
   );
+}
+
+export function buildGoogleSceneAnchorsByImportOrder(anchors: DocTextAnchor[]): SceneScriptAnchor[] {
+  return listImportableScenesWithActGroups(anchors).map(({ anchor }) => ({
+    type: anchor.type,
+    id: anchor.id,
+  }));
+}
+
+export function augmentGoogleSceneAnchorMatches(
+  scenes: Scene[],
+  googleMatches: SceneAnchorMatch[],
+  googleSceneAnchorsByOrder: SceneScriptAnchor[]
+): SceneAnchorMatch[] {
+  if (googleSceneAnchorsByOrder.length === 0) return googleMatches;
+
+  const matchedSceneIds = new Set(googleMatches.map((match) => match.sceneId));
+  const usedAnchorKeys = new Set(
+    googleMatches.map((match) => `${match.anchor.type}:${match.anchor.id}`)
+  );
+  const result = [...googleMatches];
+
+  const sortedScenes = [...scenes].sort((a, b) => a.number - b.number);
+  for (const scene of sortedScenes) {
+    if (matchedSceneIds.has(scene.id)) continue;
+
+    let index = scene.number - 1;
+    if (scene.scriptAnchor?.id.startsWith('file-')) {
+      const fileOrdinal = Number.parseInt(scene.scriptAnchor.id.slice('file-'.length), 10);
+      if (Number.isFinite(fileOrdinal) && fileOrdinal >= 0) {
+        index = fileOrdinal;
+      }
+    }
+
+    const anchor = googleSceneAnchorsByOrder[index];
+    if (!anchor) continue;
+
+    const anchorKey = `${anchor.type}:${anchor.id}`;
+    if (usedAnchorKeys.has(anchorKey)) continue;
+
+    result.push({
+      sceneId: scene.id,
+      anchor,
+      anchorText: scene.title,
+      score: 90,
+    });
+    matchedSceneIds.add(scene.id);
+    usedAnchorKeys.add(anchorKey);
+  }
+
+  return result;
+}
+
+export function prepareGoogleSceneLinkMatches(
+  scenes: Scene[],
+  anchors: DocTextAnchor[],
+  titleMatches: SceneAnchorMatch[]
+): {
+  matches: SceneAnchorMatch[];
+  scriptGoogleSceneAnchors: SceneScriptAnchor[];
+} {
+  const scriptGoogleSceneAnchors = buildGoogleSceneAnchorsByImportOrder(anchors);
+  if (scriptGoogleSceneAnchors.length === 0) {
+    return { matches: titleMatches, scriptGoogleSceneAnchors };
+  }
+
+  return {
+    matches: augmentGoogleSceneAnchorMatches(scenes, titleMatches, scriptGoogleSceneAnchors),
+    scriptGoogleSceneAnchors,
+  };
 }
 
 function findAnchorStartIndex(

@@ -260,8 +260,9 @@ export function insertStateEntities(
     `INSERT INTO plays (
       id, theater_id, title, author, description, year, document_url, google_document_id,
       google_docs_links_synced_at, script_import_synced_at, script_file_name, script_file_data_url, script_file_url,
-      script_file_mime_type, script_file_size, archived_at, act_script_anchors, cover_url, icon_url, icon_color
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      script_file_mime_type, script_file_size, archived_at, act_script_anchors, script_google_scene_anchors,
+      cover_url, icon_url, icon_color
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const play of state.plays) {
     const legacyDataUrl = play.scriptFileUrl ? null : play.scriptFileDataUrl ?? null;
@@ -283,6 +284,7 @@ export function insertStateEntities(
       play.scriptFileSize ?? null,
       play.archivedAt ?? null,
       play.actScriptAnchors ? JSON.stringify(play.actScriptAnchors) : null,
+      play.scriptGoogleSceneAnchors ? JSON.stringify(play.scriptGoogleSceneAnchors) : null,
       play.coverUrl ?? null,
       play.iconUrl ?? null,
       play.iconColor ?? null
@@ -673,6 +675,9 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       archivedAt: (row.archived_at as string | null) ?? undefined,
       actScriptAnchors: parseOptionalJson<Play['actScriptAnchors']>(
         row.act_script_anchors as string | null
+      ),
+      scriptGoogleSceneAnchors: parseOptionalJson<Play['scriptGoogleSceneAnchors']>(
+        row.script_google_scene_anchors as string | null
       ),
       coverUrl: (row.cover_url as string | null) ?? undefined,
       iconUrl: (row.icon_url as string | null) ?? undefined,
