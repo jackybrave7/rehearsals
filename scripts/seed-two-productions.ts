@@ -68,18 +68,34 @@ const chaikaPerformanceId = uuidv4();
  * Занятость участников считается по составу сцен (getExpectedActorIds), поэтому нужны роли
  * и распределение — без них сетка доступности честно показывает, что все свободны.
  */
-function rolesFor(playId: string, names: string[]) {
+function rolesFor(
+  playId: string,
+  names: string[],
+  kind: 'character' | 'crew' | 'technical' = 'character'
+) {
   return names.map((name, index) => ({
     id: uuidv4(),
     playId,
     name,
-    kind: 'character' as const,
+    kind,
     order: index,
   }));
 }
 
 const grozaRoles = rolesFor(grozaId, ['Катерина', 'Кабаниха', 'Тихон', 'Борис']);
 const chaikaRoles = rolesFor(chaikaId, ['Нина', 'Аркадина', 'Треплёв', 'Тригорин']);
+
+// Длинные названия в других группах — из-за них колонка «Участники» раньше уезжала.
+const grozaCrewRoles = rolesFor(
+  grozaId,
+  ['Режиссёр-постановщик', 'Драматург', 'Звукорежиссер и композитор'],
+  'crew'
+);
+const grozaTechnicalRoles = rolesFor(
+  grozaId,
+  ['Художник по свету', 'Монтировщик декораций'],
+  'technical'
+);
 
 // Анна Ветрова занята в обеих постановках — это и есть проверяемый случай.
 const grozaCast = [0, 2, 1, 3];
@@ -109,6 +125,13 @@ const castAssignments = [
     performanceId: chaikaPerformanceId,
     roleId: role.id,
     actorId: actors[chaikaCast[index]].id,
+  })),
+  ...[...grozaCrewRoles, ...grozaTechnicalRoles].map((role, index) => ({
+    id: uuidv4(),
+    playId: grozaId,
+    performanceId: grozaPerformanceId,
+    roleId: role.id,
+    actorId: actors[index % actors.length].id,
   })),
 ];
 
@@ -174,7 +197,12 @@ const state: AppState = {
   ],
   activePlayId: grozaId,
   selectedPerformanceByPlayId: {},
-  playRoles: [...grozaRoles, ...chaikaRoles],
+  playRoles: [
+    ...grozaRoles,
+    ...grozaCrewRoles,
+    ...grozaTechnicalRoles,
+    ...chaikaRoles,
+  ],
   performances: [
     {
       id: grozaPerformanceId,
