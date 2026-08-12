@@ -363,6 +363,7 @@ export function RehearsalsPage() {
               rehearsals={visibleRehearsals}
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
+              getPlayMarkers={getPlayMarkers}
             />
           )}
 
@@ -485,6 +486,9 @@ export function RehearsalsPage() {
                           </span>
                         )}
                       </div>
+                      {theaterPlays.length > 0 && (
+                        <p className="mt-1 text-sm text-muted">{calendarTitle}</p>
+                      )}
                       {location && (
                         <p className="mt-1 flex items-center gap-1 text-sm text-muted">
                           <MapPin size={14} /> {location}

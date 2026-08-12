@@ -11,6 +11,8 @@ import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import { timeToMinutes } from '../utils/time';
+import { CalendarPlayMarkers } from './CalendarPlayMarkers';
+import type { CalendarPlayMarker } from '../utils/rehearsalCalendarMarkers';
 
 interface WeekCalendarProps {
   weekStart: Date;
@@ -18,6 +20,7 @@ interface WeekCalendarProps {
   rehearsals: Rehearsal[];
   selectedDate: Date | null;
   onSelectDate: (date: Date) => void;
+  getPlayMarkers?: (rehearsal: Rehearsal) => CalendarPlayMarker[];
 }
 
 const HOUR_START = 10;
@@ -29,12 +32,31 @@ export function WeekCalendar({
   rehearsals,
   selectedDate,
   onSelectDate,
+  getPlayMarkers,
 }: WeekCalendarProps) {
   const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, index) => HOUR_START + index);
 
   const rehearsalsForDay = (day: Date) =>
     rehearsals.filter((rehearsal) => isSameDay(parseISO(rehearsal.date), day));
+
+  const markersFor = (rehearsal: Rehearsal): CalendarPlayMarker[] =>
+    getPlayMarkers ? getPlayMarkers(rehearsal) : [];
+
+  /** Метки всех постановок дня без повторов — как в месячном календаре. */
+  const dayMarkers = (dayRehearsals: Rehearsal[]): CalendarPlayMarker[] => {
+    const byId = new Map<string, CalendarPlayMarker>();
+    for (const rehearsal of dayRehearsals) {
+      for (const marker of markersFor(rehearsal)) byId.set(marker.id, marker);
+    }
+    return [...byId.values()];
+  };
+
+  const rehearsalTooltip = (rehearsal: Rehearsal): string => {
+    const titles = markersFor(rehearsal).map((marker) => marker.title);
+    const time = `${rehearsal.startTime}–${rehearsal.endTime}`;
+    return titles.length > 0 ? `${time} · ${titles.join(' · ')}` : time;
+  };
 
   return (
     <div className="rounded-2xl border border-gold/10 bg-surface/60 p-4 sm:p-5">
@@ -89,7 +111,12 @@ export function WeekCalendar({
                     {format(day, 'd')}
                   </div>
                   {dayRehearsals.length > 0 && (
-                    <div className="mt-1 text-[10px] text-muted">{dayRehearsals.length} реп.</div>
+                    <>
+                      <div className="mt-1 flex justify-center">
+                        <CalendarPlayMarkers markers={dayMarkers(dayRehearsals)} />
+                      </div>
+                      <div className="text-[10px] text-muted">{dayRehearsals.length} реп.</div>
+                    </>
                   )}
                 </button>
               );
@@ -114,17 +141,24 @@ export function WeekCalendar({
                       key={`${day.toISOString()}-${hour}`}
                       className="min-h-10 bg-background/40 p-0.5"
                     >
-                      {dayRehearsals.map((rehearsal) => (
-                        <button
-                          key={rehearsal.id}
-                          type="button"
-                          onClick={() => onSelectDate(day)}
-                          className="mb-0.5 w-full rounded-md bg-gold/20 px-1 py-0.5 text-left text-[10px] leading-tight text-gold-light hover:bg-gold/30"
-                          title={`${rehearsal.startTime}–${rehearsal.endTime}`}
-                        >
-                          {rehearsal.startTime}
-                        </button>
-                      ))}
+                      {dayRehearsals.map((rehearsal) => {
+                        const markers = markersFor(rehearsal);
+                        return (
+                          <button
+                            key={rehearsal.id}
+                            type="button"
+                            onClick={() => onSelectDate(day)}
+                            className="mb-0.5 flex w-full items-center gap-1 overflow-hidden rounded-md border-l-2 border-l-gold/60 bg-gold/20 px-1 py-0.5 text-left text-[10px] leading-tight text-gold-light hover:bg-gold/30"
+                            style={markers[0] ? { borderLeftColor: markers[0].color } : undefined}
+                            title={rehearsalTooltip(rehearsal)}
+                          >
+                            <span className="shrink-0">{rehearsal.startTime}</span>
+                            {markers.length > 0 && (
+                              <CalendarPlayMarkers markers={markers} max={2} className="shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 })}
