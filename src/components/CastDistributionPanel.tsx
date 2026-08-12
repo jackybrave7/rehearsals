@@ -327,12 +327,22 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gold/10">
-            <table className="w-full min-w-[28rem] text-sm">
+            {/*
+              Фиксированная раскладка: иначе ширину «Роли» задаёт самое длинное название внутри
+              своей группы, и колонка «Участники» у ролей, постановочной и технической группы
+              начинается в разных местах.
+            */}
+            <table className="w-full min-w-[28rem] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[34%]" />
+                <col />
+                {!readOnly && <col className="w-28" />}
+              </colgroup>
               <thead className="bg-background/40 text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">Роль</th>
                   <th className="px-4 py-3 font-medium">Участники</th>
-                  {!readOnly && <th className="px-4 py-3 font-medium w-20" />}
+                  {!readOnly && <th className="px-4 py-3 font-medium" />}
                 </tr>
               </thead>
               <tbody>
@@ -346,7 +356,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
                   return (
                     <tr key={role.id} className="border-t border-gold/10 align-top">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-white">{role.name}</p>
+                        <p className="font-medium text-white break-words">{role.name}</p>
                         {role.kind === 'character' && role.scriptAliases && role.scriptAliases.length > 0 && (
                           <p className="mt-1 text-xs text-muted">
                             В тексте: {role.scriptAliases.join(', ')}
