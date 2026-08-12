@@ -22,6 +22,7 @@ import { formatUnavailabilityTimeRange, getActorUnavailabilityBadge } from '../u
 import { getActorWorkload, groupRolesByPlay } from '../utils/actorInsights';
 import { formatPhone } from '../utils/phone';
 import { resolveRehearsalLocation } from '../utils/venue';
+import { getRehearsalPlayTitles } from '../utils/rehearsalPlays';
 import { getTheaterVenues } from '../store/selectors';
 import { appPaths } from '../navigation/appPaths';
 
@@ -225,6 +226,7 @@ export function ActorDetailPage() {
           <ul className="space-y-2">
             {workload.upcomingRehearsals.map((rehearsal) => {
               const location = resolveRehearsalLocation(rehearsal, venues);
+              const playTitles = getRehearsalPlayTitles(state, rehearsal);
               return (
                 <li key={rehearsal.id}>
                   <Link
@@ -245,6 +247,11 @@ export function ActorDetailPage() {
                           </>
                         )}
                       </p>
+                      {playTitles.length > 0 && (
+                        <p className="text-sm text-muted">
+                          {playTitles.map((title) => `«${title}»`).join(' · ')}
+                        </p>
+                      )}
                     </div>
                     <CalendarDays size={16} className="text-gold/70" />
                   </Link>

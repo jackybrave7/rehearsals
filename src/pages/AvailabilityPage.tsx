@@ -4,17 +4,26 @@ import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useRehearsalStore } from '../store/RehearsalContext';
-import { getActiveActors } from '../store/selectors';
+import { getActiveActors, getTheaterPlays } from '../store/selectors';
 import { getWeekStart } from '../components/WeekCalendar';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import { getExpectedActorIds } from '../utils/rehearsalInsights';
 import { appPaths } from '../navigation/appPaths';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
+import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
+import {
+  getRehearsalPlayMarkers,
+  type CalendarPlayMarker,
+} from '../utils/rehearsalCalendarMarkers';
+import { getRehearsalPlayTitles } from '../utils/rehearsalPlays';
+import { resolvePlayIconColor } from '../utils/playIcon';
+import type { Rehearsal } from '../types';
 
 export function AvailabilityPage() {
   const { state } = useRehearsalStore();
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const actors = getActiveActors(state);
+  const showPlayMarkers = getTheaterPlays(state).length > 1;
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -51,9 +60,27 @@ export function AvailabilityPage() {
       getExpectedActorIds(state, rehearsal).includes(actorId)
     );
     if (busy.length > 0) {
-      return { kind: 'rehearsal' as const, count: busy.length };
+      return { kind: 'rehearsal' as const, rehearsals: busy };
     }
     return { kind: 'free' as const };
+  };
+
+  /** Занятость важно читать по постановкам: один человек может быть занят в обеих сразу. */
+  const describeBusyDay = (busy: Rehearsal[]): string =>
+    busy
+      .map((rehearsal) => {
+        const titles = getRehearsalPlayTitles(state, rehearsal).map((title) => `«${title}»`);
+        const time = `${rehearsal.startTime}–${rehearsal.endTime}`;
+        return titles.length > 0 ? `${time} · ${titles.join(' · ')}` : time;
+      })
+      .join('\n');
+
+  const busyDayMarkers = (busy: Rehearsal[]): CalendarPlayMarker[] => {
+    const byId = new Map<string, CalendarPlayMarker>();
+    for (const rehearsal of busy) {
+      for (const marker of getRehearsalPlayMarkers(state, rehearsal)) byId.set(marker.id, marker);
+    }
+    return [...byId.values()];
   };
 
   return (
@@ -62,7 +89,9 @@ export function AvailabilityPage() {
         <div>
           <h1 className={pageTitleClass}>Доступность труппы</h1>
           <p className="mt-1 text-muted">
-            Недельная сетка: кто свободен, кто отметил недоступность, у кого репетиция
+            {showPlayMarkers
+              ? 'Недельная сетка по всему театру: кто свободен, кто отметил недоступность, у кого репетиция и в какой постановке'
+              : 'Недельная сетка: кто свободен, кто отметил недоступность, у кого репетиция'}
           </p>
         </div>
         <Link
@@ -154,10 +183,15 @@ export function AvailabilityPage() {
                         )}
                         {status.kind === 'rehearsal' && (
                           <span
-                            className="inline-block rounded-full bg-gold/15 px-2 py-1 text-[10px] text-gold-light"
-                            title={`${status.count} репетиций`}
+                            className="inline-flex flex-col items-center gap-1"
+                            title={describeBusyDay(status.rehearsals)}
                           >
-                            {status.count}
+                            <span className="rounded-full bg-gold/15 px-2 py-1 text-[10px] text-gold-light">
+                              {status.rehearsals.length}
+                            </span>
+                            {showPlayMarkers && (
+                              <CalendarPlayMarkers markers={busyDayMarkers(status.rehearsals)} />
+                            )}
                           </span>
                         )}
                         {status.kind === 'free' && (
@@ -186,8 +220,21 @@ export function AvailabilityPage() {
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="rounded-full bg-gold/15 px-2 py-0.5 text-gold-light">1</span>
-          репетиция в этот день
+          репетиций в этот день
         </span>
+        {showPlayMarkers && (
+          <span className="inline-flex items-center gap-2">
+            <CalendarPlayMarkers
+              markers={getTheaterPlays(state).map((play) => ({
+                id: play.id,
+                title: play.title,
+                iconUrl: play.iconUrl,
+                color: resolvePlayIconColor(play),
+              }))}
+            />
+            постановки — наведите на число, чтобы увидеть время и названия
+          </span>
+        )}
       </div>
     </div>
   );
