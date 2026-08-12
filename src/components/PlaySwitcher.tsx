@@ -7,6 +7,14 @@ type PlaySwitcherProps = {
   variant: 'theater' | 'zen';
 };
 
+/**
+ * Переключатель задаёт постановку только для разделов, которые работают внутри одной постановки.
+ * Календарь, участники и задачи всегда показывают весь театр — об этом нужно сказать явно, иначе
+ * кажется, что переключатель не сработал.
+ */
+export const PLAY_SWITCHER_SCOPE_HINT =
+  'Активная постановка: задаёт разделы «Сцены», «Готовность» и «Постановки и состав». Календарь репетиций показывает весь театр — постановка выбирается фильтром на самой странице.';
+
 export function PlaySwitcher({ variant }: PlaySwitcherProps) {
   const { state, dispatch, readOnly } = useRehearsalStore();
   const plays = getActiveTheaterPlays(state);
@@ -20,7 +28,7 @@ export function PlaySwitcher({ variant }: PlaySwitcherProps) {
       : 'w-full min-w-0 max-w-full truncate rounded-lg border border-gold/15 bg-background/40 px-2 py-1 text-xs font-medium text-gold-light outline-none transition-colors focus:border-gold/35 sm:text-sm lg:max-w-none';
 
   return (
-    <label className="inline-flex min-w-0 items-center gap-1.5">
+    <label className="inline-flex min-w-0 items-center gap-1.5" title={PLAY_SWITCHER_SCOPE_HINT}>
       <span className="sr-only">Активная постановка</span>
       {activePlay && <PlayIcon play={activePlay} size="sm" />}
       <select
@@ -30,7 +38,8 @@ export function PlaySwitcher({ variant }: PlaySwitcherProps) {
           dispatch({ type: 'SET_ACTIVE_PLAY', payload: event.target.value })
         }
         className={selectClass}
-        aria-label="Выбрать постановку"
+        aria-label="Активная постановка"
+        aria-description={PLAY_SWITCHER_SCOPE_HINT}
       >
         {plays.map((play) => (
           <option key={play.id} value={play.id}>
