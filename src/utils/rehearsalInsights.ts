@@ -60,6 +60,9 @@ export function getExpectedActorIds(state: AppState, rehearsal: Rehearsal): stri
   }
 
   const actorIds = new Set(getActorIdsForSceneIdsMultiPlay(state, [...sceneIds]));
+  // Замена, техник, музыкант — их добавляют вручную, ни в одной сцене их нет. Рассылка в Telegram
+  // уходит именно по actorIds, поэтому и занятость, и конфликты должны их учитывать.
+  for (const actorId of rehearsal.actorIds) actorIds.add(actorId);
   for (const block of rehearsal.schedule) {
     if (block.type === 'etude') {
       block.actorIds?.forEach((id) => actorIds.add(id));
@@ -124,6 +127,12 @@ export function getExpectedAttendees(state: AppState, rehearsal: Rehearsal): Exp
   for (const sceneId of rehearsal.sceneIds) {
     const scene = state.scenes.find((item) => item.id === sceneId);
     if (scene) addSceneActors(scene);
+  }
+
+  // Добавленные вручную участники остаются без источника: сцены за ними нет, но в рассылку и в
+  // проверку Telegram они попадают.
+  for (const actorId of rehearsal.actorIds) {
+    if (!byActor.has(actorId)) byActor.set(actorId, new Set<string>());
   }
 
   return [...byActor.entries()]
