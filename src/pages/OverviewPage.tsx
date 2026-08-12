@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { CalendarDays, CheckSquare, Film } from 'lucide-react';
+import { ArrowRight, CalendarDays, CheckSquare, Film } from 'lucide-react';
 import { useMemo } from 'react';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getPlayOverviews, type PlayOverview } from '../store/playOverview';
@@ -19,9 +19,11 @@ function premiereBadgeClass(tone: ReturnType<typeof getPremiereBadgeTone>): stri
 
 function PlayOverviewCard({
   overview,
+  isActive,
   onOpenPlay,
 }: {
   overview: PlayOverview;
+  isActive: boolean;
   onOpenPlay: (playId: string) => void;
 }) {
   const { isZen } = useDesign();
@@ -31,16 +33,9 @@ function PlayOverviewCard({
 
   return (
     <article
-      className={`${cardClass} flex cursor-pointer flex-col gap-4 overflow-hidden transition-colors hover:border-gold/25`}
-      onClick={() => onOpenPlay(play.id)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpenPlay(play.id);
-        }
-      }}
-      role="button"
-      tabIndex={0}
+      className={`${cardClass} flex flex-col gap-4 overflow-hidden transition-colors ${
+        isActive ? 'border-gold/40' : ''
+      }`}
     >
       {coverSrc && (
         <img src={coverSrc} alt="" className="-mx-5 -mt-5 mb-1 aspect-video w-[calc(100%+2.5rem)] object-cover" />
@@ -51,6 +46,11 @@ function PlayOverviewCard({
           <h2 className="text-lg font-semibold text-white">{play.title}</h2>
           <p className="text-sm text-muted">{play.author}</p>
         </div>
+        {isActive && (
+          <span className="ml-auto shrink-0 rounded-full bg-gold/15 px-2.5 py-0.5 text-xs text-gold-light">
+            активная
+          </span>
+        )}
       </div>
 
       {premiere ? (
@@ -65,11 +65,7 @@ function PlayOverviewCard({
           · {format(parseISO(premiere.date), 'd MMMM yyyy', { locale: ru })}
         </span>
       ) : (
-        <Link
-          to={appPaths.playCast}
-          onClick={(event) => event.stopPropagation()}
-          className="text-xs text-gold-light hover:underline"
-        >
+        <Link to={appPaths.playCast} className="text-xs text-gold-light hover:underline">
           Дата показа не задана — указать в расписании
         </Link>
       )}
@@ -105,7 +101,6 @@ function PlayOverviewCard({
         {nextRehearsal ? (
           <Link
             to={appPaths.rehearsal(nextRehearsal.id)}
-            onClick={(event) => event.stopPropagation()}
             className="rounded-full bg-white/5 px-2.5 py-1 text-muted hover:bg-gold/10 hover:text-gold-light"
           >
             <CalendarDays size={12} className="mr-1 inline" />
@@ -116,14 +111,12 @@ function PlayOverviewCard({
         )}
         <Link
           to={appPaths.rehearsals}
-          onClick={(event) => event.stopPropagation()}
           className="rounded-full bg-white/5 px-2.5 py-1 text-muted hover:bg-gold/10 hover:text-gold-light"
         >
           {rehearsalsCount} репет.
         </Link>
         <Link
           to={appPaths.tasks}
-          onClick={(event) => event.stopPropagation()}
           className="rounded-full bg-white/5 px-2.5 py-1 text-muted hover:bg-gold/10 hover:text-gold-light"
         >
           <CheckSquare size={12} className="mr-1 inline" />
@@ -135,6 +128,20 @@ function PlayOverviewCard({
           </span>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => onOpenPlay(play.id)}
+        title={
+          isActive
+            ? 'Открыть сцены этой постановки'
+            : `Сделать «${play.title}» активной постановкой и открыть её сцены`
+        }
+        className="mt-auto flex items-center justify-center gap-1.5 rounded-xl border border-gold/20 px-3 py-2 text-sm font-medium text-gold-light transition-colors hover:bg-gold/10"
+      >
+        {isActive ? 'Открыть сцены' : 'Сделать активной и открыть'}
+        <ArrowRight size={15} aria-hidden />
+      </button>
     </article>
   );
 }
@@ -150,26 +157,44 @@ export function PlayOverviewMini() {
   return (
     <section className={cardClass}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Все постановки</h2>
+        <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
+          Сводка по постановкам
+        </h2>
         <Link to={appPaths.overview} className="text-xs text-gold-light hover:underline">
           Открыть
         </Link>
       </div>
-      <ul className="space-y-2 text-sm">
+      <ul className="space-y-2.5 text-sm">
         {overviews.map((overview) => (
-          <li key={overview.play.id} className="flex items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-2">
-              <PlayIcon play={overview.play} size="sm" className="shrink-0" />
-              <span className="truncate font-medium text-white">{overview.play.title}</span>
-            </span>
-            <span className="shrink-0 text-muted">
-              {overview.premiere
-                ? isPremierePerformance(overview.premiere.performance)
-                  ? `до премьеры ${overview.premiere.daysLeft} дн.`
-                  : `${overview.premiere.performance.name} через ${overview.premiere.daysLeft} дн.`
-                : 'без даты'}{' '}
-              · {overview.scenes.readyPercent}%
-            </span>
+          <li key={overview.play.id} className="space-y-0.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <PlayIcon play={overview.play} size="sm" className="shrink-0" />
+                <span className="truncate font-medium text-white">{overview.play.title}</span>
+              </span>
+              <span className="shrink-0 text-muted">
+                {overview.premiere
+                  ? isPremierePerformance(overview.premiere.performance)
+                    ? `до премьеры ${overview.premiere.daysLeft} дн.`
+                    : `${overview.premiere.performance.name} через ${overview.premiere.daysLeft} дн.`
+                  : 'без даты'}{' '}
+                · {overview.scenes.readyPercent}%
+              </span>
+            </div>
+            <p className="pl-8 text-xs text-muted">
+              {overview.nextRehearsal ? (
+                <Link
+                  to={appPaths.rehearsal(overview.nextRehearsal.id)}
+                  className="hover:text-gold-light hover:underline"
+                >
+                  ближайшая репетиция{' '}
+                  {format(parseISO(overview.nextRehearsal.date), 'd MMM', { locale: ru })}{' '}
+                  {overview.nextRehearsal.startTime}
+                </Link>
+              ) : (
+                'репетиций не запланировано'
+              )}
+            </p>
           </li>
         ))}
       </ul>
@@ -204,14 +229,22 @@ export function OverviewPage() {
     <div className="space-y-6">
       <header>
         <h1 className={`text-3xl font-bold ${isZen ? 'text-foreground' : 'text-white'}`}>
-          Все постановки
+          Сводка по постановкам
         </h1>
-        <p className="mt-1 text-muted">Сводка по спектаклям театра без переключения активной пьесы</p>
+        <p className="mt-1 text-muted">
+          Прогресс всех постановок театра рядом. Пока вы просто смотрите, активная постановка не
+          меняется — её переключает только кнопка на карточке.
+        </p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {overviews.map((overview) => (
-          <PlayOverviewCard key={overview.play.id} overview={overview} onOpenPlay={openPlay} />
+          <PlayOverviewCard
+            key={overview.play.id}
+            overview={overview}
+            isActive={overview.play.id === state.activePlayId}
+            onOpenPlay={openPlay}
+          />
         ))}
       </div>
     </div>
