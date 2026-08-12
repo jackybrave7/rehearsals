@@ -5,7 +5,7 @@ import { PRO_PRICING, SUPPORT_EMAIL } from '../types/subscription';
 
 export const PRICING_COPY = {
   badge: 'Планировщик постановки для театральных коллективов',
-  title: 'Один спектакль — бесплатно.',
+  title: 'Одна постановка — бесплатно.',
   titleAccent: 'Весь репертуар — в Pro.',
   subtitle:
     'Сцены, почасовой план, посещаемость и рассылка в Telegram. Платите, только когда ведёте больше одной постановки.',

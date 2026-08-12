@@ -95,7 +95,7 @@ const PLAN_GENERATION_OPTIONS: {
   {
     mode: 'by-productions',
     label: PLAN_GENERATION_MODE_LABELS['by-productions'],
-    description: 'Блоки одного спектакля подряд — удобно при сценах из нескольких постановок',
+    description: 'Блоки одной постановки подряд — удобно при сценах из нескольких постановок',
   },
 ];
 

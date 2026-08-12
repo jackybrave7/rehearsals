@@ -551,7 +551,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
         </div>
       )}
 
-      {renderRoleTable(characterRoles, 'Роли в спектакле', 'character')}
+      {renderRoleTable(characterRoles, 'Роли в постановке', 'character')}
       {renderRoleTable(crewRoles, 'Постановочная группа', 'crew')}
       {renderRoleTable(technicalRoles, 'Техническая группа', 'technical')}
 
@@ -581,7 +581,7 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
             value={roleForm.kind}
             onChange={(e) => setRoleForm({ ...roleForm, kind: e.target.value as PlayRoleKind })}
             options={[
-              { value: 'character', label: 'Роль в спектакле' },
+              { value: 'character', label: 'Роль в постановке' },
               { value: 'crew', label: 'Постановочная группа' },
               { value: 'technical', label: 'Техническая группа' },
             ]}
