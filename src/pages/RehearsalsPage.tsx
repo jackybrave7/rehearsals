@@ -205,12 +205,15 @@ export function RehearsalsPage() {
 
   const openCreate = () => {
     if (readOnly) return;
-    setForm(
-      emptyRehearsal(
+    setForm({
+      ...emptyRehearsal(
         selectedDateStr ?? format(new Date(), 'yyyy-MM-dd'),
         state.activeTheaterId ?? undefined
-      )
-    );
+      ),
+      // Репетиция принадлежит постановке с самого начала: иначе до сборки плана она не попадает
+      // ни в фильтр календаря, ни в сводку.
+      playId: activePlay?.id ?? theaterPlays[0]?.id,
+    });
     setModalOpen(true);
   };
 
@@ -533,12 +536,28 @@ export function RehearsalsPage() {
         }
       >
         <div className="space-y-4">
-          <Input
-            label="Дата"
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
+          <div className={theaterPlays.length > 1 ? 'grid gap-4 sm:grid-cols-2' : undefined}>
+            <Input
+              label="Дата"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
+            {theaterPlays.length > 1 && (
+              <Select
+                label="Постановка"
+                hint="Сцены можно добавить из любой постановки — репетиция станет смешанной."
+                value={form.playId ?? ''}
+                onChange={(e) =>
+                  setForm({ ...form, playId: e.target.value ? e.target.value : undefined })
+                }
+                options={[
+                  ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
+                  { value: '', label: 'Пока не решил' },
+                ]}
+              />
+            )}
+          </div>
 
           {(createWarnings.length > 0 ||
             createConflicts.length > 0 ||

@@ -47,11 +47,13 @@ export function Textarea({ label, className = '', id, ...props }: TextareaProps)
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
+  hint?: string;
   options: { value: string; label: string }[];
 }
 
-export function Select({ label, options, className = '', id, ...props }: SelectProps) {
+export function Select({ label, hint, options, className = '', id, ...props }: SelectProps) {
   const inputId = id ?? label?.toLowerCase().replace(/\s/g, '-');
+  const hintId = hint ? `${inputId}-hint` : undefined;
   return (
     <div className="space-y-1.5">
       {label && (
@@ -61,6 +63,7 @@ export function Select({ label, options, className = '', id, ...props }: SelectP
       )}
       <select
         id={inputId}
+        aria-describedby={hintId}
         className={`w-full rounded-lg border border-gold/20 bg-background/50 px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30 ${className}`}
         {...props}
       >
@@ -70,6 +73,11 @@ export function Select({ label, options, className = '', id, ...props }: SelectP
           </option>
         ))}
       </select>
+      {hint && (
+        <p id={hintId} className="text-xs text-muted/80">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

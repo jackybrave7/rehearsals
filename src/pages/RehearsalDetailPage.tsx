@@ -1094,12 +1094,31 @@ export function RehearsalDetailPage() {
       >
         {editForm && (
           <div className="space-y-4">
-            <Input
-              label="Дата"
-              type="date"
-              value={editForm.date}
-              onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-            />
+            <div className={theaterPlays.length > 1 ? 'grid gap-4 sm:grid-cols-2' : undefined}>
+              <Input
+                label="Дата"
+                type="date"
+                value={editForm.date}
+                onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+              />
+              {theaterPlays.length > 1 && (
+                <Select
+                  label="Постановка"
+                  hint="К какой постановке относится занятие. Сцены могут быть из нескольких."
+                  value={editForm.playId ?? ''}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      playId: e.target.value ? e.target.value : undefined,
+                    })
+                  }
+                  options={[
+                    ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
+                    { value: '', label: 'Не указана' },
+                  ]}
+                />
+              )}
+            </div>
 
             {(editInsights.warnings.length > 0 ||
               editInsights.conflicts.length > 0 ||
