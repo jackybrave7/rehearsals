@@ -6,7 +6,7 @@ import { useRehearsalStore } from '../store/RehearsalContext';
 import { useDesign } from '../store/DesignContext';
 import { uploadFile, formatFileUploadError } from '../api/files';
 import { parseScriptImport, resolveScriptImportError } from '../services/scriptImportClient';
-import { fetchGoogleDocAnchorsWithFallback } from '../services/googleDocsClient';
+import { fetchGoogleDocAnchorsForLinks } from '../services/googleDocsClient';
 import {
   isFileSectionAnchor,
   isSupportedScriptImportFile,
@@ -272,7 +272,7 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
 
       if (canLinkGoogleDocs) {
         try {
-          const googleAnchors = await fetchGoogleDocAnchorsWithFallback(play.documentUrl!);
+          const googleAnchors = await fetchGoogleDocAnchorsForLinks(play.documentUrl!);
           const { matches: linkMatches, scriptGoogleSceneAnchors } = prepareGoogleSceneLinkMatches(
             targetScenes,
             googleAnchors.anchors
@@ -286,7 +286,7 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
           }
         } catch {
           googleLinkHint =
-            ' Ссылки на Google Docs: сделайте документ доступным по ссылке (чтение) или настройте серверный доступ.';
+            ' Ссылки на Google Docs: сделайте документ публичным («Все, у кого есть ссылка» → «Читатель»).';
         }
       }
 

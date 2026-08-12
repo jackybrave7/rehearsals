@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { Scene } from '../types';
 import {
   extractDocTextAnchorsFromGoogleHtml,
+  extractSceneLearnTextFromGoogleHtml,
   findGoogleAnchorForScene,
   matchScenesToDocAnchors,
   parseActScene,
@@ -173,6 +174,23 @@ describe('google scene links', () => {
         ['h.s2', 'Сцена 2. Метро'],
         ['h.s4', 'Сцена 4. Кафе'],
       ]
+    );
+  });
+
+  it('extracts scene body from public google html export', () => {
+    const html = `
+      <p id="h.s1"><span>Сцена 1. Метро</span></p>
+      <p><span>Реплика первой сцены.</span></p>
+      <p id="h.s2"><span>Сцена 2. Метро</span></p>
+      <p><span>Реплика второй сцены.</span></p>
+    `;
+    assert.equal(
+      extractSceneLearnTextFromGoogleHtml(html, 'h.s1'),
+      'Реплика первой сцены.'
+    );
+    assert.equal(
+      extractSceneLearnTextFromGoogleHtml(html, 'h.s2'),
+      'Реплика второй сцены.'
     );
   });
 });

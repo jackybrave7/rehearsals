@@ -605,7 +605,8 @@ export function PlayPage() {
             placeholder="https://docs.google.com/document/d/..."
           />
           <p className="-mt-2 text-xs text-muted">
-            Google Docs, Яндекс.Документы или другая ссылка на текст пьесы
+            Google Docs, Яндекс.Документы или другая ссылка на текст пьесы. Для ссылок на сцены в
+            Google Docs откройте доступ: «Все, у кого есть ссылка» → «Читатель».
           </p>
 
           <div className="space-y-2">

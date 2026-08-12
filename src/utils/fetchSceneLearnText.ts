@@ -1,9 +1,4 @@
 import type { Play, Scene } from '../types';
-import { fetchGoogleDocument } from '../services/googleDocsClient';
-import {
-  extractSceneLearnTextsFromGoogleDoc,
-  parseGoogleDocumentId,
-} from './googleDocs';
 import { parseScriptFileId } from './scriptDocument';
 import { API_BASE } from '../api/apiBase';
 
@@ -12,7 +7,6 @@ export type SceneLearnTextSource = 'script_file' | 'google_docs' | 'none';
 export interface SceneLearnTextResult {
   text: string | null;
   source: SceneLearnTextSource;
-  needsGoogleAuth?: boolean;
 }
 
 async function fetchSceneBodyFromScriptFile(
@@ -36,26 +30,9 @@ async function fetchSceneBodyFromScriptFile(
   return data.text?.trim() || null;
 }
 
-async function fetchSceneBodyFromGoogleDocs(
-  play: Play,
-  scene: Scene,
-  accessToken: string
-): Promise<string | null> {
-  const documentId =
-    play.googleDocumentId ?? (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
-  if (!documentId || !scene.scriptAnchor || scene.scriptAnchor.id.startsWith('file-')) {
-    return null;
-  }
-
-  const document = await fetchGoogleDocument(documentId, accessToken);
-  const texts = extractSceneLearnTextsFromGoogleDoc(document, [scene]);
-  return texts.get(scene.id)?.trim() || null;
-}
-
 export async function fetchSceneLearnText(
   play: Play,
   scene: Scene,
-  accessToken?: string | null,
   theaterId?: string | null
 ): Promise<SceneLearnTextResult> {
   if (theaterId) {
@@ -69,9 +46,6 @@ export async function fetchSceneLearnText(
         if (data.text) {
           return { text: data.text, source: data.source ?? 'script_file' };
         }
-        if (data.needsGoogleAuth) {
-          return { text: null, source: 'none', needsGoogleAuth: true };
-        }
       }
     } catch {
       // fall through to client-side loaders
@@ -81,25 +55,6 @@ export async function fetchSceneLearnText(
   const fromFile = await fetchSceneBodyFromScriptFile(play, scene);
   if (fromFile) {
     return { text: fromFile, source: 'script_file' };
-  }
-
-  const documentId =
-    play.googleDocumentId ?? (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
-  const hasGoogleAnchor =
-    Boolean(scene.scriptAnchor) && !scene.scriptAnchor?.id.startsWith('file-');
-
-  if (documentId && hasGoogleAnchor) {
-    if (accessToken) {
-      try {
-        const fromDocs = await fetchSceneBodyFromGoogleDocs(play, scene, accessToken);
-        if (fromDocs) {
-          return { text: fromDocs, source: 'google_docs' };
-        }
-      } catch {
-        // fall through
-      }
-    }
-    return { text: null, source: 'none', needsGoogleAuth: !accessToken };
   }
 
   return { text: null, source: 'none' };

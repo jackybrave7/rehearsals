@@ -87,13 +87,20 @@ export async function fetchGoogleDocAnchorsForLinks(
         source: body.source ?? 'public-export',
       };
     }
-  } catch {
+
+    const body = await readApiError(response);
+    throw new GoogleDocsClientError(
+      body?.error ?? `API_ERROR_${response.status}`,
+      body?.message
+    );
+  } catch (error) {
+    if (error instanceof GoogleDocsClientError) throw error;
     // fall through to user OAuth
   }
 
   throw new GoogleDocsClientError(
     'PUBLIC_ANCHORS_UNAVAILABLE',
-    'Не удалось получить якоря без входа в Google. Сделайте документ доступным по ссылке (чтение) или настройте GOOGLE_DOCS_REFRESH_TOKEN на сервере.'
+    'Не удалось получить якоря без входа в Google. Сделайте документ публичным: «Все, у кого есть ссылка» → «Читатель».'
   );
 }
 
@@ -200,9 +207,11 @@ export function resolveGoogleDocsSyncError(error: unknown): string {
   switch (error.code) {
     case 'AUTH_EXPIRED':
     case 'PUBLIC_ANCHORS_UNAVAILABLE':
+    case 'PUBLIC_EXPORT_FAILED':
+    case 'NO_PUBLIC_ANCHORS':
       return (
         error.details ??
-        'Не удалось обновить ссылки на Google Docs без входа. Откройте доступ к документу по ссылке (чтение) или войдите в Google.'
+        'Не удалось обновить ссылки на Google Docs. Сделайте документ публичным: «Все, у кого есть ссылка» → «Читатель», или войдите в Google.'
       );
     case 'AUTH_REQUIRED':
       return 'Сессия Google истекла. Войдите снова и повторите синхронизацию.';

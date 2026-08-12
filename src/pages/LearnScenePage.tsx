@@ -4,7 +4,6 @@ import { ArrowLeft, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { patchActorMemorization, fetchActorNotes, acknowledgeActorNote } from '../api/actorSelf';
 import { Button } from '../components/Button';
 import { MemorizationStatusBadge } from '../components/MemorizationStatusBadge';
-import { useGoogleDocsAuth } from '../store/GoogleDocsAuthContext';
 import { useAuth } from '../store/AuthContext';
 import { useDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -29,7 +28,6 @@ export function LearnScenePage() {
   const { user } = useAuth();
   const { isZen } = useDesign();
   const { state, dispatch } = useRehearsalStore();
-  const googleAuth = useGoogleDocsAuth();
   const theaterId = state.activeTheaterId;
   const linkedActor = findLinkedActor(state, user?.email, theaterId, user?.name);
 
@@ -48,7 +46,6 @@ export function LearnScenePage() {
   const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [needsGoogleAuth, setNeedsGoogleAuth] = useState(false);
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<MemorizationStatus>('not_started');
   const [savingStatus, setSavingStatus] = useState(false);
@@ -112,21 +109,12 @@ export function LearnScenePage() {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
-    setNeedsGoogleAuth(false);
 
     void (async () => {
       try {
-        const token = googleAuth.accessToken;
-        const result = await fetchSceneLearnText(play, scene, token, theaterId);
+        const result = await fetchSceneLearnText(play, scene, theaterId);
         if (cancelled) return;
-        if (result.text) {
-          setText(result.text);
-        } else if (result.needsGoogleAuth) {
-          setNeedsGoogleAuth(true);
-          setText(null);
-        } else {
-          setText(null);
-        }
+        setText(result.text);
       } catch {
         if (!cancelled) setLoadError('Не удалось загрузить текст сцены.');
       } finally {
@@ -137,7 +125,7 @@ export function LearnScenePage() {
     return () => {
       cancelled = true;
     };
-  }, [play, scene, googleAuth.accessToken, theaterId]);
+  }, [play, scene, theaterId]);
 
   const learnLines = useMemo(() => {
     if (!text || !play) return [];
@@ -319,10 +307,10 @@ export function LearnScenePage() {
           <p className={isZen ? 'text-foreground' : 'text-foreground'}>
             Текст сцены пока недоступен для режима заучивания.
           </p>
-          {needsGoogleAuth && (
+          {!play.scriptFileUrl && (
             <p className="text-muted">
-              Текст в Google Docs — войдите в Google в настройках режиссёра или откройте документ
-              напрямую.
+              Попросите режиссёра загрузить .docx в карточке постановки и сопоставить сцены через «Импорт
+              из файла».
             </p>
           )}
           {!scene.scriptAnchor && (

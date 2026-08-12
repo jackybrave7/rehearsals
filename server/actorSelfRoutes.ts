@@ -7,7 +7,7 @@ import { getExpectedActorIds } from '../src/utils/rehearsalInsights.js';
 import { isRehearsalPast } from '../src/utils/rehearsalSort.js';
 import { timeToMinutes } from '../src/utils/time.js';
 import { loadStateForUser } from './stateUserScope.js';
-import { resolveSceneBodyFromScriptFile } from './sceneLearnText.js';
+import { resolveSceneBodyFromPublicGoogleDoc, resolveSceneBodyFromScriptFile } from './sceneLearnText.js';
 import { normalizeActorEmail, normalizeActorName } from '../src/utils/actorProfile.js';
 
 const RSVP_STATUSES = new Set<RsvpStatus>(['confirmed', 'declined', 'late']);
@@ -486,12 +486,9 @@ export function registerActorSelfRoutes(app: Express) {
         return;
       }
 
-      const hasGoogleDoc = Boolean(play.documentUrl || play.googleDocumentId);
-      const hasGoogleAnchor =
-        Boolean(scene.scriptAnchor) && !scene.scriptAnchor?.id.startsWith('file-');
-
-      if (hasGoogleDoc && hasGoogleAnchor) {
-        res.json({ text: null, source: 'none', needsGoogleAuth: true });
+      const publicGoogleText = await resolveSceneBodyFromPublicGoogleDoc(play, scene);
+      if (publicGoogleText) {
+        res.json({ text: publicGoogleText, source: 'google_docs' });
         return;
       }
 

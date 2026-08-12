@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Routes, Route, useParams, useLocation, Outlet } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
-import { GoogleDocsAuthProvider } from './store/GoogleDocsAuthContext';
 import { RehearsalProvider } from './store/RehearsalContext';
 import { DesignProvider } from './store/DesignContext';
 import { ConfirmDialogProvider } from './components/ConfirmDialogContext';
@@ -101,11 +100,9 @@ export default function App() {
                 path="app"
                 element={
                   <ProtectedRoute>
-                    <GoogleDocsAuthProvider>
                       <RehearsalProvider>
                         <Layout />
                       </RehearsalProvider>
-                    </GoogleDocsAuthProvider>
                   </ProtectedRoute>
                 }
               >

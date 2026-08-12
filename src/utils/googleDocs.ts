@@ -646,6 +646,37 @@ export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor
   return anchors.sort((a, b) => a.index - b.index);
 }
 
+export function extractSceneLearnTextFromGoogleHtml(html: string, anchorId: string): string | null {
+  const blocks: { id?: string; text: string; isSceneHeading: boolean }[] = [];
+  const blockRe = /<(?:p|h[1-6]|div)([^>]*)>([\s\S]*?)<\/(?:p|h[1-6]|div)>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = blockRe.exec(html)) !== null) {
+    const attrs = match[1];
+    const idMatch = attrs.match(/\sid="(h\.[^"]+)"/);
+    const id = idMatch?.[1];
+    const text = stripInlineHtml(match[2]);
+    if (!text && !id) continue;
+    blocks.push({
+      id,
+      text,
+      isSceneHeading: Boolean(text && isImportableSceneHeading(text)),
+    });
+  }
+
+  const startIndex = blocks.findIndex((block) => block.id === anchorId);
+  if (startIndex < 0) return null;
+
+  const lines: string[] = [];
+  for (let index = startIndex + 1; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (block.isSceneHeading) break;
+    if (block.text) lines.push(block.text);
+  }
+
+  return lines.join('\n').trim() || null;
+}
+
 function compareScenesForMatching(
   a: Pick<Scene, 'title' | 'number'>,
   b: Pick<Scene, 'title' | 'number'>

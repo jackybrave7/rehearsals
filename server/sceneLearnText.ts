@@ -6,8 +6,16 @@ import {
   paragraphsToLearnScriptText,
 } from '../src/utils/docxLearnText.js';
 import { extractSceneBodyTextsFromPlainText } from '../src/utils/sceneDescription.js';
-import { isDocxAnchorHeading, isImportableSceneHeading, matchScenesToDocAnchors } from '../src/utils/googleDocs.js';
+import {
+  extractSceneLearnTextFromGoogleHtml,
+  isDocxAnchorHeading,
+  isImportableSceneHeading,
+  matchScenesToDocAnchors,
+  parseGoogleDocumentId,
+  resolveSceneLinkAnchor,
+} from '../src/utils/googleDocs.js';
 import { parseScriptFileId } from '../src/utils/scriptDocument.js';
+import { fetchPublicGoogleDocHtml } from './googleDocsAnchors.js';
 import { getDb } from './db.js';
 import { getFileRecord, getFileStoragePath } from './fileStorage.js';
 import { parseScriptFileBuffer } from './scriptImport.js';
@@ -110,4 +118,24 @@ export async function resolveSceneBodyFromScriptFile(
   }
 
   return body.trim() || null;
+}
+
+export async function resolveSceneBodyFromPublicGoogleDoc(
+  play: Play,
+  scene: Scene
+): Promise<string | null> {
+  const documentId =
+    play.googleDocumentId ??
+    (play.documentUrl ? parseGoogleDocumentId(play.documentUrl) : null);
+  if (!documentId) return null;
+
+  const linkAnchor = resolveSceneLinkAnchor(play, scene);
+  if (!linkAnchor?.id || linkAnchor.id.startsWith('file-')) return null;
+
+  try {
+    const html = await fetchPublicGoogleDocHtml(documentId);
+    return extractSceneLearnTextFromGoogleHtml(html, linkAnchor.id);
+  } catch {
+    return null;
+  }
 }

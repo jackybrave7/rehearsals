@@ -43,11 +43,20 @@ export async function getServerGoogleAccessToken(): Promise<string | null> {
   return cachedServerToken.token;
 }
 
+const PUBLIC_DOC_HINT =
+  'Откройте доступ к документу: «Настройки доступа» → «Все, у кого есть ссылка» → «Читатель».';
+
 export async function fetchPublicGoogleDocHtml(documentId: string): Promise<string> {
   const url = `https://docs.google.com/document/d/${encodeURIComponent(documentId)}/export?format=html`;
   const response = await fetch(url, { redirect: 'follow' });
   if (!response.ok) {
-    throw new GoogleDocsApiError(response.status, 'PUBLIC_EXPORT_FAILED');
+    throw new GoogleDocsApiError(
+      response.status,
+      'PUBLIC_EXPORT_FAILED',
+      response.status === 403 || response.status === 404
+        ? `Документ недоступен без входа. ${PUBLIC_DOC_HINT}`
+        : `Не удалось загрузить публичный экспорт Google Docs. ${PUBLIC_DOC_HINT}`
+    );
   }
   return response.text();
 }
@@ -67,7 +76,11 @@ export async function resolveGoogleDocAnchors(documentId: string): Promise<{
   const html = await fetchPublicGoogleDocHtml(documentId);
   const anchors = extractDocTextAnchorsFromGoogleHtml(html);
   if (anchors.length === 0) {
-    throw new GoogleDocsApiError(404, 'NO_PUBLIC_ANCHORS');
+    throw new GoogleDocsApiError(
+      404,
+      'NO_PUBLIC_ANCHORS',
+      `В документе не найдены заголовки сцен (H1–H6) или документ закрыт. ${PUBLIC_DOC_HINT}`
+    );
   }
 
   return { anchors, anchorCount: anchors.length, source: 'public-export' };
@@ -88,7 +101,7 @@ export async function handleFetchGoogleDocAnchors(req: Request, res: Response): 
       const status = error.code === 'NO_PUBLIC_ANCHORS' ? 404 : error.status;
       res.status(status).json({
         error: error.code,
-        message: error.details,
+        message: error.details ?? error.code,
       });
       return;
     }

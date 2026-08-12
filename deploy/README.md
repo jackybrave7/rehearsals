@@ -64,7 +64,7 @@ APP_URL=https://rehears.ru
 
 **Доставляемость на Яндекс / Mail.ru:** см. [`deploy/mail-deliverability.md`](mail-deliverability.md) (DKIM, постмастеры). Тест: `node scripts/test-smtp.mjs ваш@mail.ru`.
 
-**Google Docs (опционально):** `VITE_GOOGLE_CLIENT_ID` — только для синхронизации текста из Google Docs, не для входа в аккаунт. Подставляется **на этапе сборки**. Задайте в `.env` **до** `npm run build`.
+**Google Docs:** ссылки на сцены работают через **публичный** документ («все, у кого есть ссылка»). Знаки и режим «Учить текст» — из загруженного `.docx`. Вход в Google и `VITE_GOOGLE_CLIENT_ID` **не нужны**. Опционально `GOOGLE_DOCS_REFRESH_TOKEN` на сервере — для закрытых документов.
 
 ## 4. Сборка и первый запуск API
 
