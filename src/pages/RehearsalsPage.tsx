@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -39,6 +39,25 @@ import { getArchivedPlaysInRehearsal, rehearsalInvolvesActor, rehearsalInvolvesP
 import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
 import { getRehearsalEventLabel, getRehearsalPlayMarkers } from '../utils/rehearsalCalendarMarkers';
 
+const CALENDAR_FILTERS_KEY = 'rehearsals-calendar-filters';
+
+type CalendarFilters = { playId: string; actorId: string };
+
+const NO_CALENDAR_FILTERS: CalendarFilters = { playId: '', actorId: '' };
+
+/** Фильтры календаря живут по театру, чтобы не сбрасываться при переходах между страницами. */
+function readCalendarFilters(theaterId: string | null | undefined): CalendarFilters {
+  if (!theaterId) return NO_CALENDAR_FILTERS;
+  try {
+    const raw = localStorage.getItem(`${CALENDAR_FILTERS_KEY}:${theaterId}`);
+    if (!raw) return NO_CALENDAR_FILTERS;
+    const parsed = JSON.parse(raw) as Partial<CalendarFilters>;
+    return { playId: parsed.playId ?? '', actorId: parsed.actorId ?? '' };
+  } catch {
+    return NO_CALENDAR_FILTERS;
+  }
+}
+
 const emptyRehearsal = (date: string, theaterId?: string): Omit<Rehearsal, 'id'> => ({
   theaterId,
   date,
@@ -61,23 +80,11 @@ export function RehearsalsPage() {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [modalOpen, setModalOpen] = useState(false);
-  const [filterPlayId, setFilterPlayId] = useState('');
-  const [filterActorId, setFilterActorId] = useState('');
   const [form, setForm] = useState(emptyRehearsal(format(new Date(), 'yyyy-MM-dd')));
   const theaterPlays = getTheaterPlays(state);
   const activePlay = getActivePlay(state);
   const activeTheater = getActiveTheater(state);
-  const allTheaterRehearsals = getTheaterRehearsals(state);
-  const visibleRehearsals = useMemo(() => {
-    let list = allTheaterRehearsals;
-    if (filterPlayId) {
-      list = list.filter((rehearsal) => rehearsalInvolvesPlay(state, rehearsal, filterPlayId));
-    }
-    if (filterActorId) {
-      list = list.filter((rehearsal) => rehearsalInvolvesActor(state, rehearsal, filterActorId));
-    }
-    return list;
-  }, [allTheaterRehearsals, filterPlayId, filterActorId, state]);
+  const activeTheaterId = state.activeTheaterId;
   const theaterScenes = useMemo(
     () =>
       state.scenes.filter((scene) =>
@@ -89,9 +96,53 @@ export function RehearsalsPage() {
     () => (rehearsal: Rehearsal) => getRehearsalPlayMarkers(state, rehearsal),
     [state]
   );
+  const storedFilters = useMemo(() => readCalendarFilters(activeTheaterId), [activeTheaterId]);
+  const [filterOverride, setFilterOverride] = useState<{
+    theaterId: string | null | undefined;
+    filters: CalendarFilters;
+  } | null>(null);
+  // Смена театра возвращает фильтры этого театра, не унося выбор из предыдущего.
+  const filters =
+    filterOverride && filterOverride.theaterId === activeTheaterId
+      ? filterOverride.filters
+      : storedFilters;
+  const setFilters = (next: CalendarFilters) =>
+    setFilterOverride({ theaterId: activeTheaterId, filters: next });
+
+  useEffect(() => {
+    if (!activeTheaterId) return;
+    try {
+      localStorage.setItem(`${CALENDAR_FILTERS_KEY}:${activeTheaterId}`, JSON.stringify(filters));
+    } catch {
+      // приватный режим — фильтр просто не переживёт перезагрузку
+    }
+  }, [filters, activeTheaterId]);
+
+  const activeActors = getActiveActors(state);
+
+  // Сохранённый фильтр может указывать на удалённую постановку или участника — иначе календарь
+  // молча опустеет.
+  const filterPlayId = theaterPlays.some((play) => play.id === filters.playId)
+    ? filters.playId
+    : '';
+  const filterActorId = activeActors.some((actor) => actor.id === filters.actorId)
+    ? filters.actorId
+    : '';
+  const filteredPlay = theaterPlays.find((play) => play.id === filterPlayId);
+  const filteredActor = activeActors.find((actor) => actor.id === filterActorId);
+  const allTheaterRehearsals = getTheaterRehearsals(state);
+  const visibleRehearsals = useMemo(() => {
+    let list = allTheaterRehearsals;
+    if (filterPlayId) {
+      list = list.filter((rehearsal) => rehearsalInvolvesPlay(state, rehearsal, filterPlayId));
+    }
+    if (filterActorId) {
+      list = list.filter((rehearsal) => rehearsalInvolvesActor(state, rehearsal, filterActorId));
+    }
+    return list;
+  }, [allTheaterRehearsals, filterPlayId, filterActorId, state]);
   const theaterTasks = getTheaterTasks(state);
   const theaterVenues = getTheaterVenues(state);
-  const activeActors = getActiveActors(state);
 
   const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
   const dayRehearsals = selectedDateStr
@@ -154,12 +205,15 @@ export function RehearsalsPage() {
 
   const openCreate = () => {
     if (readOnly) return;
-    setForm(
-      emptyRehearsal(
+    setForm({
+      ...emptyRehearsal(
         selectedDateStr ?? format(new Date(), 'yyyy-MM-dd'),
         state.activeTheaterId ?? undefined
-      )
-    );
+      ),
+      // Репетиция принадлежит постановке с самого начала: иначе до сборки плана она не попадает
+      // ни в фильтр календаря, ни в сводку.
+      playId: activePlay?.id ?? theaterPlays[0]?.id,
+    });
     setModalOpen(true);
   };
 
@@ -207,9 +261,9 @@ export function RehearsalsPage() {
         <div className="min-w-0">
           <h1 className={pageTitleClass}>Репетиции</h1>
           <p className="mt-0.5 hidden text-sm text-muted sm:block">
-            {activeTheater
-              ? `${activeTheater.name} — календарь и расписание`
-              : 'Календарь и расписание'}
+            {theaterPlays.length > 1
+              ? `${activeTheater ? `${activeTheater.name} — ` : ''}календарь всего театра: репетиции всех постановок`
+              : `${activeTheater ? `${activeTheater.name} — ` : ''}календарь и расписание`}
           </p>
         </div>
         {!readOnly && (
@@ -220,12 +274,12 @@ export function RehearsalsPage() {
         )}
       </header>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
         {theaterPlays.length > 1 && (
           <Select
-            label="Постановка"
+            label="Показывать в календаре"
             value={filterPlayId}
-            onChange={(e) => setFilterPlayId(e.target.value)}
+            onChange={(e) => setFilters({ ...filters, playId: e.target.value })}
             options={[
               { value: '', label: 'Все постановки' },
               ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
@@ -236,12 +290,30 @@ export function RehearsalsPage() {
           <Select
             label="Участник"
             value={filterActorId}
-            onChange={(e) => setFilterActorId(e.target.value)}
+            onChange={(e) => setFilters({ ...filters, actorId: e.target.value })}
             options={[
               { value: '', label: 'Все участники' },
               ...activeActors.map((actor) => ({ value: actor.id, label: actor.name })),
             ]}
           />
+        )}
+        {(filteredPlay || filteredActor) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-amber-200 sm:pb-2">
+            <AlertTriangle size={14} className="shrink-0" aria-hidden />
+            <span>
+              Календарь отфильтрован
+              {filteredPlay ? `: «${filteredPlay.title}»` : ''}
+              {filteredActor ? `${filteredPlay ? ', ' : ': '}${filteredActor.name}` : ''} — часть
+              репетиций скрыта
+            </span>
+            <button
+              type="button"
+              onClick={() => setFilters(NO_CALENDAR_FILTERS)}
+              className="rounded-lg border border-amber-400/30 px-2 py-0.5 font-medium transition-colors hover:bg-amber-400/10"
+            >
+              Показать все
+            </button>
+          </div>
         )}
       </div>
 
@@ -294,6 +366,7 @@ export function RehearsalsPage() {
               rehearsals={visibleRehearsals}
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
+              getPlayMarkers={getPlayMarkers}
             />
           )}
 
@@ -416,6 +489,9 @@ export function RehearsalsPage() {
                           </span>
                         )}
                       </div>
+                      {theaterPlays.length > 0 && (
+                        <p className="mt-1 text-sm text-muted">{calendarTitle}</p>
+                      )}
                       {location && (
                         <p className="mt-1 flex items-center gap-1 text-sm text-muted">
                           <MapPin size={14} /> {location}
@@ -460,12 +536,28 @@ export function RehearsalsPage() {
         }
       >
         <div className="space-y-4">
-          <Input
-            label="Дата"
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
+          <div className={theaterPlays.length > 1 ? 'grid gap-4 sm:grid-cols-2' : undefined}>
+            <Input
+              label="Дата"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
+            {theaterPlays.length > 1 && (
+              <Select
+                label="Постановка"
+                hint="Сцены можно добавить из любой постановки — репетиция станет смешанной."
+                value={form.playId ?? ''}
+                onChange={(e) =>
+                  setForm({ ...form, playId: e.target.value ? e.target.value : undefined })
+                }
+                options={[
+                  ...theaterPlays.map((play) => ({ value: play.id, label: play.title })),
+                  { value: '', label: 'Пока не решил' },
+                ]}
+              />
+            )}
+          </div>
 
           {(createWarnings.length > 0 ||
             createConflicts.length > 0 ||

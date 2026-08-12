@@ -496,7 +496,7 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
                 { label: 'Сцены', value: state.scenes.filter((s) => theaterPlays.some((p) => p.id === s.playId)).length, to: appPaths.scenes },
                 { label: 'Репетиции', value: theaterRehearsals.length, to: appPaths.rehearsals },
                 { label: 'Участники', value: activeActors.length, to: appPaths.actors },
-                { label: 'Постановки', to: appPaths.play, hint: `${theaterPlays.length}` },
+                { label: 'Постановки и состав', to: appPaths.play, hint: `${theaterPlays.length}` },
                 { label: 'Площадки', to: appPaths.venues },
                 { label: 'Задачи', to: appPaths.tasks, hint: openTasks ? `${openTasks} открытых` : undefined },
                 { label: 'Настройки', to: appPaths.settings },
