@@ -313,9 +313,11 @@ export function PlayPage() {
     <div className="space-y-6">
       <header className={pageHeaderClass}>
         <div>
-          <h1 className={pageTitleClass}>Постановки</h1>
+          <h1 className={pageTitleClass}>Постановки и состав</h1>
           <p className="mt-1 text-muted">
-            {isPro ? 'Несколько спектаклей в работе одновременно' : 'На Free — одна активная постановка'}
+            {isPro
+              ? 'Несколько постановок в работе одновременно'
+              : 'На Free — одна активная постановка'}
           </p>
         </div>
         <Button onClick={() => void openCreate()}>
@@ -327,7 +329,7 @@ export function PlayPage() {
       {!isPro && (
         <UpgradePrompt
           compact
-          title="Нужен второй спектакль?"
+          title="Нужна вторая постановка?"
           description="На Pro — без лимита постановок и театров, плюс шаблоны и авто-напоминания."
         />
       )}
@@ -569,7 +571,7 @@ export function PlayPage() {
           <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-4">
             <p className="text-sm font-medium text-white">Обложка постановки</p>
             <p className="text-xs text-muted">
-              Прямоугольное изображение для карточки на странице «Все постановки»
+              Прямоугольное изображение для карточки на странице «Сводка по постановкам»
             </p>
             {form.coverUrl && resolveAssetUrl(form.coverUrl) && (
               <img

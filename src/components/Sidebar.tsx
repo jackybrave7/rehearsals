@@ -120,7 +120,7 @@ export function Sidebar({ className = '', drawer = false, onNavigate }: SidebarP
             }
           >
             <Icon size={18} className="shrink-0" />
-            {!isCollapsed && <span>{navLabel}</span>}
+            {!isCollapsed && <span className="min-w-0 truncate">{navLabel}</span>}
           </NavLink>
           );
         })}
