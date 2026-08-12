@@ -8,6 +8,7 @@ import { randomBytes, scryptSync } from 'node:crypto';
 import { addDays, format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../server/db.js';
+import { deleteUserCompletely } from '../server/adminDeleteUser.js';
 import { saveStateForUser } from '../server/stateUserScope.js';
 import type { AppState } from '../src/types/index.js';
 
@@ -23,7 +24,11 @@ function hashPassword(password: string): string {
 const db = getDb();
 const now = new Date().toISOString();
 
-db.prepare(`DELETE FROM users WHERE email = ?`).run(EMAIL);
+// Повторный запуск: сносим прошлого пользователя вместе с театром, иначе мешают внешние ключи.
+const previous = db.prepare(`SELECT id FROM users WHERE email = ?`).get(EMAIL) as
+  | { id: string }
+  | undefined;
+if (previous) deleteUserCompletely(previous.id, db);
 
 const userId = uuidv4();
 db.prepare(
@@ -45,6 +50,8 @@ const actorNames = [
   'Глеб Морозов',
   'Дарья Липина',
   'Егор Тихонов',
+  // Ни в одной сцене не занят: его добавляют в репетицию вручную.
+  'Технарь Пультов',
 ];
 const actors = actorNames.map((name) => ({
   id: uuidv4(),
@@ -54,6 +61,7 @@ const actors = actorNames.map((name) => ({
 }));
 
 const grozaPerformanceId = uuidv4();
+const grozaTourPerformanceId = uuidv4();
 const chaikaPerformanceId = uuidv4();
 
 /**
@@ -77,6 +85,9 @@ const chaikaRoles = rolesFor(chaikaId, ['Нина', 'Аркадина', 'Тре�
 const grozaCast = [0, 2, 1, 3];
 const chaikaCast = [0, 2, 4, 5];
 
+// Второй состав «Грозы»: Катерину играет другая актриса — видно, что показ переключает состав.
+const grozaTourCast = [2, 1, 3, 0];
+
 const castAssignments = [
   ...grozaRoles.map((role, index) => ({
     id: uuidv4(),
@@ -84,6 +95,13 @@ const castAssignments = [
     performanceId: grozaPerformanceId,
     roleId: role.id,
     actorId: actors[grozaCast[index]].id,
+  })),
+  ...grozaRoles.map((role, index) => ({
+    id: uuidv4(),
+    playId: grozaId,
+    performanceId: grozaTourPerformanceId,
+    roleId: role.id,
+    actorId: actors[grozaTourCast[index]].id,
   })),
   ...chaikaRoles.map((role, index) => ({
     id: uuidv4(),
@@ -164,7 +182,14 @@ const state: AppState = {
       name: 'Премьера',
       isDefault: true,
       date: day(38),
-      time: '19:00',
+      startTime: '19:00',
+    },
+    {
+      id: grozaTourPerformanceId,
+      playId: grozaId,
+      name: 'Выездной показ',
+      date: day(54),
+      startTime: '18:00',
     },
     {
       id: chaikaPerformanceId,
@@ -172,7 +197,7 @@ const state: AppState = {
       name: 'Премьера',
       isDefault: true,
       date: day(72),
-      time: '19:00',
+      startTime: '19:00',
     },
   ],
   castAssignments,
@@ -220,7 +245,8 @@ const state: AppState = {
       sceneIds: [grozaScenes[0].id, grozaScenes[1].id],
       taskIds: [],
       schedule: [],
-      actorIds: [actors[0].id, actors[1].id],
+      // Технарь ни в одной сцене не занят — попадает в занятость только как ручной участник.
+      actorIds: [actors[0].id, actors[1].id, actors[6].id],
       attendance: {},
     },
     {
@@ -234,7 +260,7 @@ const state: AppState = {
       sceneIds: [chaikaScenes[0].id],
       taskIds: [],
       schedule: [],
-      actorIds: [actors[0].id, actors[2].id],
+      actorIds: [actors[0].id, actors[2].id, actors[6].id],
       attendance: {},
     },
     // Смешанная репетиция: сцены из двух постановок.
