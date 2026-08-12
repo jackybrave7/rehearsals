@@ -459,13 +459,14 @@ export function CastDistributionPanel({ playId, readOnly = false }: CastDistribu
           {!readOnly && (
             <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={openCreatePerformance}>
               <Plus size={14} />
-              Показ
+              Новый показ
             </Button>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Показы постановки">
+        <span className="text-xs uppercase tracking-wide text-muted">Показ:</span>
         {performances.map((performance) => (
           <div key={performance.id} className="inline-flex items-center gap-0.5">
             <button

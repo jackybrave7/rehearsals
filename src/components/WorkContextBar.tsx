@@ -18,21 +18,30 @@ type WorkContextBarProps = {
   onMenuClick?: () => void;
 };
 
+/**
+ * «Показ» — самое неочевидное звено крошек: выглядит как дата спектакля, а на деле выбирает состав,
+ * который вы видите в сценах и в плане.
+ */
+const PERFORMANCE_SCOPE_HINT =
+  'Показ: чей состав вы видите в сценах и в плане репетиции. У каждого показа своя дата и свой состав — настраиваются в «Постановки и состав».';
+
 function ContextValue({
   value,
   to,
   muted,
+  title,
 }: {
   value: string;
   to: string;
   muted?: boolean;
+  title?: string;
 }) {
   const className = `inline-flex max-w-[14rem] min-w-0 items-center truncate rounded-md px-1 py-0.5 text-sm font-medium leading-tight transition-colors hover:bg-white/[0.04] hover:text-gold-light sm:max-w-none ${
     muted ? 'text-muted/60 italic font-normal' : 'text-foreground'
   }`;
 
   return (
-    <Link to={to} className={className}>
+    <Link to={to} className={className} title={title}>
       {value}
     </Link>
   );
@@ -148,6 +157,7 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
               value={performanceValue}
               to={workContextLinks.performance}
               muted={!performance}
+              title={PERFORMANCE_SCOPE_HINT}
             />
           </span>
           <span className="shrink-0 text-muted/40" aria-hidden>
