@@ -386,70 +386,73 @@ export function PlayPage() {
                 {coverSrc && (
                   <img src={coverSrc} alt="" className="aspect-video w-full object-cover" />
                 )}
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                 {playReadOnly && (
                   <p className="mb-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted">
                     Архивная постановка — только просмотр. Нажмите «Восстановить», чтобы снова редактировать
                     состав и сцены.
                   </p>
                 )}
-                <div className="flex items-start gap-5">
-                  <PlayIcon play={play} size="lg" className="!h-14 !w-14 !text-lg" />
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-xl font-bold text-white">«{play.title}»</h2>
-                    <p className="mt-1 text-gold-light">{play.author}</p>
-                    {play.year && <p className="text-sm text-muted">{play.year} год</p>}
-                    {play.description && (
-                      <p className="mt-3 max-w-2xl text-sm text-muted leading-relaxed">
-                        {play.description}
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-5">
+                  <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                    <PlayIcon play={play} size="lg" className="!h-14 !w-14 !text-lg shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl font-bold text-white">«{play.title}»</h2>
+                      <p className="mt-1 text-gold-light">{play.author}</p>
+                      {play.year && <p className="text-sm text-muted">{play.year} год</p>}
+                      {play.description && (
+                        <p className="mt-3 text-sm leading-relaxed text-muted break-words whitespace-pre-wrap">
+                          {play.description}
+                        </p>
+                      )}
+                      <p className="mt-2 text-xs text-muted">
+                        {roleCount} ролей · {performanceCount} показов · {sceneCount} сцен
                       </p>
-                    )}
-                    <p className="mt-2 text-xs text-muted">
-                      {roleCount} ролей · {performanceCount} показов · {sceneCount} сцен
-                    </p>
 
-                    {(play.documentUrl || play.scriptFileName) && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {play.documentUrl && (
-                          <a
-                            href={play.documentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gold/20 bg-background/40 px-3 py-2 text-xs text-gold-light transition-colors hover:border-gold/40"
-                          >
-                            <ExternalLink size={14} />
-                            Онлайн-документ
-                          </a>
-                        )}
-                        {play.scriptFileName && resolvePlayScriptUrl(play) && (
-                          <a
-                            href={resolvePlayScriptUrl(play)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gold/20 bg-background/40 px-3 py-2 text-xs text-gold-light transition-colors hover:border-gold/40"
-                          >
-                            <FileText size={14} />
-                            {play.scriptFileName}
-                          </a>
-                        )}
-                      </div>
-                    )}
+                      {(play.documentUrl || play.scriptFileName) && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {play.documentUrl && (
+                            <a
+                              href={play.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gold/20 bg-background/40 px-3 py-2 text-xs text-gold-light transition-colors hover:border-gold/40"
+                            >
+                              <ExternalLink size={14} />
+                              Онлайн-документ
+                            </a>
+                          )}
+                          {play.scriptFileName && resolvePlayScriptUrl(play) && (
+                            <a
+                              href={resolvePlayScriptUrl(play)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gold/20 bg-background/40 px-3 py-2 text-xs text-gold-light transition-colors hover:border-gold/40"
+                            >
+                              <FileText size={14} />
+                              {play.scriptFileName}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-start gap-0.5">
+                  <div className="flex flex-wrap items-center gap-1 border-t border-gold/10 pt-3 md:w-auto md:shrink-0 md:flex-col md:items-stretch md:border-t-0 md:pt-0">
                     <Button
                       variant="ghost"
-                      className="!px-3 !py-1.5 text-sm"
+                      className="!px-2.5 !py-1.5 text-sm sm:!px-3"
                       onClick={() => toggleArchive(play)}
+                      title={play.archivedAt ? 'Восстановить' : 'В архив'}
                     >
                       {play.archivedAt ? (
                         <>
                           <ArchiveRestore size={16} />
-                          Восстановить
+                          <span className="hidden sm:inline">Восстановить</span>
                         </>
                       ) : (
                         <>
                           <Archive size={16} />
-                          В архив
+                          <span className="hidden sm:inline">В архив</span>
                         </>
                       )}
                     </Button>
@@ -457,15 +460,16 @@ export function PlayPage() {
                       <>
                         <Button
                           variant="ghost"
-                          className="!px-3 !py-1.5 text-sm"
+                          className="!px-2.5 !py-1.5 text-sm sm:!px-3"
                           onClick={() => openEdit(play)}
+                          title="Редактировать"
                         >
                           <Pencil size={16} />
-                          Редактировать
+                          <span className="hidden sm:inline">Редактировать</span>
                         </Button>
                         <DeleteButton
                           label={`Удалить постановку «${play.title}»`}
-                          className="mt-1.5"
+                          className="mt-0 md:mt-1.5"
                           onClick={() => handleDelete(play)}
                         />
                       </>
