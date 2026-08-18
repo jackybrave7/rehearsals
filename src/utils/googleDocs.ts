@@ -598,17 +598,35 @@ export function extractDocTextAnchors(document: GoogleDocsDocument): DocTextAnch
   return [...unique.values()].sort((a, b) => a.index - b.index);
 }
 
-function stripInlineHtml(value: string): string {
-  return value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+function decodeHtmlEntities(value: string): string {
+  let decoded = value.replace(/&#(\d+);/g, (_, code) => {
+    const numeric = Number(code);
+    return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : '';
+  });
+  decoded = decoded.replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+    const numeric = parseInt(code, 16);
+    return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : '';
+  });
+  return decoded
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&hellip;/g, '…')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/&amp;/g, '&');
+}
+
+function stripInlineHtml(value: string): string {
+  return decodeHtmlEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /** Якоря из публичного HTML-экспорта Google Docs (без OAuth пользователя). */

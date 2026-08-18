@@ -177,6 +177,21 @@ describe('google scene links', () => {
     );
   });
 
+  it('parses anchors from google html with numeric entities', () => {
+    const html = `
+      <h2 id="h.s1"><span>&#1057;&#1094;&#1077;&#1085;&#1072; 1. &#1052;&#1086;&#1088;&#1077;</span></h2>
+      <h2 id="h.s2"><span>&#1057;&#1094;&#1077;&#1085;&#1072; 2. &#1041;&#1077;&#1088;&#1077;&#1075;</span></h2>
+    `;
+    const anchors = extractDocTextAnchorsFromGoogleHtml(html);
+    assert.deepEqual(
+      anchors.map((anchor) => [anchor.id, anchor.text]),
+      [
+        ['h.s1', 'Сцена 1. Море'],
+        ['h.s2', 'Сцена 2. Берег'],
+      ]
+    );
+  });
+
   it('extracts scene body from public google html export', () => {
     const html = `
       <p id="h.s1"><span>Сцена 1. Метро</span></p>

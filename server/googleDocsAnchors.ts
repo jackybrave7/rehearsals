@@ -79,7 +79,7 @@ export async function resolveGoogleDocAnchors(documentId: string): Promise<{
     throw new GoogleDocsApiError(
       404,
       'NO_PUBLIC_ANCHORS',
-      `В документе не найдены заголовки сцен (H1–H6) или документ закрыт. ${PUBLIC_DOC_HINT}`
+      'В документе не найдены заголовки сцен (H1–H6). Оформите названия как «Сцена 1», «Сцена 2» и т.д.'
     );
   }
 
