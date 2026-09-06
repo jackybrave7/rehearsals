@@ -5,10 +5,14 @@ cd /d "%~dp0"
 
 set "SSH_KEY=%USERPROFILE%\.ssh\rehearsals_vps"
 set "SSH_HOST=root@45.153.71.162"
+set "SSH_PORT=22"
+
+if exist "deploy\deploy.local.bat" call "deploy\deploy.local.bat"
 
 echo.
 echo [rehearsals] SSH на VPS...
 echo   Сервер:  %SSH_HOST%
+echo   Порт:    %SSH_PORT%
 echo   Ключ:    %SSH_KEY%
 echo   Проект:  /var/www/rehearsals
 echo.
@@ -27,7 +31,7 @@ if not exist "%SSH_KEY%" (
   exit /b 1
 )
 
-"%SSH_BIN%" -i "%SSH_KEY%" -o StrictHostKeyChecking=accept-new %SSH_HOST% -t "cd /var/www/rehearsals && exec bash -l"
+"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new %SSH_HOST% -t "cd /var/www/rehearsals && exec bash -l"
 
 set "EXIT_CODE=%ERRORLEVEL%"
 if not "%EXIT_CODE%"=="0" (

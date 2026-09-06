@@ -4,12 +4,15 @@ cd /d "%~dp0"
 
 set "SSH_KEY=%USERPROFILE%\.ssh\rehearsals_vps"
 set "SSH_HOST=root@45.153.71.162"
+set "SSH_PORT=22"
 set "REMOTE_DIR=/var/www/rehearsals"
 set "REMOTE_SCRIPT=/tmp/rehearsals-deploy.sh"
 set "SSH_BIN=%SystemRoot%\System32\OpenSSH\ssh.exe"
 set "SCP_BIN=%SystemRoot%\System32\OpenSSH\scp.exe"
 set "SKIP_GIT=0"
 set "COMMIT_MSG="
+
+if exist "deploy\deploy.local.bat" call "deploy\deploy.local.bat"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -27,6 +30,7 @@ goto parse_args
 echo.
 echo [rehearsals] Deploy to VPS...
 echo   Server:  %SSH_HOST%
+echo   Port:    %SSH_PORT%
 echo   Path:    %REMOTE_DIR%
 echo.
 
@@ -76,17 +80,23 @@ if not exist "deploy\remote-deploy.sh" (
   exit /b 1
 )
 
-echo Uploading deploy script...
-"%SCP_BIN%" -i "%SSH_KEY%" -o StrictHostKeyChecking=accept-new "deploy\remote-deploy.sh" %SSH_HOST%:%REMOTE_SCRIPT%
+call :check_ssh
 if errorlevel 1 (
-  echo ERROR: scp failed
+  pause
+  exit /b 1
+)
+
+echo Uploading deploy script...
+"%SCP_BIN%" -i "%SSH_KEY%" -P %SSH_PORT% -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "deploy\remote-deploy.sh" %SSH_HOST%:%REMOTE_SCRIPT%
+if errorlevel 1 (
+  call :print_ssh_failure
   pause
   exit /b 1
 )
 
 echo Running deploy on server...
 echo.
-"%SSH_BIN%" -i "%SSH_KEY%" -o StrictHostKeyChecking=accept-new %SSH_HOST% "tr -d '\r' < %REMOTE_SCRIPT% | bash -l -s"
+"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new %SSH_HOST% "tr -d '\r' < %REMOTE_SCRIPT% | bash -l -s"
 
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
@@ -180,3 +190,43 @@ if not "!LOCAL_HEAD!"=="!REMOTE_HEAD!" (
 echo [git] remote is up to date: !LOCAL_HEAD:~0,7!
 echo.
 exit /b 0
+
+:check_ssh
+for /f "tokens=2 delims=@" %%I in ("%SSH_HOST%") do set "SSH_IP=%%I"
+if not defined SSH_IP set "SSH_IP=%SSH_HOST%"
+
+echo [ssh] Checking TCP port %SSH_PORT% on %SSH_IP%...
+powershell -NoProfile -Command "$r = Test-NetConnection -ComputerName '%SSH_IP%' -Port %SSH_PORT% -WarningAction SilentlyContinue; if ($r.TcpTestSucceeded) { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+  call :print_ssh_failure
+  exit /b 1
+)
+
+echo [ssh] Port is open, testing SSH...
+"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new %SSH_HOST% "echo ok" >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo ERROR: TCP port %SSH_PORT% is open, but SSH login failed.
+  echo Check key %SSH_KEY% and authorized_keys on the server.
+  echo.
+  exit /b 1
+)
+exit /b 0
+
+:print_ssh_failure
+echo.
+echo ERROR: Cannot reach SSH on %SSH_HOST% port %SSH_PORT%.
+echo.
+echo This is NOT a git or npm problem. The VPS is unreachable from your PC:
+echo   - ping may work, but ports 22/80/443 do not respond
+echo   - server may be stopped, suspended, or firewalled
+echo.
+echo What to do:
+echo   1. Open TimeWeb panel - check VPS status and billing
+echo   2. Start the server if it is stopped
+echo   3. Firewall: allow inbound TCP 22 from your IP
+echo   4. Console/VNC: run   systemctl status ssh nginx
+echo   5. Run deploy-check.bat for details
+echo   6. See deploy\README.md - "Connection timed out"
+echo.
+exit /b 1

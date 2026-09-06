@@ -143,6 +143,49 @@ npm run build          # если менялись VITE_* — проверьте
 pm2 restart rehearsals-api
 ```
 
+С Windows: `deploy.bat` (коммит + push + деплой) или `deploy.bat --skip-git` если код уже на GitHub.
+
+Проверка доступности сервера: `deploy-check.bat`.
+
+Локальные настройки SSH (другой порт/IP): скопируйте `deploy/deploy.local.example.bat` → `deploy/deploy.local.bat` (файл в `.gitignore`).
+
+### Connection timed out (SSH / scp)
+
+Если `deploy.bat` падает на `Connection timed out` **до** строк `Running deploy on server...`:
+
+| Симптом | Что значит |
+|---------|------------|
+| ping OK, порт 22 FAIL | VPS включён, но **SSH закрыт** или сервис не слушает порт |
+| ping OK, порты 22/80/443 FAIL | Сервер **не обслуживает** трафик (остановлен, файрвол, завис) |
+| ping FAIL | Неверный IP или VPS **выключен** у хостера |
+
+**Это не ошибка скрипта деплоя** — с вашего ПК нельзя достучаться до `45.153.71.162`.
+
+**Что сделать в панели TimeWeb:**
+
+1. **Серверы → VPS** — статус «Работает»; при «Выключен» — включить.
+2. **Сеть / Firewall** — разрешить входящий **TCP 22** (и 80/443 для сайта).
+3. **Консоль / VNC** (если SSH недоступен):
+   ```bash
+   systemctl status ssh
+   systemctl start ssh
+   systemctl status nginx
+   ufw status
+   curl -s http://127.0.0.1:3001/api/health
+   ```
+4. Проверить **оплату** — просроченный VPS часто блокирует все порты кроме ping.
+
+После восстановления SSH: `deploy.bat --skip-git`.
+
+**Альтернатива:** GitHub Actions workflow `Deploy production` (`.github/workflows/deploy-prod.yml`). В репозитории → Settings → Secrets:
+
+- `DEPLOY_SSH_HOST` = `45.153.71.162`
+- `DEPLOY_SSH_USER` = `root`
+- `DEPLOY_SSH_KEY` = содержимое приватного ключа `rehearsals_vps`
+- `DEPLOY_SSH_PORT` = `22` (опционально)
+
+Запуск: Actions → Deploy production → Run workflow. Если и GitHub не может подключиться — VPS точно недоступен снаружи.
+
 ## Полезное
 
 - Логи API: `pm2 logs rehearsals-api`
