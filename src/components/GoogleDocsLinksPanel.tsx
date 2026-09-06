@@ -22,6 +22,7 @@ import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { generateId } from '../utils/id';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { ScriptSyncHint } from './ScriptSyncHint';
 
 interface GoogleDocsLinksPanelProps {
   play: Play;
@@ -270,12 +271,12 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
 
+          <ScriptSyncHint variant="compact" />
+
           <p className="rounded-lg border border-gold/15 bg-gold/5 px-3 py-2 text-xs text-muted">
-            Документ должен быть <strong className="text-white">публичным</strong>: «Настройки доступа» →
-            «Все, у кого есть ссылка» → «Читатель». Вход в Google не нужен.
-            {play.scriptFileUrl
-              ? ' Знаки, описания и режим «Учить текст» — из загруженного .docx («Импорт из файла»).'
-              : ' Для знаков и режима «Учить текст» скачайте документ как .docx и загрузите в карточке постановки.'}
+            Ссылка в постановке должна вести на <strong className="text-white">тот же</strong> Google Docs, из
+            которого скачан .docx. Документ — <strong className="text-white">публичный</strong>: «Все, у кого
+            есть ссылка» → «Читатель». Вход в Google не нужен.
           </p>
 
           <div className="flex flex-wrap gap-2">

@@ -18,6 +18,7 @@ import { Modal } from '../components/Modal';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Input, Textarea } from '../components/FormFields';
 import { CastDistributionPanel } from '../components/CastDistributionPanel';
+import { ScriptSyncHint } from '../components/ScriptSyncHint';
 import { PlayIcon } from '../components/PlayIcon';
 import { ArchivedPlaysMenu } from '../components/ArchivedPlaysMenu';
 import {
@@ -603,6 +604,8 @@ export function PlayPage() {
             {coverError && <p className="text-sm text-red-400">{coverError}</p>}
           </div>
 
+          <ScriptSyncHint className="mb-1" />
+
           <Input
             label="Ссылка на онлайн-документ"
             type="url"
@@ -611,15 +614,13 @@ export function PlayPage() {
             placeholder="https://docs.google.com/document/d/..."
           />
           <p className="-mt-2 text-xs text-muted">
-            Google Docs, Яндекс.Документы или другая ссылка на текст пьесы. Для ссылок на сцены в
-            Google Docs откройте доступ: «Все, у кого есть ссылка» → «Читатель».
+            Тот же документ, из которого вы скачаете .docx ниже. Доступ: «Все, у кого есть ссылка» → «Читатель».
           </p>
 
           <div className="space-y-2">
             <p className="text-sm text-muted">Файл с пьесой</p>
             <p className="text-xs text-muted">
-              Форматы: .txt или .docx (до 5 МБ). Старый .doc и PDF не поддерживаются — в Word/Google Docs
-              сохраните как .docx.
+              Скачайте .docx из этого Google Docs (не другой версии). Форматы: .txt или .docx (до 5 МБ).
             </p>
             {form.scriptFileName ? (
               <div className="flex items-center justify-between rounded-lg border border-gold/20 bg-background/40 px-4 py-3">

@@ -30,6 +30,7 @@ import { generateId } from '../utils/id';
 import { appPaths } from '../navigation/appPaths';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { ScriptSyncHint } from './ScriptSyncHint';
 
 interface ScriptImportPanelProps {
   play: Play;
@@ -351,13 +352,14 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         }
       >
         <div className="space-y-4">
+          <ScriptSyncHint variant="compact" />
+
           <p className="text-sm text-muted">
-            Без Google: скачайте пьесу из Google Docs как Word или текст и загрузите сюда.
             {linkedCount > 0
-              ? ` Привязано ${linkedCount} из ${scenes.length} сцен`
+              ? `Привязано ${linkedCount} из ${scenes.length} сцен`
               : scenes.length === 0
-                ? ' Можно создать сцены из заголовков файла'
-                : ' Сопоставление по заголовкам «АКТ», «сц.» и стилям Word'}
+                ? 'Можно создать сцены из заголовков файла'
+                : 'Сопоставление по заголовкам «АКТ», «сц.» и стилям Word'}
             {countedCount > 0 ? ` · хронометраж для ${countedCount} сцен` : ''}
             {syncedAtLabel ? ` · обновлено ${syncedAtLabel}` : ''}
           </p>
@@ -418,11 +420,11 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
               isZen ? 'border-border/60 bg-black/[0.02]' : 'border-gold/10 bg-black/20'
             }`}
           >
-            <p className="font-medium text-foreground">Как подготовить файл</p>
+            <p className="font-medium text-foreground">Шаги на этой странице</p>
             <ol className="mt-2 list-decimal space-y-1 pl-4">
-              <li>В Google Docs: Файл → Скачать → Microsoft Word (.docx) или Обычный текст (.txt).</li>
-              <li>Названия сцен — отдельными строками, как в списке сцен (лучше стиль «Заголовок 1–2» в Word).</li>
-              <li>Загрузите файл и нажмите «Импортировать сцены» — список сцен создастся из заголовков (или «Сопоставить», если сцены уже есть).</li>
+              <li>Загрузите .docx из того же Google Docs, что указан в карточке постановки.</li>
+              <li>Названия сцен — заголовками: «Сцена 1», «АКТ 1, сц. 2» и т.д.</li>
+              <li>Нажмите «Сопоставить сцены», затем «Google Docs → Сопоставить ссылки».</li>
             </ol>
           </div>
         </div>
