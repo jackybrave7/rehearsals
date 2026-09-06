@@ -629,21 +629,58 @@ function stripInlineHtml(value: string): string {
   );
 }
 
-/** Якоря из публичного HTML-экспорта Google Docs (без OAuth пользователя). */
-export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor[] {
-  const anchors: DocTextAnchor[] = [];
-  const seen = new Set<string>();
-  let index = 0;
+const LINKABLE_GOOGLE_HEADING_ID_RE = /^h\.[a-z0-9]+$/i;
 
-  const blockRe =
+/** Якорь с id из Google Docs (#heading=h.xxx). Без него ссылку на фрагмент построить нельзя. */
+export function isLinkableGoogleHeadingAnchor(
+  anchor: Pick<DocTextAnchor, 'id' | 'type'>
+): boolean {
+  return anchor.type === 'heading' && LINKABLE_GOOGLE_HEADING_ID_RE.test(anchor.id);
+}
+
+interface HtmlHeadingBlock {
+  start: number;
+  id: string;
+  innerHtml: string;
+}
+
+function collectGoogleHtmlHeadingBlocks(html: string): HtmlHeadingBlock[] {
+  const blocks: HtmlHeadingBlock[] = [];
+  const seenStarts = new Set<number>();
+
+  const idBlockRe =
     /<(?:p|h[1-6]|div)[^>]*\sid="(h\.[^"]+)"[^>]*>([\s\S]*?)<\/(?:p|h[1-6]|div)>/gi;
   let match: RegExpExecArray | null;
-  while ((match = blockRe.exec(html)) !== null) {
-    const id = match[1];
-    const text = stripInlineHtml(match[2]);
-    if (!text || seen.has(id)) continue;
-    if (!isImportableSceneHeading(text)) continue;
-    seen.add(id);
+  while ((match = idBlockRe.exec(html)) !== null) {
+    seenStarts.add(match.index);
+    blocks.push({ start: match.index, id: match[1], innerHtml: match[2] });
+  }
+
+  const hRe = /<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/gi;
+  while ((match = hRe.exec(html)) !== null) {
+    if (seenStarts.has(match.index)) continue;
+    if (/\sid="h\.[^"]+"/i.test(match[2])) continue;
+    blocks.push({ start: match.index, id: '', innerHtml: match[3] });
+  }
+
+  return blocks.sort((a, b) => a.start - b.start);
+}
+
+/** Якоря из публичного HTML-экспорта Google Docs (без OAuth пользователя). */
+export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor[] {
+  const blocks = collectGoogleHtmlHeadingBlocks(html);
+  const anchors: DocTextAnchor[] = [];
+  const seenIds = new Set<string>();
+  let unlinkedIndex = 0;
+  let index = 0;
+
+  for (const block of blocks) {
+    const text = stripInlineHtml(block.innerHtml);
+    if (!text || !isImportableSceneHeading(text)) continue;
+
+    const id = block.id || `html.unlinked.${unlinkedIndex++}`;
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
     anchors.push({ type: 'heading', id, text, index: index++ });
   }
 
@@ -651,12 +688,12 @@ export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor
     const idRe = /\sid="(h\.[^"]+)"/gi;
     while ((match = idRe.exec(html)) !== null) {
       const id = match[1];
-      if (seen.has(id)) continue;
+      if (seenIds.has(id)) continue;
       const slice = html.slice(match.index, match.index + 1200);
       const textMatch = slice.match(/>([^<]{2,200})</);
       const text = textMatch ? stripInlineHtml(textMatch[1]) : '';
       if (!text || !isImportableSceneHeading(text)) continue;
-      seen.add(id);
+      seenIds.add(id);
       anchors.push({ type: 'heading', id, text, index: index++ });
     }
   }
@@ -813,7 +850,9 @@ export function matchScenesToDocAnchors(
 }
 
 export function buildGoogleDocAnchorsForLinking(anchors: DocTextAnchor[]): DocTextAnchor[] {
-  return listImportableScenesWithActGroups(anchors).map(({ anchor }) => anchor);
+  return listImportableScenesWithActGroups(anchors)
+    .map(({ anchor }) => anchor)
+    .filter(isLinkableGoogleHeadingAnchor);
 }
 
 export function prepareGoogleSceneLinkMatches(

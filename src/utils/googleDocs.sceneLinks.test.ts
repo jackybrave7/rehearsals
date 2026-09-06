@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Scene } from '../types';
 import {
+  buildGoogleDocAnchorsForLinking,
   extractDocTextAnchorsFromGoogleHtml,
   extractSceneLearnTextFromGoogleHtml,
   findGoogleAnchorForScene,
@@ -206,6 +207,50 @@ describe('google scene links', () => {
     assert.equal(
       extractSceneLearnTextFromGoogleHtml(html, 'h.s2'),
       'Реплика второй сцены.'
+    );
+  });
+
+  it('imports h2 scene headings without google heading ids', () => {
+    const html = `
+      <h2><span>&#1057;&#1094;&#1077;&#1085;&#1072; 1. &#1052;&#1077;&#1090;&#1088;&#1086;</span></h2>
+      <h2 id="h.s2"><span>&#1057;&#1094;&#1077;&#1085;&#1072; 2. &#1052;&#1077;&#1090;&#1088;&#1086;</span></h2>
+      <h2 id="h.s3"><span>&#1057;&#1094;&#1077;&#1085;&#1072; 3. &#1052;&#1077;&#1090;&#1088;&#1086;</span></h2>
+      <h2><span>&#1057;&#1094;&#1077;&#1085;&#1072; 4. &#1050;&#1072;&#1092;&#1077;</span></h2>
+      <h2 id="h.s5"><span>&#1057;&#1094;&#1077;&#1085;&#1072; 5. &#1050;&#1072;&#1092;&#1077;</span></h2>
+    `;
+    const anchors = extractDocTextAnchorsFromGoogleHtml(html);
+    assert.deepEqual(
+      anchors.map((anchor) => [anchor.id, anchor.text]),
+      [
+        ['html.unlinked.0', 'Сцена 1. Метро'],
+        ['h.s2', 'Сцена 2. Метро'],
+        ['h.s3', 'Сцена 3. Метро'],
+        ['html.unlinked.1', 'Сцена 4. Кафе'],
+        ['h.s5', 'Сцена 5. Кафе'],
+      ]
+    );
+    assert.deepEqual(
+      buildGoogleDocAnchorsForLinking(anchors).map((anchor) => anchor.id),
+      ['h.s2', 'h.s3', 'h.s5']
+    );
+  });
+
+  it('adds missing scene 1 from google html without heading id', () => {
+    const html = `
+      <h2><span>Сцена 1. Метро. Встреча.</span></h2>
+      <h2 id="h.s2"><span>Сцена 2. Метро</span></h2>
+      <h2 id="h.s3"><span>Сцена 3. Метро</span></h2>
+    `;
+    const anchors = extractDocTextAnchorsFromGoogleHtml(html);
+    const existing = [
+      scene({ id: 's2', number: 2, title: 'Сцена 2. Метро' }),
+      scene({ id: 's3', number: 3, title: 'Сцена 3. Метро' }),
+    ];
+    const matches = matchScenesToDocAnchors(existing, anchors);
+    const { toAdd } = mergeMissingScenesFromImport('play-1', existing, anchors, matches);
+    assert.deepEqual(
+      toAdd.map((item) => [item.number, item.title]),
+      [[1, 'Сцена 1. Метро. Встреча.']]
     );
   });
 });
