@@ -686,6 +686,7 @@ export function extractDocTextAnchorsFromGoogleHtml(html: string): DocTextAnchor
 
   if (anchors.length === 0) {
     const idRe = /\sid="(h\.[^"]+)"/gi;
+    let match: RegExpExecArray | null;
     while ((match = idRe.exec(html)) !== null) {
       const id = match[1];
       if (seenIds.has(id)) continue;

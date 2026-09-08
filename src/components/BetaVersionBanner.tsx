@@ -15,14 +15,23 @@ export function BetaVersionBanner() {
     <div
       className={
         isZen
-          ? 'border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-center text-[11px] leading-tight text-amber-100/95 sm:px-4'
-          : `border-b border-amber-500/20 bg-amber-500/10 text-center text-amber-100/95 ${
+          ? 'border-b px-3 py-1 text-center text-[11px] leading-tight sm:px-4'
+          : `border-b text-center ${
               isMobile ? 'px-3 py-1 text-[11px] leading-tight' : 'px-4 py-1.5 text-xs'
             }`
       }
+      style={{
+        backgroundColor: 'var(--color-warning-bg)',
+        borderColor: 'var(--color-warning-border)',
+        color: 'var(--color-warning-text)',
+      }}
     >
       Бетта-версия,{' '}
-      <Link to={appPaths.support} className="font-medium text-amber-50 underline underline-offset-2 hover:text-white">
+      <Link
+        to={appPaths.support}
+        className="font-medium underline underline-offset-2 hover:opacity-80"
+        style={{ color: 'var(--color-warning-title)' }}
+      >
         написать разработчику
       </Link>
     </div>
