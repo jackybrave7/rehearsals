@@ -13,6 +13,7 @@ set "SKIP_GIT=0"
 set "COMMIT_MSG="
 
 if exist "deploy\deploy.local.bat" call "deploy\deploy.local.bat"
+call "deploy\ssh-options.bat"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -87,7 +88,7 @@ if errorlevel 1 (
 )
 
 echo Uploading deploy script...
-"%SCP_BIN%" -i "%SSH_KEY%" -P %SSH_PORT% -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "deploy\remote-deploy.sh" %SSH_HOST%:%REMOTE_SCRIPT%
+"%SCP_BIN%" -i "%SSH_KEY%" -P %SSH_PORT% %SSH_BATCH_OPTS% "deploy\remote-deploy.sh" %SSH_HOST%:%REMOTE_SCRIPT%
 if errorlevel 1 (
   call :print_ssh_failure
   pause
@@ -96,7 +97,7 @@ if errorlevel 1 (
 
 echo Running deploy on server...
 echo.
-"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new %SSH_HOST% "tr -d '\r' < %REMOTE_SCRIPT% | bash -l -s"
+"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% %SSH_BATCH_OPTS% %SSH_HOST% "tr -d '\r' < %REMOTE_SCRIPT% | bash -l -s"
 
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
@@ -202,12 +203,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [ssh] Port is open, testing SSH...
-"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new %SSH_HOST% "echo ok" >nul 2>&1
-if errorlevel 1 (
+echo [ssh] Port is open, testing SSH (max 25 sec)...
+for /f "delims=" %%R in ('powershell -NoProfile -ExecutionPolicy Bypass -File "deploy\ssh-probe.ps1" -SshBin "%SSH_BIN%" -KeyPath "%SSH_KEY%" -HostSpec "%SSH_HOST%" -Port %SSH_PORT% -TimeoutSec 25') do set "SSH_PROBE=%%R"
+if not "%SSH_PROBE%"=="OK" (
   echo.
-  echo ERROR: TCP port %SSH_PORT% is open, but SSH login failed.
-  echo Check key %SSH_KEY% and authorized_keys on the server.
+  if "%SSH_PROBE%"=="TIMEOUT" (
+    echo ERROR: SSH hung after TCP connect. Turn off VPN and retry.
+    echo Or open ssh.bat once and wait — first connect can be slow.
+  ) else (
+    echo ERROR: TCP port %SSH_PORT% is open, but SSH login failed.
+    echo Check key %SSH_KEY% and ~/.ssh/authorized_keys on the server.
+  )
+  echo Verbose: "%SSH_BIN%" -vvv -i "%SSH_KEY%" %SSH_BATCH_OPTS% %SSH_HOST%
   echo.
   exit /b 1
 )

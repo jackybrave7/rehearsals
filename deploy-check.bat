@@ -8,6 +8,7 @@ set "SSH_PORT=22"
 set "SSH_BIN=%SystemRoot%\System32\OpenSSH\ssh.exe"
 
 if exist "deploy\deploy.local.bat" call "deploy\deploy.local.bat"
+call "deploy\ssh-options.bat"
 
 for /f "tokens=2 delims=@" %%I in ("%SSH_HOST%") do set "SSH_IP=%%I"
 if not defined SSH_IP set "SSH_IP=%SSH_HOST%"
@@ -40,19 +41,27 @@ if errorlevel 1 (
   echo       OK
 )
 
-echo [3/3] SSH handshake...
-"%SSH_BIN%" -i "%SSH_KEY%" -p %SSH_PORT% -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new %SSH_HOST% "echo ok" >nul 2>&1
-if errorlevel 1 (
-  echo       FAIL: SSH did not accept the key / connection
-) else (
+echo [3/3] SSH login (max 25 sec, no GSSAPI/password prompts)...
+for /f "delims=" %%R in ('powershell -NoProfile -ExecutionPolicy Bypass -File "deploy\ssh-probe.ps1" -SshBin "%SSH_BIN%" -KeyPath "%SSH_KEY%" -HostSpec "%SSH_HOST%" -Port %SSH_PORT% -TimeoutSec 25') do set "SSH_PROBE=%%R"
+if "%SSH_PROBE%"=="OK" (
   echo       OK
+) else if "%SSH_PROBE%"=="TIMEOUT" (
+  echo       FAIL: SSH hung during handshake/auth ^(often VPN or slow GSSAPI^)
+  echo       Try: turn off VPN, or run ssh.bat and wait 30-60 sec once
+) else (
+  echo       FAIL: key not accepted ^(%SSH_PROBE%^)
+  echo       Add public key in TimeWeb console: cat %SSH_KEY%.pub ^>^> ~/.ssh/authorized_keys
 )
 
 echo.
-echo If step 2 or 3 failed, deploy.bat cannot work from this PC right now.
-echo The VPS may be stopped, firewalled, or sshd is down.
-echo See deploy\README.md section "Connection timed out".
-echo.
+if not "%SSH_PROBE%"=="OK" (
+  echo Manual verbose test:
+  echo   "%SSH_BIN%" -vvv -i "%SSH_KEY%" %SSH_BATCH_OPTS% %SSH_HOST%
+  echo.
+  echo If step 2 OK but step 3 fails: VPN off, verify key on server, check fail2ban.
+  echo See deploy\README.md section "Connection timed out".
+  echo.
+)
 
 :done
 pause

@@ -15,10 +15,12 @@ import { getMainNavLabel, getNavItemsForUser, getPrimaryNavItems, getSecondaryNa
 import { getTheaterPlays } from '../../store/selectors';
 
 export function ZenShell({
+  betaBanner,
   statusBar,
   reminderBanner,
   recoveryBar,
 }: {
+  betaBanner?: ReactNode;
   statusBar: ReactNode;
   reminderBanner?: ReactNode;
   recoveryBar?: ReactNode;
@@ -46,6 +48,7 @@ export function ZenShell({
   return (
     <div className="zen-shell flex min-h-screen flex-col bg-background">
       <header className="zen-header sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-xl">
+        {betaBanner}
         {statusBar}
         {reminderBanner}
         {recoveryBar}

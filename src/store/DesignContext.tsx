@@ -8,9 +8,12 @@ const STORAGE_KEY = 'rehearsals-design';
 
 function readDesign(): AppDesign {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'zen' ? 'zen' : 'theater';
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'theater') return 'theater';
+    if (stored === 'zen') return 'zen';
+    return 'zen';
   } catch {
-    return 'theater';
+    return 'zen';
   }
 }
 

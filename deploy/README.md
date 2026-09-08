@@ -186,6 +186,24 @@ pm2 restart rehearsals-api
 
 Запуск: Actions → Deploy production → Run workflow. Если и GitHub не может подключиться — VPS точно недоступен снаружи.
 
+### Порт 22 OK, но SSH «висит» на handshake
+
+Если `deploy-check.bat` показывает **OK** на шаге 2 и зависает на шаге 3:
+
+1. **Выключите VPN** (HideMy.Name и др.) — TCP может проходить, а SSH-обмен обрывается или идёт минутами.
+2. **Первое подключение** иногда ждёт 30–60 сек (GSSAPI/DNS на сервере) — `deploy.bat` теперь отключает GSSAPI и ставит таймаут 25 сек.
+3. **Ключ не на сервере** — через **Консоль/VNC** в TimeWeb:
+   ```bash
+   mkdir -p ~/.ssh && chmod 700 ~/.ssh
+   echo 'ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ' >> ~/.ssh/authorized_keys
+   chmod 600 ~/.ssh/authorized_keys
+   ```
+   Публичный ключ: `%USERPROFILE%\.ssh\rehearsals_vps.pub` (или `ssh-keygen -y -f rehearsals_vps`).
+4. **Подробный лог** (куда именно зависает):
+   ```bat
+   "%SystemRoot%\System32\OpenSSH\ssh.exe" -vvv -i %USERPROFILE%\.ssh\rehearsals_vps root@45.153.71.162
+   ```
+
 ## Полезное
 
 - Логи API: `pm2 logs rehearsals-api`

@@ -51,6 +51,23 @@ describe('scene numbering', () => {
     assert.equal(resolveSceneNumberFromTitle('Сцена 4. Кафе', 3), 4);
   });
 
+  it('never assigns scene number 0 from title', () => {
+    assert.equal(resolveSceneNumberFromTitle('Сцена 0. Метро. Начало.', 1), 1);
+  });
+
+  it('renumbers script scenes 0,1,2 to continuous 1,2,3', () => {
+    const scenes = [
+      scene({ id: 'a', number: 0, title: 'Сцена 0. Метро. Начало.' }),
+      scene({ id: 'b', number: 1, title: 'Сцена 1. Метро. Встреча.' }),
+      scene({ id: 'c', number: 2, title: 'Сцена 2. Метро. Попутчики' }),
+    ];
+    const normalized = normalizeSceneNumbersFromTitles(scenes, 'play-1')
+      .filter((item) => item.playId === 'play-1')
+      .sort(compareScenesByScriptOrder)
+      .map((item) => item.number);
+    assert.deepEqual(normalized, [1, 2, 3]);
+  });
+
   it('sorts scenes by script number', () => {
     const scenes = [
       scene({ id: 'a', number: 3, title: 'Сцена 5. Кафе' }),

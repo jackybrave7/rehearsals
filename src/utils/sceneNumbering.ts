@@ -24,22 +24,35 @@ export function compareScenesByScriptOrder(
 }
 
 export function resolveSceneNumberFromTitle(title: string, fallbackOrder: number): number {
-  return parseActScene(title).scene ?? fallbackOrder;
+  const fromTitle = parseActScene(title).scene;
+  if (fromTitle !== undefined && fromTitle >= 1) return fromTitle;
+  return Math.max(1, fallbackOrder);
+}
+
+function assignSequentialSceneNumbers(scenes: Scene[]): Scene[] {
+  return scenes.map((scene, index) => ({ ...scene, number: index + 1 }));
+}
+
+function sceneNumbersNeedSequentialRenumber(scenes: Scene[]): boolean {
+  if (scenes.some((scene) => scene.number < 1)) return true;
+  const numbers = scenes.map((scene) => scene.number);
+  return new Set(numbers).size !== numbers.length;
 }
 
 /** Выставляет scene.number по номеру в заголовке («Сцена 4» → 4). */
 export function normalizeSceneNumbersFromTitles(scenes: Scene[], playId: string): Scene[] {
   const playScenes = scenes.filter((scene) => scene.playId === playId);
   const sorted = [...playScenes].sort(compareScenesByScriptOrder);
-  const byId = new Map(
-    sorted.map((scene, index) => [
-      scene.id,
-      {
-        ...scene,
-        number: resolveSceneNumberFromTitle(scene.title, index + 1),
-      },
-    ])
-  );
+  let numbered = sorted.map((scene, index) => ({
+    ...scene,
+    number: resolveSceneNumberFromTitle(scene.title, index + 1),
+  }));
+
+  if (sceneNumbersNeedSequentialRenumber(numbered)) {
+    numbered = assignSequentialSceneNumbers(sorted);
+  }
+
+  const byId = new Map(numbered.map((scene) => [scene.id, scene]));
 
   if (playScenes.every((scene) => byId.get(scene.id)?.number === scene.number)) {
     return scenes;
@@ -67,10 +80,14 @@ export function renumberScenesForPlay(scenes: Scene[], playId: string): Scene[] 
     .sort((a, b) => compareScenesByScriptOrder(a, b));
 
   const renumbered = new Map(
-    playScenes.map((scene, index) => [scene.id, { ...scene, number: index + 1 }])
+    assignSequentialSceneNumbers(playScenes).map((scene) => [scene.id, scene])
   );
 
-  if (playScenes.every((scene, index) => scene.number === index + 1)) {
+  if (
+    playScenes.length > 0 &&
+    !sceneNumbersNeedSequentialRenumber(playScenes) &&
+    playScenes.every((scene, index) => scene.number === index + 1)
+  ) {
     return scenes;
   }
 
