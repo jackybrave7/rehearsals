@@ -154,7 +154,7 @@ function AttentionList({
 }
 
 export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [telegramSending, setTelegramSending] = useState(false);
@@ -192,6 +192,7 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
   };
 
   const handleSendTelegram = async () => {
+    if (readOnly) return;
     if (!nextRehearsal) return;
     const theaterId = nextRehearsal.theaterId ?? state.activeTheaterId;
     if (!theaterId) {
@@ -326,19 +327,21 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSendTelegram()}
-                disabled={telegramSending}
-                className={
-                  variant === 'zen'
-                    ? 'zen-primary-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60'
-                    : 'inline-flex items-center gap-2 rounded-lg border border-gold/25 bg-gold/15 px-4 py-2 text-sm font-medium text-gold-light transition-colors hover:bg-gold/25 disabled:opacity-60'
-                }
-              >
-                <Send size={16} />
-                {telegramSending ? 'Отправка…' : 'Отправить план в Telegram'}
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => void handleSendTelegram()}
+                  disabled={telegramSending}
+                  className={
+                    variant === 'zen'
+                      ? 'zen-primary-btn inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60'
+                      : 'inline-flex items-center gap-2 rounded-lg border border-gold/25 bg-gold/15 px-4 py-2 text-sm font-medium text-gold-light transition-colors hover:bg-gold/25 disabled:opacity-60'
+                  }
+                >
+                  <Send size={16} />
+                  {telegramSending ? 'Отправка…' : 'Отправить план в Telegram'}
+                </button>
+              )}
               <Link
                 to={appPaths.rehearsal(nextRehearsal.id)}
                 className={

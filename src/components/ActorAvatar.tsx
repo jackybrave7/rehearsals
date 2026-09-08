@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import { resolveAssetUrl } from '../utils/fileUrls';
 
@@ -21,11 +22,24 @@ const iconSizes = {
 };
 
 export function ActorAvatar({ name, photoUrl, size = 'md', archived }: ActorAvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false);
   const boxClass = `${sizes[size]} shrink-0 ${size === 'sm' ? 'rounded-full' : 'rounded-xl'} object-cover ${archived ? 'grayscale' : ''}`;
   const src = resolveAssetUrl(photoUrl);
 
-  if (src) {
-    return <img src={src} alt={name} className={boxClass} loading="lazy" />;
+  useEffect(() => {
+    setImageFailed(false);
+  }, [photoUrl]);
+
+  if (src && !imageFailed) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        className={boxClass}
+        loading="lazy"
+        onError={() => setImageFailed(true)}
+      />
+    );
   }
 
   return (

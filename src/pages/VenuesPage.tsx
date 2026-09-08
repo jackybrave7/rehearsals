@@ -18,7 +18,7 @@ const emptyVenue = (): Omit<Venue, 'id'> => ({
 });
 
 export function VenuesPage() {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { confirm } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Venue | null>(null);
@@ -26,19 +26,21 @@ export function VenuesPage() {
   const venues = getTheaterVenues(state);
 
   const openCreate = () => {
+    if (readOnly) return;
     setEditing(null);
     setForm(emptyVenue());
     setModalOpen(true);
   };
 
   const openEdit = (venue: Venue) => {
+    if (readOnly) return;
     setEditing(venue);
     setForm({ ...venue });
     setModalOpen(true);
   };
 
   const handleSave = () => {
-    if (!form.name.trim()) return;
+    if (readOnly || !form.name.trim()) return;
     if (editing) {
       dispatch({ type: 'UPDATE_VENUE', payload: { ...form, id: editing.id, theaterId: editing.theaterId } });
     } else {
@@ -48,6 +50,7 @@ export function VenuesPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (readOnly) return;
     const confirmed = await confirm({
       title: 'Удалить площадку?',
       message: 'Площадка будет удалена из списка. Репетиции сохранят текст адреса, если он был указан вручную.',
@@ -65,10 +68,12 @@ export function VenuesPage() {
           <h1 className={pageTitleClass}>Площадки</h1>
           <p className="mt-1 text-muted">Репетиционные площадки и залы</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus size={18} />
-          Добавить
-        </Button>
+        {!readOnly && (
+          <Button onClick={openCreate}>
+            <Plus size={18} />
+            Добавить
+          </Button>
+        )}
       </header>
 
       {venues.length === 0 ? (
@@ -96,12 +101,14 @@ export function VenuesPage() {
               {venue.notes && (
                 <p className="border-t border-gold/10 px-5 py-3 text-sm text-muted">{venue.notes}</p>
               )}
-              <div className="card-actions flex min-h-10 gap-2 border-t border-gold/10 px-5 py-3">
-                <Button variant="ghost" className="!px-2 !py-1" onClick={() => openEdit(venue)}>
-                  <Pencil size={16} />
-                </Button>
-                <DeleteButton label="Удалить площадку" onClick={() => handleDelete(venue.id)} />
-              </div>
+              {!readOnly && (
+                <div className="card-actions flex min-h-10 gap-2 border-t border-gold/10 px-5 py-3">
+                  <Button variant="ghost" className="!px-2 !py-1" onClick={() => openEdit(venue)}>
+                    <Pencil size={16} />
+                  </Button>
+                  <DeleteButton label="Удалить площадку" onClick={() => handleDelete(venue.id)} />
+                </div>
+              )}
             </div>
           ))}
         </div>

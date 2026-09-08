@@ -96,7 +96,7 @@ export function ScenesPage() {
   const [scriptLinkInput, setScriptLinkInput] = useState('');
 
   const openCreate = () => {
-    if (!activePlay || playReadOnly) return;
+    if (!activePlay || scenesReadOnly) return;
     setEditing(null);
     setForm({ ...emptyScene(), number: playScenes.length + 1 });
     setScriptLinkInput('');
@@ -104,6 +104,7 @@ export function ScenesPage() {
   };
 
   const openEdit = (scene: Scene) => {
+    if (scenesReadOnly) return;
     setEditing(scene);
     setForm({ ...scene, roleIds: scene.roleIds ?? [] });
     setScriptLinkInput('');
@@ -121,7 +122,7 @@ export function ScenesPage() {
   };
 
   const handleSave = () => {
-    if (!activePlay || !form.title.trim() || playReadOnly) return;
+    if (!activePlay || !form.title.trim() || scenesReadOnly) return;
     const manualAnchor = scriptLinkInput.trim()
       ? parseAnchorFromGoogleDocsUrl(scriptLinkInput.trim())
       : undefined;
@@ -145,7 +146,7 @@ export function ScenesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (playReadOnly) return;
+    if (scenesReadOnly) return;
     const confirmed = await confirm({
       title: 'Удалить сцену?',
       message: 'Сцена будет удалена из постановки и всех связанных планов.',
@@ -157,7 +158,7 @@ export function ScenesPage() {
   };
 
   const handleStatusChange = (scene: Scene, status: SceneStatus) => {
-    if (playReadOnly || scene.status === status) return;
+    if (scenesReadOnly || scene.status === status) return;
     dispatch({ type: 'UPDATE_SCENE', payload: { ...scene, status } });
   };
 
@@ -394,9 +395,9 @@ export function ScenesPage() {
           )}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <GoogleDocsLinksPanel play={activePlay} scenes={sorted} />
+          <GoogleDocsLinksPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
           <ScriptImportPanel play={activePlay} scenes={sorted} readOnly={scenesReadOnly} />
-          <Button onClick={openCreate} disabled={playReadOnly} className="w-full sm:w-auto">
+          <Button onClick={openCreate} disabled={scenesReadOnly} className="w-full sm:w-auto">
             <Plus size={18} />
             Добавить сцену
           </Button>
@@ -777,7 +778,7 @@ export function ScenesPage() {
                           onChange={(e) =>
                             handleStatusChange(scene, e.target.value as SceneStatus)
                           }
-                          disabled={playReadOnly}
+                          disabled={scenesReadOnly}
                           aria-label={`Статус сцены ${scene.number}`}
                           className={`cursor-pointer rounded-full border border-transparent px-2 py-0.5 text-[10px] transition-colors focus:border-gold/30 focus:outline-none focus:ring-1 focus:ring-gold/30 ${statusColors[scene.status]}`}
                         >
@@ -790,7 +791,7 @@ export function ScenesPage() {
                           )}
                         </select>
                         <div className="card-actions flex min-h-10 gap-0.5">
-                          {!playReadOnly && (
+                          {!scenesReadOnly && (
                             <>
                               <Button
                                 variant="ghost"

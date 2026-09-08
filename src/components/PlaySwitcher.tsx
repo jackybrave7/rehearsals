@@ -16,7 +16,7 @@ export const PLAY_SWITCHER_SCOPE_HINT =
   'Активная постановка: задаёт разделы «Сцены», «Готовность» и «Постановки и состав». Календарь репетиций показывает весь театр — постановка выбирается фильтром на самой странице.';
 
 export function PlaySwitcher({ variant }: PlaySwitcherProps) {
-  const { state, dispatch, readOnly } = useRehearsalStore();
+  const { state, dispatch } = useRehearsalStore();
   const plays = getActiveTheaterPlays(state);
   const activePlay = getActivePlay(state);
 
@@ -33,7 +33,6 @@ export function PlaySwitcher({ variant }: PlaySwitcherProps) {
       {activePlay && <PlayIcon play={activePlay} size="sm" />}
       <select
         value={state.activePlayId ?? ''}
-        disabled={readOnly}
         onChange={(event) =>
           dispatch({ type: 'SET_ACTIVE_PLAY', payload: event.target.value })
         }

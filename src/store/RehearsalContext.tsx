@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useReducer,
   useLayoutEffect,
@@ -1252,6 +1253,27 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
+const READ_ONLY_NAV_ACTIONS = new Set<Action['type']>([
+  'LOAD',
+  'SET_ACTIVE_THEATER',
+  'SET_ACTIVE_PLAY',
+  'SET_SELECTED_PERFORMANCE',
+]);
+
+const ACTOR_SELF_SERVICE_ACTIONS = new Set<Action['type']>([
+  'PATCH_REHEARSAL_RSVP',
+  'MERGE_REHEARSAL_ACTOR_NOTES',
+  'ADD_REHEARSAL_ACTOR_NOTE',
+  'UPDATE_REHEARSAL_ACTOR_NOTE',
+  'DELETE_REHEARSAL_ACTOR_NOTE',
+]);
+
+function isTheaterEditActionAllowed(action: Action, isActorRole: boolean): boolean {
+  if (READ_ONLY_NAV_ACTIONS.has(action.type)) return true;
+  if (isActorRole && ACTOR_SELF_SERVICE_ACTIONS.has(action.type)) return true;
+  return false;
+}
+
 interface RehearsalContextValue {
   state: AppState;
   dispatch: React.Dispatch<Action>;
@@ -1286,6 +1308,16 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
       getTheaterRole(state.activeTheaterId) === 'actor');
   const isActorRole =
     state.activeTheaterId != null && getTheaterRole(state.activeTheaterId) === 'actor';
+
+  const guardedDispatch = useCallback(
+    (action: Action) => {
+      if (readOnly && !isTheaterEditActionAllowed(action, isActorRole)) {
+        return;
+      }
+      dispatch(action);
+    },
+    [readOnly, isActorRole]
+  );
 
   const retryConnection = () => setLoadAttempt((value) => value + 1);
 
@@ -1457,7 +1489,7 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
     <RehearsalContext.Provider
       value={{
         state,
-        dispatch,
+        dispatch: guardedDispatch,
         ready,
         loadError,
         saveError,

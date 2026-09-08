@@ -43,7 +43,7 @@ const sectionTitles = {
 } as const;
 
 export function TasksPage() {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { confirm } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -70,6 +70,7 @@ export function TasksPage() {
   const grouped = useMemo(() => groupTasksForDisplay(filteredTasks), [filteredTasks]);
 
   const openCreate = () => {
+    if (readOnly) return;
     setEditing(null);
     setForm({
       ...emptyTask(),
@@ -79,17 +80,19 @@ export function TasksPage() {
   };
 
   const openEdit = (task: Task) => {
+    if (readOnly) return;
     setEditing(task);
     setForm({ ...normalizeTask(task) });
     setModalOpen(true);
   };
 
   const toggleComplete = (task: Task) => {
+    if (readOnly) return;
     dispatch({ type: 'UPDATE_TASK', payload: { ...task, completed: !task.completed } });
   };
 
   const handleSave = () => {
-    if (!form.title.trim()) return;
+    if (readOnly || !form.title.trim()) return;
     const payload: Task = {
       ...normalizeTask({ ...form, id: editing?.id ?? generateId() }),
       theaterId: editing?.theaterId ?? state.activeTheaterId ?? undefined,
@@ -104,6 +107,7 @@ export function TasksPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (readOnly) return;
     const confirmed = await confirm({
       title: 'Удалить задачу?',
       message: 'Задача будет удалена без возможности восстановления.',
@@ -134,7 +138,10 @@ export function TasksPage() {
         <button
           type="button"
           onClick={() => toggleComplete(task)}
+          disabled={readOnly}
           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+            readOnly ? 'cursor-default opacity-60' : ''
+          } ${
             task.completed
               ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
               : 'border-gold/30 hover:border-gold'
@@ -190,12 +197,14 @@ export function TasksPage() {
             })}
           </div>
         </div>
-        <div className="schedule-block-actions flex gap-1">
-          <Button variant="ghost" className="!px-2 !py-1" onClick={() => openEdit(task)}>
-            <Pencil size={16} />
-          </Button>
-          <DeleteButton label="Удалить задачу" onClick={() => handleDelete(task.id)} />
-        </div>
+        {!readOnly && (
+          <div className="schedule-block-actions flex gap-1">
+            <Button variant="ghost" className="!px-2 !py-1" onClick={() => openEdit(task)}>
+              <Pencil size={16} />
+            </Button>
+            <DeleteButton label="Удалить задачу" onClick={() => handleDelete(task.id)} />
+          </div>
+        )}
       </div>
     );
   };
@@ -207,10 +216,12 @@ export function TasksPage() {
           <h1 className={pageTitleClass}>Задачи</h1>
           <p className="mt-1 text-muted">Подготовка к показам: сроки, приоритеты, привязка к постановкам</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus size={18} />
-          Добавить
-        </Button>
+        {!readOnly && (
+          <Button onClick={openCreate}>
+            <Plus size={18} />
+            Добавить
+          </Button>
+        )}
       </header>
 
       {tasks.length > 0 && (

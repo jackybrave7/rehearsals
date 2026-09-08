@@ -27,6 +27,7 @@ import { ScriptSyncHint } from './ScriptSyncHint';
 interface GoogleDocsLinksPanelProps {
   play: Play;
   scenes: Scene[];
+  readOnly?: boolean;
 }
 
 function formatSyncDate(value: string | undefined): string | null {
@@ -41,7 +42,7 @@ function formatSyncDate(value: string | undefined): string | null {
   }
 }
 
-export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps) {
+export function GoogleDocsLinksPanel({ play, scenes, readOnly = false }: GoogleDocsLinksPanelProps) {
   const { state, dispatch } = useRehearsalStore();
   const { isZen } = useDesign();
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,6 +66,7 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
   const likelyOfficeUpload = hasGoogleDocs ? isLikelyUploadedOfficeDoc(play.documentUrl!) : false;
 
   const handleSync = async (options?: { silent?: boolean }) => {
+    if (readOnly) return;
     if (!options?.silent) {
       setSyncMessage(null);
       setSyncError(null);
@@ -280,18 +282,22 @@ export function GoogleDocsLinksPanel({ play, scenes }: GoogleDocsLinksPanelProps
           </p>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={scenes.length === 0 ? 'primary' : 'secondary'}
-              onClick={() => void handleSync()}
-              disabled={isSyncing}
-            >
-              {isSyncing ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <RefreshCw size={16} />
-              )}
-              {scenes.length === 0 ? 'Импортировать сцены' : 'Сопоставить ссылки'}
-            </Button>
+            {!readOnly ? (
+              <Button
+                variant={scenes.length === 0 ? 'primary' : 'secondary'}
+                onClick={() => void handleSync()}
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={16} />
+                )}
+                {scenes.length === 0 ? 'Импортировать сцены' : 'Сопоставить ссылки'}
+              </Button>
+            ) : (
+              <p className="text-sm text-muted">Сопоставление ссылок доступно редакторам и владельцу театра.</p>
+            )}
           </div>
 
           {(likelyOfficeUpload || syncError || syncMessage) && (

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { Play } from '../types';
 import { resolveAssetUrl } from '../utils/fileUrls';
 import { resolvePlayIconColor, resolvePlayInitial } from '../utils/playIcon';
@@ -18,15 +19,21 @@ const sizeClasses = {
 export { resolvePlayIconColor, resolvePlayInitial } from '../utils/playIcon';
 
 export function PlayIcon({ play, size = 'md', className = '' }: PlayIconProps) {
+  const [imageFailed, setImageFailed] = useState(false);
   const sizeClass = sizeClasses[size];
 
-  if (play.iconUrl?.trim()) {
+  useEffect(() => {
+    setImageFailed(false);
+  }, [play.id, play.iconUrl]);
+
+  if (play.iconUrl?.trim() && !imageFailed) {
     const src = resolveAssetUrl(play.iconUrl.trim());
     if (src) {
       return (
         <img
           src={src}
           alt=""
+          onError={() => setImageFailed(true)}
           className={`shrink-0 rounded-full object-cover ${sizeClass} ${className}`}
         />
       );

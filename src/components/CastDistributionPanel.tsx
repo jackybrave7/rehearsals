@@ -28,8 +28,9 @@ const emptyRole = (playId: string, kind: PlayRoleKind, order: number): Omit<Play
   description: '',
 });
 
-export function CastDistributionPanel({ playId, readOnly = false }: CastDistributionPanelProps) {
-  const { state, dispatch } = useRehearsalStore();
+export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }: CastDistributionPanelProps) {
+  const { state, dispatch, readOnly: storeReadOnly } = useRehearsalStore();
+  const readOnly = readOnlyProp || storeReadOnly;
   const { confirm, confirmDelete } = useConfirmDialog();
   const performances = getPlayPerformances(state, playId);
   const savedPerformanceId = state.selectedPerformanceByPlayId?.[playId];

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import type { Express, Request, Response } from 'express';
 import { requireAuth } from './auth.js';
+import { canUserDownloadFile } from './fileAccess.js';
 import { getDb } from './db.js';
 import {
   getFileRecord,
@@ -9,18 +10,6 @@ import {
   publicFileUrl,
   saveBufferAsFile,
 } from './fileStorage.js';
-
-function canDownloadFile(session: { user: { id: string }; isPlatformAdmin?: boolean }, fileId: string): boolean {
-  const db = getDb();
-  const record = getFileRecord(db, fileId);
-  if (!record) return false;
-  if (record.ownerUserId === session.user.id) return true;
-  if (!session.isPlatformAdmin) return false;
-  const linked = db
-    .prepare(`SELECT 1 AS ok FROM support_ticket_attachments WHERE file_id = ? LIMIT 1`)
-    .get(fileId) as { ok: number } | undefined;
-  return Boolean(linked?.ok);
-}
 
 export function registerFileRoutes(app: Express): void {
   app.post('/api/files', (req: Request, res: Response) => {
@@ -68,7 +57,7 @@ export function registerFileRoutes(app: Express): void {
     if (!session) return;
 
     const fileId = req.params.id;
-    if (!canDownloadFile(session, fileId)) {
+    if (!canUserDownloadFile(session, fileId)) {
       res.status(404).json({ error: 'NOT_FOUND' });
       return;
     }

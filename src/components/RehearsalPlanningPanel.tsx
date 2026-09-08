@@ -71,6 +71,7 @@ export function RehearsalPlanningPanel({ rehearsal }: RehearsalPlanningPanelProp
   };
 
   const deleteSelectedTemplate = async () => {
+    if (readOnly) return;
     const template = templates.find((item) => item.id === selectedTemplateId);
     if (!template) return;
     const confirmed = await confirm({

@@ -52,7 +52,7 @@ const emptyPlay = (): Omit<Play, 'id'> => ({
 });
 
 export function PlayPage() {
-  const { state, dispatch } = useRehearsalStore();
+  const { state, dispatch, readOnly } = useRehearsalStore();
   const { theaters: accessTheaters } = useAuth();
   const { isPro } = useSubscription();
   const { confirmDelete, alert } = useConfirmDialog();
@@ -72,6 +72,7 @@ export function PlayPage() {
   const ownedActivePlayCount = countOwnedActivePlays(state, ownedTheaterIds);
 
   const openCreate = async () => {
+    if (readOnly) return;
     if (!canCreateActivePlay(ownedActivePlayCount, isPro)) {
       await alert({
         title: 'Лимит тарифа Free',
@@ -90,6 +91,7 @@ export function PlayPage() {
   };
 
   const openEdit = (play: Play) => {
+    if (readOnly || isPlayReadOnly(play)) return;
     setEditingId(play.id);
     setForm({
       ...play,
@@ -212,6 +214,7 @@ export function PlayPage() {
   };
 
   const toggleArchive = (play: Play) => {
+    if (readOnly) return;
     const archiving = !play.archivedAt;
     if (archiving && !isPro) {
       const otherActive = state.plays.filter(
@@ -265,6 +268,7 @@ export function PlayPage() {
   };
 
   const handleDelete = async (play: Play) => {
+    if (readOnly || isPlayReadOnly(play)) return;
     const confirmed = await confirmDelete({
       title: `Удалить постановку «${play.title}»?`,
       message: 'Постановка и все её сцены будут удалены без возможности восстановления.',
@@ -321,10 +325,12 @@ export function PlayPage() {
               : 'На Free — одна активная постановка'}
           </p>
         </div>
-        <Button onClick={() => void openCreate()}>
-          <Plus size={18} />
-          Добавить постановку
-        </Button>
+        {!readOnly ? (
+          <Button onClick={() => void openCreate()}>
+            <Plus size={18} />
+            Добавить постановку
+          </Button>
+        ) : null}
       </header>
 
       {!isPro && (
@@ -339,9 +345,11 @@ export function PlayPage() {
         <div className="rounded-2xl border border-dashed border-gold/20 p-12 text-center">
           <BookOpen size={48} className="mx-auto text-gold/30" />
           <p className="mt-4 text-muted">Добавьте постановку, чтобы начать планирование сцен</p>
-          <Button className="mt-4" onClick={() => void openCreate()}>
-            Добавить постановку
-          </Button>
+          {!readOnly ? (
+            <Button className="mt-4" onClick={() => void openCreate()}>
+              Добавить постановку
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
@@ -374,7 +382,8 @@ export function PlayPage() {
 
           {selectedPlay && (() => {
             const play = selectedPlay;
-            const playReadOnly = isPlayReadOnly(play);
+            const playArchived = isPlayReadOnly(play);
+            const playEditLocked = playArchived || readOnly;
             const sceneCount = state.scenes.filter((s) => s.playId === play.id).length;
             const roleCount = state.playRoles.filter(
               (r) => r.playId === play.id && r.kind === 'character'
@@ -388,7 +397,7 @@ export function PlayPage() {
                   <img src={coverSrc} alt="" className="aspect-video w-full object-cover" />
                 )}
                 <div className="p-4 sm:p-6">
-                {playReadOnly && (
+                {playArchived && (
                   <p className="mb-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted">
                     Архивная постановка — только просмотр. Нажмите «Восстановить», чтобы снова редактировать
                     состав и сцены.
@@ -439,25 +448,27 @@ export function PlayPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1 border-t border-gold/10 pt-3 md:w-auto md:shrink-0 md:flex-col md:items-stretch md:border-t-0 md:pt-0">
-                    <Button
-                      variant="ghost"
-                      className="!px-2.5 !py-1.5 text-sm sm:!px-3"
-                      onClick={() => toggleArchive(play)}
-                      title={play.archivedAt ? 'Восстановить' : 'В архив'}
-                    >
-                      {play.archivedAt ? (
-                        <>
-                          <ArchiveRestore size={16} />
-                          <span className="hidden sm:inline">Восстановить</span>
-                        </>
-                      ) : (
-                        <>
-                          <Archive size={16} />
-                          <span className="hidden sm:inline">В архив</span>
-                        </>
-                      )}
-                    </Button>
-                    {!playReadOnly && (
+                    {!playEditLocked ? (
+                      <Button
+                        variant="ghost"
+                        className="!px-2.5 !py-1.5 text-sm sm:!px-3"
+                        onClick={() => toggleArchive(play)}
+                        title={play.archivedAt ? 'Восстановить' : 'В архив'}
+                      >
+                        {play.archivedAt ? (
+                          <>
+                            <ArchiveRestore size={16} />
+                            <span className="hidden sm:inline">Восстановить</span>
+                          </>
+                        ) : (
+                          <>
+                            <Archive size={16} />
+                            <span className="hidden sm:inline">В архив</span>
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                    {!playEditLocked && (
                       <>
                         <Button
                           variant="ghost"
@@ -477,8 +488,8 @@ export function PlayPage() {
                     )}
                   </div>
                 </div>
-                <CastDistributionPanel playId={play.id} readOnly={playReadOnly} />
-                {playReadOnly && (
+                <CastDistributionPanel playId={play.id} readOnly={playEditLocked} />
+                {playArchived && (
                   <p className="mt-3 text-xs text-muted">
                     Чтобы назначать исполнителей, восстановите постановку из архива.
                   </p>
