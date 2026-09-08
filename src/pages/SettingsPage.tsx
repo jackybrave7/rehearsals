@@ -8,6 +8,8 @@ import { useSubscription } from '../hooks/useSubscription';
 import { UpgradePrompt } from '../components/UpgradePrompt';
 import { SUBSCRIPTION_PLAN_LABELS } from '../utils/subscription';
 import { supportMailto } from '../content/pricing';
+import { appPaths } from '../navigation/appPaths';
+import { isLocalDevHost } from '../utils/isLocalDevHost';
 import { getShowRehearsalWarnings, getActiveTheater } from '../store/selectors';
 import { TheaterMembersPanel } from '../components/TheaterMembersPanel';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
@@ -31,7 +33,6 @@ import {
   DEFAULT_SCENE_TIMING_SETTINGS,
   resolveSceneTimingSettings,
 } from '../utils/sceneTiming';
-import { appPaths } from '../navigation/appPaths';
 import { pageTitleClass } from '../utils/pageLayout';
 import {
   DEFAULT_TIMEZONE,
@@ -593,8 +594,20 @@ export function SettingsPage() {
 
             {!telegramStatus?.botConfigured ? (
               <div className="rounded-2xl border border-dashed border-gold/20 bg-surface/40 p-5 text-sm text-muted">
-                Бот сервиса пока не настроен на сервере. Администратору нужно задать{' '}
-                <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code>.
+                {isLocalDevHost() ? (
+                  <>
+                    Бот сервиса пока не настроен на сервере. Администратору нужно задать{' '}
+                    <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code>.
+                  </>
+                ) : (
+                  <>
+                    Telegram-бот сервиса пока недоступен.{' '}
+                    <Link to={appPaths.support} className="text-gold-light underline-offset-2 hover:underline">
+                      Напишите в поддержку
+                    </Link>
+                    , если нужна помощь.
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-4 rounded-2xl border border-gold/10 bg-surface/40 p-5">
@@ -703,9 +716,21 @@ export function SettingsPage() {
                   </p>
                 ) : null}
                 <p className="text-muted">
-                  Задайте <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code> и перезапустите
-                  API (<code>restart.bat</code>). Без перезапуска планировщик остаётся выключенным, даже если токен уже
-                  в файле.
+                  {isLocalDevHost() ? (
+                    <>
+                      Задайте <code className="text-gold-light">TELEGRAM_BOT_TOKEN</code> в <code>.env</code> и
+                      перезапустите API (<code>restart.bat</code>). Без перезапуска планировщик остаётся выключенным,
+                      даже если токен уже в файле.
+                    </>
+                  ) : (
+                    <>
+                      Авто-напоминания временно не отправляются — сервис ещё настраивается.{' '}
+                      <Link to={appPaths.support} className="text-gold-light underline-offset-2 hover:underline">
+                        Напишите в поддержку
+                      </Link>
+                      , если проблема не исчезнет.
+                    </>
+                  )}
                 </p>
               </div>
             ) : (

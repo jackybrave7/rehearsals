@@ -1,5 +1,6 @@
 import type { AuthSessionPayload, TheaterAccessRole, TheaterMember } from '../types/auth';
 import { API_BASE } from './apiBase';
+import { isLocalDevHost } from '../utils/isLocalDevHost';
 
 async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
@@ -164,10 +165,14 @@ async function parseAuthError(
   preloaded?: { error?: string; message?: string } | null
 ): Promise<string> {
   if (response.status === 503) {
-    return 'Сервер временно недоступен. API не запущен — на VPS выполните: bash deploy/recreate-api-container.sh';
+    return isLocalDevHost()
+      ? 'Сервер временно недоступен. Запустите restart.bat и дождитесь запуска API.'
+      : 'Сервер временно недоступен. Попробуйте через минуту.';
   }
   if (response.status === 502 || response.status === 504) {
-    return 'Сервер не отвечает. Подождите минуту или перезапустите API на сервере.';
+    return isLocalDevHost()
+      ? 'Сервер не отвечает. Проверьте, что API запущен (restart.bat).'
+      : 'Сервер не отвечает. Попробуйте обновить страницу через минуту.';
   }
 
   try {
@@ -183,7 +188,7 @@ async function parseAuthError(
     if (code === 'INVALID_NAME') return 'Укажите имя';
     if (code === 'DELETE_ACCOUNT_FAILED') return 'Не удалось удалить аккаунт. Попробуйте позже или напишите в поддержку.';
     if (code === 'MAIL_NOT_CONFIGURED') {
-      return 'Почта на сервере не настроена. Обратитесь к администратору (SMTP в .env).';
+      return 'Отправка письма временно недоступна. Попробуйте позже.';
     }
     if (code === 'MAIL_FAILED') return 'Не удалось отправить письмо. Попробуйте позже.';
     if (code === 'INVALID_EMAIL') return 'Укажите email';
@@ -207,7 +212,9 @@ async function parseAuthError(
   }
 
   if (response.status === 404) {
-    return 'Сервис авторизации недоступен. Перезапустите API (restart.bat) — возможно, порт 3001 занят другим приложением.';
+    return isLocalDevHost()
+      ? 'Сервис авторизации недоступен. Запустите restart.bat — возможно, порт 3001 занят.'
+      : 'Сервис временно недоступен. Попробуйте обновить страницу через минуту.';
   }
 
   return `AUTH_${response.status}`;

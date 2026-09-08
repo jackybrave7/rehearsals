@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const isActorOnlyAccount = useMemo(
-    () => theaters.length > 0 && !theaters.some((entry) => entry.role === 'owner' || entry.role === 'editor'),
+    () => theaters.length > 0 && theaters.every((entry) => entry.role === 'actor'),
     [theaters]
   );
 

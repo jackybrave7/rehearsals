@@ -4,8 +4,13 @@ import { findLinkedActor } from '../utils/actorProfile';
 
 /** Показывать навигацию и маршруты кабинета актёра, а не режиссёра. */
 export function useActorNavMode(): boolean {
-  const { isActorOnly, isActorOnlyAccount, user, theaters } = useAuth();
+  const { isActorOnly, isActorOnlyAccount, getTheaterRole, user, theaters } = useAuth();
   const { state } = useRehearsalStore();
+
+  const activeRole = getTheaterRole(state.activeTheaterId);
+  if (activeRole === 'observer' || activeRole === 'owner' || activeRole === 'editor') {
+    return false;
+  }
 
   if (isActorOnlyAccount || isActorOnly(state.activeTheaterId)) return true;
 

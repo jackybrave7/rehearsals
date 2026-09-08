@@ -45,6 +45,7 @@ import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
 import { scenesNumbersChanged, normalizeAllSceneNumbers, renumberPlayScenesAfterDelete } from '../utils/sceneNumbering';
 import { estimateRehearsalMinutes, resolveSceneTimingSettings } from '../utils/sceneTiming';
 import { generateId } from '../utils/id';
+import { isLocalDevHost } from '../utils/isLocalDevHost';
 import { syncDecidedNotesToActorNotes } from '../utils/decidedNotesMentions';
 import {
   mergeActorsForNewScheduleBlocks,
@@ -258,12 +259,6 @@ async function loadInitialAppState(accessibleTheaterIds: Set<string>): Promise<A
   }
   mirrorLocalStorage(initial);
   return initial;
-}
-
-function isLocalDevHost(): boolean {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return host === 'localhost' || host === '127.0.0.1';
 }
 
 function formatSaveError(error: unknown): string {

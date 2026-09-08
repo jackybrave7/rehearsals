@@ -7,6 +7,7 @@ import { useAuth } from '../store/AuthContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getActiveTheater } from '../store/selectors';
 import { resolveTheaterReminderSettings } from '../utils/reminders';
+import { isLocalDevHost } from '../utils/isLocalDevHost';
 
 export function ReminderSchedulerBanner() {
   const { state } = useRehearsalStore();
@@ -48,20 +49,26 @@ export function ReminderSchedulerBanner() {
       <div className="flex items-start gap-2">
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-300" />
         <p className="min-w-0">
-          <span className="lg:hidden">
-            Планировщик напоминаний выключен — проверьте{' '}
-            <code className="rounded bg-black/20 px-1 text-amber-50">TELEGRAM_BOT_TOKEN</code> и перезапуск
-            API.{' '}
-          </span>
-          <span className="hidden lg:inline">
-            Авто-напоминания включены для театра «{activeTheater.name}», но планировщик на сервере{' '}
-            <strong className="font-medium text-amber-50">выключен</strong> — нет{' '}
-            <code className="rounded bg-black/20 px-1 text-amber-50">TELEGRAM_BOT_TOKEN</code> или API не
-            перезапускали после добавления токена. Задайте токен в <code>.env</code> и перезапустите API (
-            <code>restart.bat</code>).{' '}
-          </span>
-          <Link to={appPaths.settings} className="text-gold-light underline-offset-2 hover:underline">
-            Настройки
+          {isLocalDevHost() ? (
+            <>
+              <span className="lg:hidden">
+                Планировщик напоминаний выключен — проверьте{' '}
+                <code className="rounded bg-black/20 px-1 text-amber-50">TELEGRAM_BOT_TOKEN</code> и перезапуск API.{' '}
+              </span>
+              <span className="hidden lg:inline">
+                Авто-напоминания включены для театра «{activeTheater.name}», но планировщик на сервере{' '}
+                <strong className="font-medium text-amber-50">выключен</strong>. Задайте{' '}
+                <code className="rounded bg-black/20 px-1 text-amber-50">TELEGRAM_BOT_TOKEN</code> в{' '}
+                <code>.env</code> и перезапустите API (<code>restart.bat</code>).{' '}
+              </span>
+            </>
+          ) : (
+            <>
+              Авто-напоминания для «{activeTheater.name}» временно недоступны — сервис ещё настраивается.{' '}
+            </>
+          )}
+          <Link to={appPaths.support} className="text-gold-light underline-offset-2 hover:underline">
+            {isLocalDevHost() ? 'Настройки' : 'Написать в поддержку'}
           </Link>
         </p>
       </div>

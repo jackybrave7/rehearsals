@@ -10,6 +10,7 @@ import {
 import { buildSceneDescriptionsFromTexts } from '../utils/sceneDescription';
 import { buildSceneRoleIdsFromTexts } from '../utils/sceneRoleAssignment';
 import type { PlayRole, Scene } from '../types';
+import { isLocalDevHost } from '../utils/isLocalDevHost';
 
 export class GoogleDocsClientError extends Error {
   code: string;
@@ -45,7 +46,9 @@ export async function fetchGoogleDocument(
   } catch {
     throw new GoogleDocsClientError(
       'NETWORK_ERROR',
-      'Не удалось связаться с локальным API. Убедитесь, что сервер запущен (restart.bat).'
+      isLocalDevHost()
+        ? 'Не удалось связаться с локальным API. Убедитесь, что сервер запущен (restart.bat).'
+        : 'Не удалось связаться с сервером. Попробуйте обновить страницу.'
     );
   }
 

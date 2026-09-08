@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { addDays, addWeeks, endOfWeek, format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CalendarDays, ExternalLink, MessageSquare, Sparkles, Theater, UserCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { patchActorAvailability, patchActorRsvp, fetchActorNotes, acknowledgeActorNote, fetchActorRehearsalsRsvp } from '../api/actorSelf';
 import { ActorAvailabilityCalendar } from '../components/ActorAvailabilityCalendar';
 import { MemorizationStatusBadge } from '../components/MemorizationStatusBadge';
@@ -153,10 +153,15 @@ function ActorUpcomingRehearsalCard({
 }
 
 export function MyPage() {
-  const { user } = useAuth();
+  const { user, getTheaterRole } = useAuth();
   const { isZen } = useDesign();
   const { state, dispatch } = useRehearsalStore();
   const theaterId = state.activeTheaterId;
+
+  if (getTheaterRole(theaterId) === 'observer') {
+    return <Navigate to={appPaths.home} replace />;
+  }
+
   const linkedActor = findLinkedActor(state, user?.email, theaterId, user?.name);
   const alternateTheater = findTheaterWithLinkedActor(state, user?.email, user?.name);
   const activeTheaterName = state.theaters.find((t) => t.id === theaterId)?.name;
