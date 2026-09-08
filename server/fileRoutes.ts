@@ -10,6 +10,18 @@ import {
   saveBufferAsFile,
 } from './fileStorage.js';
 
+function canDownloadFile(session: { user: { id: string }; isPlatformAdmin?: boolean }, fileId: string): boolean {
+  const db = getDb();
+  const record = getFileRecord(db, fileId);
+  if (!record) return false;
+  if (record.ownerUserId === session.user.id) return true;
+  if (!session.isPlatformAdmin) return false;
+  const linked = db
+    .prepare(`SELECT 1 AS ok FROM support_ticket_attachments WHERE file_id = ? LIMIT 1`)
+    .get(fileId) as { ok: number } | undefined;
+  return Boolean(linked?.ok);
+}
+
 export function registerFileRoutes(app: Express): void {
   app.post('/api/files', (req: Request, res: Response) => {
     const session = requireAuth(req, res);
@@ -56,6 +68,11 @@ export function registerFileRoutes(app: Express): void {
     if (!session) return;
 
     const fileId = req.params.id;
+    if (!canDownloadFile(session, fileId)) {
+      res.status(404).json({ error: 'NOT_FOUND' });
+      return;
+    }
+
     const record = getFileRecord(getDb(), fileId);
     if (!record) {
       res.status(404).json({ error: 'NOT_FOUND' });

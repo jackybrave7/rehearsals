@@ -10,6 +10,19 @@ export type SupportTicketCategory = (typeof SUPPORT_TICKET_CATEGORIES)[number]['
 
 export type SupportTicketStatus = 'open' | 'in_progress' | 'closed';
 
+export const MAX_SUPPORT_ATTACHMENTS = 5;
+export const MAX_SUPPORT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const SUPPORT_ATTACHMENT_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
+
+export interface SupportTicketAttachment {
+  id: string;
+  fileId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+}
+
 export interface SupportTicket {
   id: string;
   ticketNumber: string;
@@ -22,6 +35,7 @@ export interface SupportTicket {
   status: SupportTicketStatus;
   createdAt: string;
   updatedAt: string;
+  attachments: SupportTicketAttachment[];
 }
 
 export const SUPPORT_TICKET_STATUS_LABELS: Record<SupportTicketStatus, string> = {

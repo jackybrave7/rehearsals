@@ -24,6 +24,7 @@ jobs:
           port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
           source: deploy/remote-deploy.sh
           target: /tmp/
+          strip_components: 1
 
       - name: Run deploy on server
         uses: appleboy/ssh-action@v1.2.0
@@ -33,4 +34,18 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
           command_timeout: 30m
-          script: tr -d '\r' < /tmp/remote-deploy.sh | bash -l -s
+          script: |
+            set -eo pipefail
+            DEPLOY_SCRIPT=/tmp/remote-deploy.sh
+            if [ ! -f "$DEPLOY_SCRIPT" ]; then
+              DEPLOY_SCRIPT=/tmp/deploy/remote-deploy.sh
+            fi
+            if [ ! -f "$DEPLOY_SCRIPT" ]; then
+              echo "Deploy script not found (checked /tmp/remote-deploy.sh and /tmp/deploy/remote-deploy.sh)"
+              ls -la /tmp /tmp/deploy 2>/dev/null || true
+              exit 1
+            fi
+            tr -d '\r' < "$DEPLOY_SCRIPT" | bash -s
+            echo "Deployed commit on server:"
+            git -C /var/www/rehearsals rev-parse --short HEAD
+            curl -sf http://127.0.0.1:3001/api/health

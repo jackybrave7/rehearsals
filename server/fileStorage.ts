@@ -9,6 +9,15 @@ const projectRoot = path.resolve(__dirname, '..');
 export const uploadsDir = path.join(projectRoot, 'data', 'uploads');
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_SUPPORT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_SUPPORT_ATTACHMENTS = 5;
+
+export const SUPPORT_ATTACHMENT_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 
 export interface StoredFile {
   id: string;
@@ -75,9 +84,10 @@ export function saveBufferAsFile(
   ownerUserId: string,
   buffer: Buffer,
   originalName: string,
-  mimeType: string
+  mimeType: string,
+  maxBytes: number = MAX_FILE_BYTES
 ): StoredFile {
-  if (buffer.byteLength > MAX_FILE_BYTES) {
+  if (buffer.byteLength > maxBytes) {
     throw new Error('FILE_TOO_LARGE');
   }
 
@@ -109,6 +119,27 @@ export function saveDataUrlAsFile(
   const mimeType = match[1];
   const buffer = Buffer.from(match[2], 'base64');
   return saveBufferAsFile(db, ownerUserId, buffer, originalName, mimeType);
+}
+
+export function saveSupportAttachmentFile(
+  db: AppDatabase,
+  ownerUserId: string,
+  buffer: Buffer,
+  originalName: string,
+  mimeType: string
+): StoredFile {
+  const normalizedMime = mimeType || 'application/octet-stream';
+  if (!SUPPORT_ATTACHMENT_MIME_TYPES.has(normalizedMime)) {
+    throw new Error('INVALID_FILE_TYPE');
+  }
+  return saveBufferAsFile(
+    db,
+    ownerUserId,
+    buffer,
+    originalName,
+    normalizedMime,
+    MAX_SUPPORT_ATTACHMENT_BYTES
+  );
 }
 
 export function deleteStoredFile(db: AppDatabase, fileId: string): void {

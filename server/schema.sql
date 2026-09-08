@@ -255,6 +255,16 @@ CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_i
 CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_created_at ON support_tickets(created_at);
 
+CREATE TABLE IF NOT EXISTS support_ticket_attachments (
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_ticket_id ON support_ticket_attachments(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_file_id ON support_ticket_attachments(file_id);
+
 CREATE TABLE IF NOT EXISTS rehearsal_actor_notes (
   id TEXT PRIMARY KEY,
   theater_id TEXT NOT NULL,

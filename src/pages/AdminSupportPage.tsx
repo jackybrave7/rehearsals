@@ -101,6 +101,37 @@ function TicketRow({
                   {ticket.message}
                 </p>
               </div>
+              {ticket.attachments.length > 0 ? (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-foreground/65">
+                    Вложения ({ticket.attachments.length})
+                  </p>
+                  <ul className="mt-2 grid gap-3 sm:grid-cols-2">
+                    {ticket.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        <a
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-3 rounded-xl border border-gold/10 bg-background/70 p-3 transition-colors hover:border-gold/25"
+                        >
+                          <img
+                            src={attachment.url}
+                            alt=""
+                            className="h-16 w-16 shrink-0 rounded-lg border border-gold/10 object-cover"
+                          />
+                          <span className="min-w-0 text-sm text-gold-light">
+                            <span className="block truncate">{attachment.originalName}</span>
+                            <span className="text-xs text-muted">
+                              {(attachment.sizeBytes / 1024).toFixed(0)} КБ
+                            </span>
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-end gap-4">
                 <Select
                   label="Статус"

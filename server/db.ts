@@ -179,6 +179,12 @@ export function getDb(): AppDatabase {
       sent_at TEXT,
       acknowledged_at TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS support_ticket_attachments (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    )`,
   ]) {
     try {
       db.exec(migration);
@@ -194,6 +200,8 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_theater_members_user_id ON theater_members(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_theaters_owner_user_id ON theaters(owner_user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_ticket_id ON support_ticket_attachments(ticket_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_file_id ON support_ticket_attachments(file_id)`,
   ]) {
     db.exec(indexSql);
   }

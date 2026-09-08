@@ -184,7 +184,11 @@ pm2 restart rehearsals-api
 - `DEPLOY_SSH_KEY` = содержимое приватного ключа `rehearsals_vps`
 - `DEPLOY_SSH_PORT` = `22` (опционально)
 
-Запуск: Actions → Deploy production → Run workflow. Если и GitHub не может подключиться — VPS точно недоступен снаружи.
+Запуск: Actions → Deploy production → Run workflow.
+
+**Важно:** успешный run должен занимать **несколько минут** (npm install + build). Если job завершился за ~30 секунд — деплой, скорее всего, не выполнился (старый workflow искал скрипт не там). После обновления workflow в логах SSH должны быть строки `git pull`, `npm run build` и `Deployed commit on server:`.
+
+Если и GitHub не может подключиться — VPS точно недоступен снаружи.
 
 ### Порт 22 OK, но SSH «висит» на handshake
 

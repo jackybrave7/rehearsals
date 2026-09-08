@@ -3,12 +3,14 @@ import { getDb } from './db.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import {
   SUPPORT_TICKET_STATUSES,
+  loadSupportTicketAttachments,
   type SupportTicket,
   type SupportTicketRow,
   type SupportTicketStatus,
 } from './supportTickets.js';
 
 function mapTicketRow(row: SupportTicketRow): SupportTicket {
+  const db = getDb();
   return {
     id: row.id,
     ticketNumber: row.ticket_number,
@@ -21,6 +23,7 @@ function mapTicketRow(row: SupportTicketRow): SupportTicket {
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    attachments: loadSupportTicketAttachments(db, row.id),
   };
 }
 

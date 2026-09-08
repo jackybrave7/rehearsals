@@ -456,10 +456,15 @@ export async function sendSupportTicketConfirmationEmail(options: {
   category: string;
   subject: string | null;
   message: string;
+  attachmentCount?: number;
 }): Promise<void> {
   const greeting = options.name.trim() || options.to;
   const categoryLabel = SUPPORT_CATEGORY_LABELS[options.category] ?? options.category;
   const subjectLine = options.subject?.trim() ? `\nТема: ${options.subject.trim()}` : '';
+  const attachmentLine =
+    options.attachmentCount && options.attachmentCount > 0
+      ? `\nВложений: ${options.attachmentCount}`
+      : '';
 
   await sendMail({
     to: options.to,
@@ -471,7 +476,7 @@ export async function sendSupportTicketConfirmationEmail(options: {
       'Мы получили ваше обращение в поддержку «Репетиции».',
       '',
       `Номер обращения: ${options.ticketNumber}`,
-      `Категория: ${categoryLabel}${subjectLine}`,
+      `Категория: ${categoryLabel}${subjectLine}${attachmentLine}`,
       '',
       'Ваше сообщение:',
       options.message,
