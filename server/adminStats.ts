@@ -4,6 +4,7 @@ import { getUserSubscriptionPlan, normalizeSubscriptionPlan } from './subscripti
 import { getDbInfo, listBackupFiles } from './backup.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import { getRegistrationMode } from './platformSettings.js';
+import { listUserBroadcastEngagement, type UserBroadcastEngagement } from './broadcastTracking.js';
 import type { TheaterAccessRole } from './authTypes.js';
 
 export interface AdminUserSummary {
@@ -57,6 +58,7 @@ export interface AdminUserTheaterStats {
 export interface AdminUserDetail extends AdminUserSummary {
   generatedAt: string;
   theaters: AdminUserTheaterStats[];
+  broadcastEngagement: UserBroadcastEngagement[];
 }
 
 export interface PlatformStats {
@@ -416,6 +418,7 @@ export function collectAdminUserDetail(
     ...mapUserSummaryRow(db, row, today, since30Days),
     generatedAt: nowIso,
     theaters,
+    broadcastEngagement: listUserBroadcastEngagement(userId, db),
   };
 }
 

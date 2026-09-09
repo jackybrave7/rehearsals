@@ -185,6 +185,57 @@ export function getDb(): AppDatabase {
       file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS email_broadcasts (
+      id TEXT PRIMARY KEY,
+      subject TEXT NOT NULL,
+      body_text TEXT NOT NULL,
+      filters_json TEXT NOT NULL,
+      sent_by_user_id TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      recipient_count INTEGER NOT NULL DEFAULT 0,
+      success_count INTEGER NOT NULL DEFAULT 0,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'sent',
+      scheduled_at TEXT,
+      sent_at TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_broadcast_links (
+      id TEXT PRIMARY KEY,
+      broadcast_id TEXT NOT NULL REFERENCES email_broadcasts(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_broadcast_recipients (
+      id TEXT PRIMARY KEY,
+      broadcast_id TEXT NOT NULL REFERENCES email_broadcasts(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      delivery_status TEXT NOT NULL DEFAULT 'pending',
+      delivery_error TEXT,
+      sent_at TEXT,
+      opened_at TEXT,
+      open_count INTEGER NOT NULL DEFAULT 0,
+      clicked_at TEXT,
+      click_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_broadcast_opens (
+      id TEXT PRIMARY KEY,
+      recipient_id TEXT NOT NULL REFERENCES email_broadcast_recipients(id) ON DELETE CASCADE,
+      opened_at TEXT NOT NULL,
+      user_agent TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_broadcast_clicks (
+      id TEXT PRIMARY KEY,
+      recipient_id TEXT NOT NULL REFERENCES email_broadcast_recipients(id) ON DELETE CASCADE,
+      link_id TEXT REFERENCES email_broadcast_links(id) ON DELETE SET NULL,
+      url TEXT NOT NULL,
+      clicked_at TEXT NOT NULL,
+      user_agent TEXT
+    )`,
+    `ALTER TABLE email_broadcasts ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'`,
+    `ALTER TABLE email_broadcasts ADD COLUMN scheduled_at TEXT`,
+    `ALTER TABLE email_broadcasts ADD COLUMN sent_at TEXT`,
   ]) {
     try {
       db.exec(migration);
@@ -202,6 +253,10 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_theaters_owner_user_id ON theaters(owner_user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_ticket_id ON support_ticket_attachments(ticket_id)`,
     `CREATE INDEX IF NOT EXISTS idx_support_ticket_attachments_file_id ON support_ticket_attachments(file_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_broadcast_id ON email_broadcast_recipients(broadcast_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_user_id ON email_broadcast_recipients(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_broadcast_clicks_recipient_id ON email_broadcast_clicks(recipient_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_broadcasts_status_scheduled ON email_broadcasts(status, scheduled_at)`,
   ]) {
     db.exec(indexSql);
   }
@@ -222,6 +277,10 @@ export function getDb(): AppDatabase {
   ).run();
 
   seedRegistrationNotificationFromEnv(db);
+
+  db.prepare(
+    `UPDATE email_broadcasts SET sent_at = created_at WHERE sent_at IS NULL AND status = 'sent'`
+  ).run();
 
   // Однократно: старые пользователи до бета-одобрения считаются одобренными.
   // Не запускать на каждом старте — иначе новые заявки в бете тоже авто-одобряются.

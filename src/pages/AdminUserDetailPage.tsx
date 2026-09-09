@@ -11,6 +11,9 @@ import {
   Trash2,
   Users,
   HardDrive,
+  Mail,
+  MousePointerClick,
+  Eye,
 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
@@ -369,6 +372,91 @@ export function AdminUserDetailPage() {
                 </Button>
               </div>
             ) : null}
+          </section>
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+            <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-white">
+              <Mail size={18} className="text-gold" />
+              Рассылки
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              История email-рассылок платформы и взаимодействие этого пользователя с письмами.
+            </p>
+            {(detail.broadcastEngagement ?? []).length === 0 ? (
+              <p className="text-sm text-muted">Пользователь ещё не получал рассылок с отслеживанием.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gold/10 text-muted">
+                      <th className="px-3 py-2 font-medium">Дата</th>
+                      <th className="px-3 py-2 font-medium">Тема</th>
+                      <th className="px-3 py-2 font-medium">Доставка</th>
+                      <th className="px-3 py-2 font-medium">Открыто</th>
+                      <th className="px-3 py-2 font-medium">Клики</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail.broadcastEngagement ?? []).map((item) => (
+                      <tr key={`${item.broadcastId}-${item.sentAt ?? item.broadcastAt}`} className="border-b border-gold/5">
+                        <td className="px-3 py-2 text-muted">
+                          {format(parseISO(item.broadcastAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                        </td>
+                        <td className="px-3 py-2 text-white">{item.subject}</td>
+                        <td className="px-3 py-2">
+                          {item.deliveryStatus === 'sent' ? (
+                            <span className="text-emerald-300">отправлено</span>
+                          ) : item.deliveryStatus === 'failed' ? (
+                            <span className="text-red-300" title={item.deliveryError ?? undefined}>
+                              ошибка
+                            </span>
+                          ) : (
+                            <span className="text-muted">ожидание</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-sky-300">
+                          {item.openCount > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Eye size={14} />
+                              {item.openCount}
+                              {item.openedAt
+                                ? ` · ${format(parseISO(item.openedAt), 'd MMM, HH:mm', { locale: ru })}`
+                                : ''}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-amber-200">
+                          {item.clickCount > 0 ? (
+                            <span>
+                              <span className="inline-flex items-center gap-1">
+                                <MousePointerClick size={14} />
+                                {item.clickCount}
+                                {item.clickedAt
+                                  ? ` · ${format(parseISO(item.clickedAt), 'd MMM, HH:mm', { locale: ru })}`
+                                  : ''}
+                              </span>
+                              {item.clicks.length > 0 ? (
+                                <span className="mt-1 block text-xs text-muted">
+                                  {item.clicks
+                                    .slice(0, 2)
+                                    .map((click) => click.url)
+                                    .join(' · ')}
+                                  {item.clicks.length > 2 ? ` · +${item.clicks.length - 2}` : ''}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {detail.registrationStatus !== 'approved' ? (

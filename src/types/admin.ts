@@ -123,4 +123,117 @@ export interface AdminUserTheaterStats {
 export interface AdminUserDetail extends AdminUserSummary {
   generatedAt: string;
   theaters: AdminUserTheaterStats[];
+  broadcastEngagement: UserBroadcastEngagement[];
+}
+
+export type BroadcastSubscriptionFilter = 'all' | 'free' | 'pro';
+export type BroadcastRegistrationStatusFilter =
+  | 'all'
+  | 'approved'
+  | 'pending_approval'
+  | 'pending_email';
+export type BroadcastTriStateFilter = 'all' | 'yes' | 'no';
+
+export interface BroadcastFilters {
+  registeredFrom?: string;
+  registeredTo?: string;
+  subscriptionPlan: BroadcastSubscriptionFilter;
+  registrationStatus: BroadcastRegistrationStatusFilter;
+  emailVerified: BroadcastTriStateFilter;
+  hasTheater: BroadcastTriStateFilter;
+  isTheaterOwner: BroadcastTriStateFilter;
+  minActiveSessions: number;
+  excludePlatformAdmins: boolean;
+}
+
+export interface BroadcastRecipient {
+  id: string;
+  email: string;
+  name: string;
+  subscriptionPlan: 'free' | 'pro';
+}
+
+export interface BroadcastPreview {
+  recipientCount: number;
+  sample: BroadcastRecipient[];
+  filters: BroadcastFilters;
+}
+
+export interface BroadcastSendResult {
+  broadcastId: string;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  failures: Array<{ email: string; error: string }>;
+}
+
+export type BroadcastStatus = 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
+
+export interface BroadcastScheduleResult {
+  broadcastId: string;
+  scheduledAt: string;
+  recipientCount: number;
+}
+
+export interface BroadcastHistoryItem {
+  id: string;
+  subject: string;
+  bodyPreview: string;
+  filters: BroadcastFilters;
+  sentByUserId: string;
+  sentByEmail: string;
+  createdAt: string;
+  status: BroadcastStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  recipientCount: number;
+  successCount: number;
+  failureCount: number;
+  openedCount: number;
+  clickedCount: number;
+  openRatePercent: number;
+  clickRatePercent: number;
+}
+
+export interface BroadcastEngagementStats {
+  sentCount: number;
+  failedCount: number;
+  openedCount: number;
+  clickedCount: number;
+  openRatePercent: number;
+  clickRatePercent: number;
+}
+
+export interface BroadcastRecipientEngagement {
+  id: string;
+  userId: string;
+  email: string;
+  name: string;
+  deliveryStatus: 'sent' | 'failed' | 'pending';
+  deliveryError: string | null;
+  sentAt: string | null;
+  openedAt: string | null;
+  openCount: number;
+  clickedAt: string | null;
+  clickCount: number;
+}
+
+export interface BroadcastDetail extends BroadcastHistoryItem {
+  bodyText: string;
+  stats: BroadcastEngagementStats;
+  recipients: BroadcastRecipientEngagement[];
+}
+
+export interface UserBroadcastEngagement {
+  broadcastId: string;
+  subject: string;
+  broadcastAt: string;
+  deliveryStatus: 'sent' | 'failed' | 'pending';
+  deliveryError: string | null;
+  sentAt: string | null;
+  openedAt: string | null;
+  openCount: number;
+  clickedAt: string | null;
+  clickCount: number;
+  clicks: Array<{ url: string; clickedAt: string }>;
 }

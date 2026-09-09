@@ -196,6 +196,50 @@ export async function sendMail(options: {
   });
 }
 
+function buildBroadcastEmailHtml(options: { greeting: string; bodyText: string }): string {
+  const body = options.bodyText
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const withLinks = escapeHtml(block).replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" style="color:#b8860b;">$1</a>'
+      );
+      return `<p style="margin:0 0 12px;line-height:1.6;">${withLinks.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+
+  return `<!DOCTYPE html>
+<html>
+  <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
+    <p style="margin:0 0 12px;line-height:1.6;">Здравствуйте, ${escapeHtml(options.greeting)}!</p>
+    ${body}
+    <p style="margin:20px 0 0;font-size:13px;color:#666;line-height:1.5;">
+      Это письмо отправлено из сервиса «Репетиции».
+    </p>
+  </body>
+</html>`;
+}
+
+export async function sendBroadcastEmail(options: {
+  to: string;
+  name: string;
+  subject: string;
+  bodyText: string;
+  html?: string;
+}): Promise<void> {
+  const greeting = options.name.trim() || options.to.split('@')[0] || 'коллега';
+  const text = `Здравствуйте, ${greeting}!\n\n${options.bodyText}\n\n—\nРепетиции`;
+  await sendMail({
+    to: options.to,
+    subject: options.subject,
+    text,
+    html: options.html ?? buildBroadcastEmailHtml({ greeting, bodyText: options.bodyText }),
+    msgType: 'newsletter',
+  });
+}
+
 export async function sendProActivatedEmail(to: string, name: string): Promise<void> {
   const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
   const settingsUrl = `${appUrl.replace(/\/$/, '')}/app/settings`;
