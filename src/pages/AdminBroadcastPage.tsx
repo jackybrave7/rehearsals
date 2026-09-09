@@ -440,7 +440,7 @@ export function AdminBroadcastPage() {
               Письмо
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Обращение «Здравствуйте, …» и подпись сервиса добавятся автоматически.
+              Текст отправляется как есть. Подстановки: {'{name}'} — имя, {'{email}'} — адрес. Подпись сервиса добавится автоматически.
             </p>
           </div>
 
@@ -454,7 +454,7 @@ export function AdminBroadcastPage() {
             label="Текст"
             value={bodyText}
             onChange={(event) => setBodyText(event.target.value)}
-            placeholder={'Здравствуйте!\n\nКоротко о том, что изменилось…'}
+            placeholder={'Здравствуйте, {name}!\n\nКоротко о том, что изменилось…'}
           />
 
           <div className="space-y-3 rounded-xl border border-gold/10 bg-background/30 p-4">

@@ -13,6 +13,7 @@ import {
   listBroadcastRecipientEngagement,
   markRecipientFailed,
   markRecipientSent,
+  renderBroadcastTemplate,
   type BroadcastEngagementStats,
   type BroadcastRecipientEngagement,
 } from './broadcastTracking.js';
@@ -387,10 +388,11 @@ export async function dispatchBroadcast(
       recipient.email,
       db
     );
-    const greeting = recipient.name.trim() || recipient.email.split('@')[0] || 'коллега';
+    const templateVars = { name: recipient.name, email: recipient.email };
+    const renderedSubject = renderBroadcastTemplate(row.subject, templateVars);
+    const renderedBody = renderBroadcastTemplate(row.body_text, templateVars);
     const html = buildTrackedBroadcastHtml({
-      greeting,
-      bodyText: row.body_text,
+      bodyText: renderedBody,
       recipientId,
       links,
     });
@@ -399,8 +401,8 @@ export async function dispatchBroadcast(
       await sendBroadcastEmail({
         to: recipient.email,
         name: recipient.name,
-        subject: row.subject,
-        bodyText: row.body_text,
+        subject: renderedSubject,
+        bodyText: renderedBody,
         html,
       });
       markRecipientSent(recipientId, db);

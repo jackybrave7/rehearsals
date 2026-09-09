@@ -83,18 +83,25 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export function buildTrackedBroadcastHtml(options: {
-  greeting: string;
-  bodyText: string;
-  recipientId: string;
-  links: BroadcastLink[];
-  appUrl?: string;
-}): string {
-  const appUrl = (options.appUrl ?? readAppBaseUrl()).replace(/\/$/, '');
-  const linkByUrl = new Map(options.links.map((link) => [link.url, link]));
-  const openPixel = `${appUrl}/api/broadcast/track/open/${options.recipientId}.gif`;
+export interface BroadcastTemplateVars {
+  name: string;
+  email: string;
+}
 
-  const body = options.bodyText
+export function resolveBroadcastRecipientName(name: string, email: string): string {
+  return name.trim() || email.split('@')[0] || 'коллега';
+}
+
+export function renderBroadcastTemplate(text: string, vars: BroadcastTemplateVars): string {
+  const name = resolveBroadcastRecipientName(vars.name, vars.email);
+  return text.replace(/\{name\}/g, name).replace(/\{email\}/g, vars.email);
+}
+
+function renderBroadcastBodyHtml(bodyText: string, linkByUrl: Map<string, BroadcastLink>, options: {
+  appUrl: string;
+  recipientId: string;
+}): string {
+  return bodyText
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean)
@@ -105,18 +112,32 @@ export function buildTrackedBroadcastHtml(options: {
         const suffix = match.slice(normalized.length);
         const tracked = linkByUrl.get(normalized);
         const href = tracked
-          ? `${appUrl}/api/broadcast/track/click/${options.recipientId}/${tracked.id}`
+          ? `${options.appUrl}/api/broadcast/track/click/${options.recipientId}/${tracked.id}`
           : normalized;
         return `<a href="${escapeHtml(href)}" style="color:#b8860b;">${escapeHtml(normalized)}</a>${suffix}`;
       });
       return `<p style="margin:0 0 12px;line-height:1.6;">${withLinks.replace(/\n/g, '<br>')}</p>`;
     })
     .join('');
+}
+
+export function buildTrackedBroadcastHtml(options: {
+  bodyText: string;
+  recipientId: string;
+  links: BroadcastLink[];
+  appUrl?: string;
+}): string {
+  const appUrl = (options.appUrl ?? readAppBaseUrl()).replace(/\/$/, '');
+  const linkByUrl = new Map(options.links.map((link) => [link.url, link]));
+  const openPixel = `${appUrl}/api/broadcast/track/open/${options.recipientId}.gif`;
+  const body = renderBroadcastBodyHtml(options.bodyText, linkByUrl, {
+    appUrl,
+    recipientId: options.recipientId,
+  });
 
   return `<!DOCTYPE html>
 <html>
   <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
-    <p style="margin:0 0 12px;line-height:1.6;">Здравствуйте, ${escapeHtml(options.greeting)}!</p>
     ${body}
     <p style="margin:20px 0 0;font-size:13px;color:#666;line-height:1.5;">
       Это письмо отправлено из сервиса «Репетиции».
