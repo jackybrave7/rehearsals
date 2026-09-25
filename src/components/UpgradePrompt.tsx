@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
+import { useRegistrationMode } from '../hooks/useRegistrationMode';
 
 interface UpgradePromptProps {
   title: string;
@@ -8,6 +9,9 @@ interface UpgradePromptProps {
 }
 
 export function UpgradePrompt({ title, description, compact = false }: UpgradePromptProps) {
+  const registrationMode = useRegistrationMode();
+  if (registrationMode === 'beta') return null;
+
   return (
     <div
       className={`rounded-2xl border border-accent/25 bg-accent/5 ${

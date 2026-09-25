@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import type { Play, Scene } from '../types';
-import { resolveActScriptUrl, resolveSceneScriptUrl } from '../utils/googleDocs';
+import { resolveActGoogleDocsUrl, resolveSceneGoogleDocsUrl } from '../utils/googleDocs';
 
 interface SceneScriptLinkProps {
   play: Play | undefined;
@@ -10,7 +10,7 @@ interface SceneScriptLinkProps {
 }
 
 export function SceneScriptLink({ play, scene, compact, className = '' }: SceneScriptLinkProps) {
-  const url = resolveSceneScriptUrl(play, scene);
+  const url = resolveSceneGoogleDocsUrl(play, scene);
   if (!url) return null;
 
   const hasAnchor = Boolean(scene.scriptAnchor);
@@ -53,7 +53,7 @@ interface ActScriptLinkProps {
 }
 
 export function ActScriptLink({ play, actGroup, compact, className = '' }: ActScriptLinkProps) {
-  const url = resolveActScriptUrl(play, actGroup);
+  const url = resolveActGoogleDocsUrl(play, actGroup);
   if (!url) return null;
 
   const hasAnchor = Boolean(play?.actScriptAnchors?.[actGroup]);

@@ -7,11 +7,26 @@ async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers,
-  });
+  try {
+    return await fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: 'include',
+      headers,
+    });
+  } catch (error) {
+    if (
+      error instanceof TypeError ||
+      (error instanceof Error &&
+        /load failed|failed to fetch|networkerror|network request failed/i.test(error.message))
+    ) {
+      throw new Error(
+        isLocalDevHost()
+          ? 'Сервер не отвечает. Запустите restart.bat и дождитесь API на порту 3001.'
+          : 'Сервер не отвечает. Сайт временно недоступен — попробуйте позже.'
+      );
+    }
+    throw error instanceof Error ? error : new Error('Ошибка сети');
+  }
 }
 
 export async function fetchAuthSession(): Promise<AuthSessionPayload | null> {

@@ -77,6 +77,24 @@ export function resolvePlayGoogleDocsUrl(play: Play | undefined): string | null 
   return play.documentUrl ?? `https://docs.google.com/document/d/${documentId}/edit`;
 }
 
+/** Ссылка на конкретный фрагмент Google Docs (якорь), не на весь документ и не на файл. */
+export function isGoogleDocsFragmentUrl(url: string): boolean {
+  if (!url.includes('docs.google.com/document')) return false;
+  return /#(?:heading|bookmark)=/.test(url);
+}
+
+export function resolveSceneGoogleDocsUrl(play: Play | undefined, scene: Scene): string | null {
+  const url = resolveSceneScriptUrl(play, scene);
+  if (!url || !isGoogleDocsFragmentUrl(url)) return null;
+  return url;
+}
+
+export function resolveActGoogleDocsUrl(play: Play | undefined, actGroup: string): string | null {
+  const url = resolveActScriptUrl(play, actGroup);
+  if (!url || !isGoogleDocsFragmentUrl(url)) return null;
+  return url;
+}
+
 export function resolveSceneScriptUrl(play: Play | undefined, scene: Scene): string | null {
   if (!play) return null;
 
@@ -430,7 +448,7 @@ export function resolveSceneLinkAnchor(play: Play, scene: Scene): SceneScriptAnc
   const stored = scene.scriptAnchor;
   if (!stored || stored.id.startsWith('file-')) return null;
 
-  return null;
+  return stored;
 }
 
 interface GoogleDocsParagraphElement {

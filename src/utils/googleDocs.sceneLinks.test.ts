@@ -10,6 +10,7 @@ import {
   parseActScene,
   prepareGoogleSceneLinkMatches,
   resolveSceneLinkAnchor,
+  resolveSceneGoogleDocsUrl,
   resolveSceneScriptUrl,
 } from './googleDocs';
 import { mergeMissingScenesFromImport } from './scriptDocument';
@@ -176,6 +177,18 @@ describe('google scene links', () => {
     const url = resolveSceneScriptUrl(play, scene4);
     assert.equal(url, 'https://docs.google.com/document/d/abc123/edit#heading=h.s4');
     assert.equal(resolveSceneLinkAnchor(play, scene4)?.id, 'h.s4');
+  });
+
+  it('hides google doc scene link without play document url', () => {
+    const scene1 = scene({ id: 's1', number: 1, title: 'Сцена 1' });
+    const playWithFileOnly = {
+      id: 'play-1',
+      title: 'Test',
+      author: 'a',
+      scriptFileUrl: '/api/files/abc',
+    };
+    assert.equal(resolveSceneScriptUrl(playWithFileOnly, scene1), '/api/files/abc');
+    assert.equal(resolveSceneGoogleDocsUrl(playWithFileOnly, scene1), null);
   });
 
   it('parses anchors from public google html export', () => {
