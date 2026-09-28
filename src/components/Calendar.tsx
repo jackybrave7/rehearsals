@@ -15,6 +15,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import type { CalendarPlayMarker } from '../utils/rehearsalCalendarMarkers';
 import { CalendarPlayMarkers } from './CalendarPlayMarkers';
+import { CalendarDayPhotoHover } from './CalendarDayPhotoHover';
+import { collectOutcomePhotoUrls } from '../utils/rehearsalOutcomePhotos';
 
 interface CalendarProps {
   currentMonth: Date;
@@ -111,13 +113,17 @@ export function Calendar({
           const count = getRehearsalsForDay(day).length;
 
           const dayRehearsals = getRehearsalsForDay(day);
+          const dayPhotoUrls = collectOutcomePhotoUrls(dayRehearsals, {
+            limit: 3,
+            endedOnly: true,
+          });
 
           return (
             <button
               key={dateStr}
               type="button"
               onClick={() => onSelectDate(day)}
-              className={`relative flex h-11 items-center justify-center rounded-lg text-sm transition-colors ${
+              className={`group/day relative flex h-11 items-center justify-center rounded-lg text-sm transition-colors ${
                 !isSameMonth(day, currentMonth)
                   ? 'text-muted/30'
                   : isSelected
@@ -128,6 +134,7 @@ export function Calendar({
               }`}
             >
               {format(day, 'd')}
+              <CalendarDayPhotoHover photos={dayPhotoUrls} />
               {hasRehearsal && !isSelected && (
                 <DayMarkers dayRehearsals={dayRehearsals} getPlayMarkers={getPlayMarkers} />
               )}

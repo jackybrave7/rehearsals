@@ -12,6 +12,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import { timeToMinutes } from '../utils/time';
 import { CalendarPlayMarkers } from './CalendarPlayMarkers';
+import { CalendarDayPhotoHover } from './CalendarDayPhotoHover';
+import { collectOutcomePhotoUrls } from '../utils/rehearsalOutcomePhotos';
 import type { CalendarPlayMarker } from '../utils/rehearsalCalendarMarkers';
 
 interface WeekCalendarProps {
@@ -91,12 +93,16 @@ export function WeekCalendar({
               const isSelected = selectedDate && isSameDay(day, selectedDate);
               const isToday = isSameDay(day, new Date());
               const dayRehearsals = rehearsalsForDay(day);
+              const dayPhotoUrls = collectOutcomePhotoUrls(dayRehearsals, {
+                limit: 3,
+                endedOnly: true,
+              });
               return (
                 <button
                   key={day.toISOString()}
                   type="button"
                   onClick={() => onSelectDate(day)}
-                  className={`bg-background/80 px-2 py-2 text-center transition-colors ${
+                  className={`group/day relative bg-background/80 px-2 py-2 text-center transition-colors ${
                     isSelected ? 'bg-gold/15' : 'hover:bg-white/[0.03]'
                   }`}
                 >
@@ -110,6 +116,7 @@ export function WeekCalendar({
                   >
                     {format(day, 'd')}
                   </div>
+                  <CalendarDayPhotoHover photos={dayPhotoUrls} />
                   {dayRehearsals.length > 0 && (
                     <>
                       <div className="mt-1 flex justify-center">

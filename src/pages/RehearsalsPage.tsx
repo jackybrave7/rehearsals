@@ -35,9 +35,11 @@ import {
 import { suggestRehearsalDates } from '../utils/suggestRehearsalDates';
 import { getUpcomingRehearsals } from '../utils/rehearsalSort';
 import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
+import { RehearsalOutcomePhotoPreviews } from '../components/RehearsalOutcomePhotoPreviews';
 import { getArchivedPlaysInRehearsal, rehearsalInvolvesActor, rehearsalInvolvesPlay } from '../utils/rehearsalPlays';
 import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
 import { getRehearsalEventLabel, getRehearsalPlayMarkers } from '../utils/rehearsalCalendarMarkers';
+import { isRehearsalEnded } from '../utils/rehearsalOutcomePhotos';
 
 const CALENDAR_FILTERS_KEY = 'rehearsals-calendar-filters';
 
@@ -458,6 +460,8 @@ export function RehearsalsPage() {
                 {dayRehearsals.map((r) => {
                   const location = resolveRehearsalLocation(r, theaterVenues);
                   const calendarTitle = getRehearsalEventLabel(state, r);
+                  const outcomePhotos = r.outcomePhotoUrls ?? [];
+                  const showPhotoPreviews = isRehearsalEnded(r) && outcomePhotos.length > 0;
                   return (
                   <div
                     key={r.id}
@@ -505,6 +509,11 @@ export function RehearsalsPage() {
                         </div>
                       </div>
                     </Link>
+                    {showPhotoPreviews ? (
+                      <div className="mt-3 border-t border-gold/10 pt-3">
+                        <RehearsalOutcomePhotoPreviews photos={outcomePhotos} maxVisible={4} />
+                      </div>
+                    ) : null}
                     <div className="mt-3 flex justify-end border-t border-gold/10 pt-3">
                       <RehearsalActionsMenu
                         rehearsal={r}

@@ -16,6 +16,7 @@ import { PlayPage } from './pages/PlayPage';
 import { ScenesPage } from './pages/ScenesPage';
 import { TasksPage } from './pages/TasksPage';
 import { RehearsalsPage } from './pages/RehearsalsPage';
+import { GalleryPage } from './pages/GalleryPage';
 import { AvailabilityPage } from './pages/AvailabilityPage';
 import { ReadinessPage } from './pages/ReadinessPage';
 import { RehearsalDetailPage } from './pages/RehearsalDetailPage';
@@ -121,6 +122,7 @@ export default function App() {
                   <Route path="tasks" element={<TasksPage />} />
                   <Route path="venues" element={<VenuesPage />} />
                   <Route path="rehearsals" element={<RehearsalsPage />} />
+                  <Route path="gallery" element={<GalleryPage />} />
                   <Route path="availability" element={<AvailabilityPage />} />
                   <Route path="rehearsals/:id" element={<RehearsalDetailPage />} />
                   <Route path="settings" element={<SettingsPage />} />
