@@ -337,4 +337,3 @@ CREATE INDEX IF NOT EXISTS idx_rehearsal_actor_notes_actor_id ON rehearsal_actor
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_broadcast_id ON email_broadcast_recipients(broadcast_id);
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_user_id ON email_broadcast_recipients(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_clicks_recipient_id ON email_broadcast_clicks(recipient_id);
-CREATE INDEX IF NOT EXISTS idx_email_broadcasts_status_scheduled ON email_broadcasts(status, scheduled_at);
