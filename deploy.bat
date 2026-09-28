@@ -10,6 +10,7 @@ set "REMOTE_SCRIPT=/tmp/rehearsals-deploy.sh"
 set "SSH_BIN=%SystemRoot%\System32\OpenSSH\ssh.exe"
 set "SCP_BIN=%SystemRoot%\System32\OpenSSH\scp.exe"
 set "SKIP_GIT=0"
+set "PUSH_ONLY=0"
 set "COMMIT_MSG="
 
 if exist "deploy\deploy.local.bat" call "deploy\deploy.local.bat"
@@ -19,6 +20,11 @@ call "deploy\ssh-options.bat"
 if "%~1"=="" goto args_done
 if /i "%~1"=="--skip-git" (
   set "SKIP_GIT=1"
+  shift
+  goto parse_args
+)
+if /i "%~1"=="--push-only" (
+  set "PUSH_ONLY=1"
   shift
   goto parse_args
 )
@@ -56,6 +62,15 @@ if "%SKIP_GIT%"=="0" (
   echo.
 )
 
+if "%PUSH_ONLY%"=="1" (
+  echo [rehearsals] Push-only mode — skipping SSH.
+  echo   GitHub Actions will deploy main automatically ^(see Actions - Deploy production^).
+  echo   Or run: deploy.bat --skip-git   after SSH is fixed.
+  echo.
+  endlocal
+  exit /b 0
+)
+
 if not exist "%SSH_BIN%" (
   echo ERROR: OpenSSH not found: %SSH_BIN%
   pause
@@ -83,6 +98,13 @@ if not exist "deploy\remote-deploy.sh" (
 
 call :check_ssh
 if errorlevel 1 (
+  echo.
+  echo [rehearsals] SSH unavailable from this PC — code is already on GitHub if push succeeded.
+  echo   Auto-deploy: GitHub - Actions - Deploy production ^(runs on every push to main^).
+  echo   Direct SSH: deploy-check.bat, then deploy.bat --skip-git
+  echo   Alt port: copy deploy\deploy.local.example.bat to deploy.local.bat and set SSH_PORT=54321
+  echo   ^(once: bash deploy/setup-ssh-port-54321.sh on the server^).
+  echo.
   pause
   exit /b 1
 )

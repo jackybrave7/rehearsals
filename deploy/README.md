@@ -145,6 +145,16 @@ pm2 restart rehearsals-api
 
 С Windows: `deploy.bat` (коммит + push + деплой) или `deploy.bat --skip-git` если код уже на GitHub.
 
+**Деплой из Cursor (без SSH с ПК):** после push в `main` workflow **Deploy production** запускается сам. Достаточно:
+
+```bat
+deploy.bat "описание изменений" --push-only
+```
+
+или коммит + push вручную — через 3–5 минут проверьте Actions на GitHub.
+
+**SSH с ПК (как раньше):** если провайдер режет исходящий порт 22, в firewall уже открыт **TCP 54321**. На сервере один раз: `bash deploy/setup-ssh-port-54321.sh`. На Windows: `copy deploy\deploy.local.example.bat deploy\deploy.local.bat` (порт 54321), затем `deploy-check.bat` и `deploy.bat --skip-git`.
+
 Проверка доступности сервера: `deploy-check.bat`.
 
 Локальные настройки SSH (другой порт/IP): скопируйте `deploy/deploy.local.example.bat` → `deploy/deploy.local.bat` (файл в `.gitignore`).
