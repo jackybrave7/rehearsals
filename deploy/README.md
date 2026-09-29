@@ -191,12 +191,22 @@ deploy.bat "описание изменений" --push-only
 
 - `DEPLOY_SSH_HOST` = `45.153.71.162`
 - `DEPLOY_SSH_USER` = `root`
-- `DEPLOY_SSH_KEY` = содержимое приватного ключа `rehearsals_vps`
-- `DEPLOY_SSH_PORT` = `22` (опционально)
+- `DEPLOY_SSH_KEY` = **полный** приватный ключ (как в `rehearsals_vps`, с строками `BEGIN/END`)
+- `DEPLOY_SSH_PORT` = **`54321`** (если secret не задан, workflow по умолчанию тоже 54321)
 
 Запуск: Actions → Deploy production → Run workflow.
 
-**Важно:** успешный run должен занимать **несколько минут** (npm install + build). Если job завершился за ~30 секунд — деплой, скорее всего, не выполнился (старый workflow искал скрипт не там). После обновления workflow в логах SSH должны быть строки `git pull`, `npm run build` и `Deployed commit on server:`.
+### Actions падает — как читать лог
+
+| Где оборвалось | Что проверить |
+|----------------|---------------|
+| **Upload deploy script** / `dial tcp ... connection refused` | Порт: secret `DEPLOY_SSH_PORT` = **54321**, firewall VPS пропускает 54321 с интернета |
+| **permission denied (publickey)** | В GitHub secret ключ **тот же**, что на сервере в `root/.ssh/authorized_keys`; не `.pub` |
+| **Run deploy** → `npm run build` / exit 1 | Откройте лог шага — ошибка TypeScript/Vite; локально `npm run build` |
+| **API health check failed** | В логе есть `docker logs rehearsals-api` — часто битый `.env` или нет `npm prune` после сборки |
+| Job **skipped** | Репозиторий не `jackybrave7/rehearsals` (условие `if:` в workflow) |
+
+Успешный деплой занимает **3–10 минут** (npm ci + build). Если job ~30 секунд — SSH не дошёл до `git pull`.
 
 Если и GitHub не может подключиться — VPS точно недоступен снаружи.
 

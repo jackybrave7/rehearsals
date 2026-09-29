@@ -10,6 +10,10 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: true
 
+env:
+  # На VPS SSH часто на 54321 (см. deploy/setup-ssh-port-54321.sh). Переопределите secret DEPLOY_SSH_PORT.
+  DEPLOY_PORT: ${{ secrets.DEPLOY_SSH_PORT || '54321' }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,13 +22,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Deploy info
+        run: |
+          echo "Deploy port (from secret or default 54321): ${DEPLOY_PORT}"
+          echo "Commit: $(git rev-parse --short HEAD) — $(git log -1 --format=%s)"
+
       - name: Upload deploy script
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          port: ${{ env.DEPLOY_PORT }}
+          timeout: 120s
           source: deploy/remote-deploy.sh
           target: /tmp/
           strip_components: 1
@@ -35,10 +45,12 @@ jobs:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          port: ${{ env.DEPLOY_PORT }}
           command_timeout: 30m
           script: |
             set -eo pipefail
+            echo "=== GitHub Actions deploy ==="
+            echo "Port from workflow: ${DEPLOY_PORT:-unknown}"
             DEPLOY_SCRIPT=/tmp/remote-deploy.sh
             if [ ! -f "$DEPLOY_SCRIPT" ]; then
               DEPLOY_SCRIPT=/tmp/deploy/remote-deploy.sh

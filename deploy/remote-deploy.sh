@@ -49,6 +49,7 @@ run_in_node_container() {
     -w /app \
     "${env_file_args[@]}" \
     -e NODE_ENV=development \
+    -e NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}" \
     "$NODE_IMAGE" \
     bash -lc "$cmd"
 }
