@@ -24,6 +24,7 @@ export const appPaths = {
   adminUsers: `${APP_BASE}/admin/users`,
   adminSupport: `${APP_BASE}/admin/support`,
   adminBroadcast: `${APP_BASE}/admin/broadcast`,
+  adminOnboardingDrip: `${APP_BASE}/admin/onboarding-drip`,
   adminUser: (id: string) => `${APP_BASE}/admin/users/${id}`,
   rehearsal: (id: string) => `${APP_BASE}/rehearsals/${id}`,
   playCast: `${APP_BASE}/play#cast`,

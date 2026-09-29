@@ -2,6 +2,12 @@ import nodemailer from 'nodemailer';
 import { createPrivateKey, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  buildBrandedEmailHtml,
+  ONBOARDING_DRIP_FOOTER_NOTE,
+} from '../shared/brandedEmail.js';
+import { isFullDripEmailDocument, renderDripEmailHtml } from '../shared/dripEmailDocument.js';
+import { dripBodyHtmlFromPlainText } from '../shared/dripEmailBody.js';
 
 export interface MailConfig {
   host: string;
@@ -114,6 +120,31 @@ function textToHtml(text: string): string {
   return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#222;">${paragraphs.join('')}</body></html>`;
 }
 
+function readMailLogoUrl(appUrl: string): string | null {
+  const explicit = process.env.MAIL_LOGO_URL?.trim();
+  if (explicit) return explicit;
+  return `${appUrl}/email/logo.png`;
+}
+
+function defaultAppUrl(): string {
+  return (process.env.APP_URL?.trim() || 'https://rehears.ru').replace(/\/$/, '');
+}
+
+function renderBrandedEmail(options: {
+  greeting: string;
+  bodyHtml: string;
+  actionLabel?: string;
+  actionUrl?: string;
+  footerNote?: string;
+}): string {
+  const appUrl = defaultAppUrl();
+  return buildBrandedEmailHtml({
+    appUrl,
+    logoUrl: readMailLogoUrl(appUrl),
+    ...options,
+  });
+}
+
 function buildActionEmailHtml(options: {
   greeting: string;
   paragraphs: string[];
@@ -122,28 +153,15 @@ function buildActionEmailHtml(options: {
   footer?: string;
 }): string {
   const body = options.paragraphs
-    .map((paragraph) => `<p style="margin:0 0 12px;line-height:1.5;">${escapeHtml(paragraph)}</p>`)
+    .map((paragraph) => `<p style="margin:0 0 12px;">${escapeHtml(paragraph)}</p>`)
     .join('');
-  const footer = options.footer
-    ? `<p style="margin:16px 0 0;font-size:13px;color:#666;line-height:1.5;">${escapeHtml(options.footer)}</p>`
-    : '';
-  return `<!DOCTYPE html>
-<html>
-  <body style="font-family:Arial,sans-serif;color:#222;max-width:560px;">
-    <p style="margin:0 0 12px;line-height:1.5;">Здравствуйте, ${escapeHtml(options.greeting)}!</p>
-    ${body}
-    <p style="margin:20px 0;">
-      <a href="${escapeHtml(options.actionUrl)}" style="display:inline-block;padding:12px 20px;background:#b8860b;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">
-        ${escapeHtml(options.actionLabel)}
-      </a>
-    </p>
-    <p style="margin:0 0 12px;font-size:13px;color:#666;line-height:1.5;word-break:break-all;">
-      Если кнопка не открывается, скопируйте ссылку:<br>
-      <a href="${escapeHtml(options.actionUrl)}" style="color:#b8860b;">${escapeHtml(options.actionUrl)}</a>
-    </p>
-    ${footer}
-  </body>
-</html>`;
+  return renderBrandedEmail({
+    greeting: options.greeting,
+    bodyHtml: body,
+    actionLabel: options.actionLabel,
+    actionUrl: options.actionUrl,
+    footerNote: options.footer,
+  });
 }
 
 export async function sendMail(options: {
@@ -549,5 +567,65 @@ export async function sendSupportTicketConfirmationEmail(options: {
     </p>
   </body>
 </html>`,
+  });
+}
+
+export async function sendOnboardingDripEmail(options: {
+  to: string;
+  name: string;
+  subject: string;
+  bodyText: string;
+  bodyFormat: 'plain' | 'html';
+  bodyHtml?: string | null;
+  actionLabel: string;
+  actionUrl: string;
+}): Promise<void> {
+  const appUrl = (process.env.APP_URL?.trim() || 'https://rehears.ru').replace(/\/$/, '');
+  const greeting = options.name.trim() || options.to;
+  const plainParagraphs = options.bodyText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const text = [
+    `Здравствуйте, ${greeting}!`,
+    '',
+    ...plainParagraphs,
+    '',
+    `${options.actionLabel}: ${options.actionUrl}`,
+    '',
+    '—',
+    'Репетиции',
+  ].join('\n');
+
+  let html: string;
+  const storedHtml = options.bodyHtml?.trim();
+  if (options.bodyFormat === 'html' && storedHtml && isFullDripEmailDocument(storedHtml)) {
+    html = renderDripEmailHtml(storedHtml, { appUrl, greeting });
+  } else if (options.bodyFormat === 'html' && storedHtml) {
+    html = buildBrandedEmailHtml({
+      appUrl,
+      logoUrl: readMailLogoUrl(appUrl),
+      greeting,
+      bodyHtml: storedHtml,
+      actionLabel: options.actionLabel,
+      actionUrl: options.actionUrl,
+      footerNote: ONBOARDING_DRIP_FOOTER_NOTE,
+    });
+  } else {
+    const inner = dripBodyHtmlFromPlainText(options.bodyText, { leadFirst: true });
+    html = buildBrandedEmailHtml({
+      appUrl,
+      logoUrl: readMailLogoUrl(appUrl),
+      greeting,
+      bodyHtml: inner,
+      actionLabel: options.actionLabel,
+      actionUrl: options.actionUrl,
+      footerNote: ONBOARDING_DRIP_FOOTER_NOTE,
+    });
+  }
+
+  await sendMail({
+    to: options.to,
+    subject: options.subject,
+    text,
+    html,
+    msgType: 'onboarding',
   });
 }

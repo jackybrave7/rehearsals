@@ -30,6 +30,9 @@ import { handleFetchGoogleDocAnchors } from './googleDocsAnchors.js';
 import { handleParseScriptImport, handleSceneBodyText } from './scriptImport.js';
 import { startReminderScheduler } from './reminderScheduler.js';
 import { startBroadcastScheduler } from './broadcastScheduler.js';
+import { startOnboardingDripScheduler } from './onboardingDripScheduler.js';
+import { registerOnboardingDripAdminRoutes } from './onboardingDrip.js';
+import { seedEmailDripStepsIfEmpty, syncDefaultDripTemplatesToLatest } from './onboardingDripRules.js';
 import { startTelegramLinkPoller } from './telegramLinkPoller.js';
 import { registerActorSelfRoutes } from './actorSelfRoutes.js';
 import { registerRehearsalNotesRoutes } from './rehearsalNotesRoutes.js';
@@ -55,6 +58,7 @@ registerAdminPlatformSettingsRoutes(app);
 registerAdminEmailVerificationRoutes(app);
 registerAdminMailDeliverabilityRoutes(app);
 registerAdminBroadcastRoutes(app);
+registerOnboardingDripAdminRoutes(app);
 registerBroadcastTrackingRoutes(app);
 registerSupportTicketRoutes(app);
 registerAdminSupportTicketRoutes(app);
@@ -169,11 +173,14 @@ app.put('/api/state', (req, res) => {
 });
 
 const server = app.listen(PORT, () => {
-  getDb();
+  const db = getDb();
+  seedEmailDripStepsIfEmpty(db);
+  syncDefaultDripTemplatesToLatest(db);
   console.log(`[api] SQLite: ${getDbPath()}`);
   console.log(`[api] http://localhost:${PORT}`);
   startReminderScheduler();
   startBroadcastScheduler();
+  startOnboardingDripScheduler();
   startTelegramLinkPoller();
 });
 

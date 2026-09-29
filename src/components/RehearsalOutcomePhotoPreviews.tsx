@@ -21,7 +21,7 @@ export function RehearsalOutcomePhotoPreviews({
   const visible = photos.slice(0, maxVisible);
   const hiddenCount = photos.length - visible.length;
   const thumbClass =
-    size === 'sm' ? 'h-10 w-14 object-cover' : 'h-14 w-20 object-cover sm:h-16 sm:w-24';
+    size === 'sm' ? 'size-10 shrink-0 object-cover' : 'size-14 shrink-0 object-cover sm:size-16';
 
   return (
     <>
@@ -30,7 +30,7 @@ export function RehearsalOutcomePhotoPreviews({
           <button
             key={url}
             type="button"
-            className="overflow-hidden rounded-md border border-gold/15 bg-black/20 transition hover:border-gold/35"
+            className="shrink-0 overflow-hidden rounded-md border border-gold/15 bg-black/20 transition hover:border-gold/35"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();

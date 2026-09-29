@@ -337,3 +337,32 @@ CREATE INDEX IF NOT EXISTS idx_rehearsal_actor_notes_actor_id ON rehearsal_actor
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_broadcast_id ON email_broadcast_recipients(broadcast_id);
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_user_id ON email_broadcast_recipients(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_broadcast_clicks_recipient_id ON email_broadcast_clicks(recipient_id);
+
+CREATE TABLE IF NOT EXISTS email_drip_sent (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  step_id TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, step_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_drip_sent_sent_at ON email_drip_sent(sent_at);
+
+CREATE TABLE IF NOT EXISTS email_drip_steps (
+  id TEXT PRIMARY KEY,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  title TEXT NOT NULL,
+  condition_type TEXT NOT NULL DEFAULT 'checklist_pending',
+  condition_checklist_step TEXT,
+  delay_days INTEGER NOT NULL DEFAULT 1,
+  delay_hours INTEGER NOT NULL DEFAULT 0,
+  delay_minutes INTEGER NOT NULL DEFAULT 0,
+  subject TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  body_html TEXT,
+  body_format TEXT NOT NULL DEFAULT 'plain',
+  action_label TEXT NOT NULL,
+  action_path TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);

@@ -5,6 +5,7 @@ const items = [
   { to: appPaths.admin, label: 'Обзор', end: true },
   { to: appPaths.adminUsers, label: 'Пользователи', end: false },
   { to: appPaths.adminBroadcast, label: 'Рассылка', end: false },
+  { to: appPaths.adminOnboardingDrip, label: 'Цепочка', end: false },
   { to: appPaths.adminSupport, label: 'Поддержка', end: false },
 ];
 

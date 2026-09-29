@@ -29,6 +29,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminUserDetailPage } from './pages/AdminUserDetailPage';
 import { AdminSupportPage } from './pages/AdminSupportPage';
 import { AdminBroadcastPage } from './pages/AdminBroadcastPage';
+import { AdminOnboardingDripPage } from './pages/AdminOnboardingDripPage';
 import { MarketingPage } from './pages/MarketingPage';
 import { PricingPage } from './pages/PricingPage';
 import { LoginPage } from './pages/LoginPage';
@@ -166,6 +167,14 @@ export default function App() {
                   element={
                     <AdminRoute>
                       <AdminBroadcastPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/onboarding-drip"
+                  element={
+                    <AdminRoute>
+                      <AdminOnboardingDripPage />
                     </AdminRoute>
                   }
                 />

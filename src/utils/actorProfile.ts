@@ -1,5 +1,6 @@
 import type { AppState, Actor, Play, PlayRole, Rehearsal, Scene } from '../types';
 import type { AuthSessionPayload } from '../types/auth';
+import { getActorIdsForSceneIds } from './rehearsalActors';
 
 export function normalizeActorEmail(email: string | null | undefined): string {
   return (email ?? '').trim().toLowerCase();
@@ -82,6 +83,46 @@ export function getActorRoleIds(state: AppState, actorId: string): Set<string> {
   return roleIds;
 }
 
+/** Показы, на которых актёр назначен в данной постановке. */
+export function getActorPerformanceIdsInPlay(
+  state: AppState,
+  actorId: string,
+  playId: string
+): string[] {
+  return [
+    ...new Set(
+      state.castAssignments
+        .filter((assignment) => assignment.actorId === actorId && assignment.playId === playId)
+        .map((assignment) => assignment.performanceId)
+    ),
+  ];
+}
+
+/** Актёр участвует в сцене, если на одном из своих показов он играет роль из scene.roleIds. */
+export function isActorInScene(state: AppState, actorId: string, scene: Scene): boolean {
+  if (!scene.roleIds?.length || !scene.playId) return false;
+  const performanceIds = getActorPerformanceIdsInPlay(state, actorId, scene.playId);
+  for (const performanceId of performanceIds) {
+    const ids = getActorIdsForSceneIds(state, performanceId, [scene.id]);
+    if (ids.includes(actorId)) return true;
+  }
+  return false;
+}
+
+export function getActorRoleIdsInPlay(
+  state: AppState,
+  actorId: string,
+  playId: string
+): Set<string> {
+  const roleIds = new Set<string>();
+  for (const assignment of state.castAssignments) {
+    if (assignment.actorId === actorId && assignment.playId === playId) {
+      roleIds.add(assignment.roleId);
+    }
+  }
+  return roleIds;
+}
+
 export interface ActorCastEntry {
   play: Play;
   role: PlayRole;
@@ -107,10 +148,9 @@ export function getActorCastEntries(state: AppState, actorId: string): ActorCast
 }
 
 export function getActorScenes(state: AppState, actorId: string): AppState['scenes'] {
-  const roleIds = getActorRoleIds(state, actorId);
-  if (roleIds.size === 0) return [];
-
-  return state.scenes.filter((scene) => scene.roleIds?.some((roleId) => roleIds.has(roleId)));
+  return state.scenes
+    .filter((scene) => isActorInScene(state, actorId, scene))
+    .sort((a, b) => a.number - b.number);
 }
 
 export function getActorScenesInRehearsal(

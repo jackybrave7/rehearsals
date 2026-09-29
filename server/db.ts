@@ -236,6 +236,35 @@ export function getDb(): AppDatabase {
     `ALTER TABLE email_broadcasts ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'`,
     `ALTER TABLE email_broadcasts ADD COLUMN scheduled_at TEXT`,
     `ALTER TABLE email_broadcasts ADD COLUMN sent_at TEXT`,
+    `ALTER TABLE platform_settings ADD COLUMN email_drip_enabled INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE platform_settings ADD COLUMN email_drip_include_legacy INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE platform_settings ADD COLUMN email_drip_launched_at TEXT`,
+    `ALTER TABLE platform_settings ADD COLUMN email_drip_templates_version INTEGER NOT NULL DEFAULT 0`,
+    `CREATE TABLE IF NOT EXISTS email_drip_sent (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      step_id TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, step_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_drip_steps (
+      id TEXT PRIMARY KEY,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      title TEXT NOT NULL,
+      condition_type TEXT NOT NULL DEFAULT 'checklist_pending',
+      condition_checklist_step TEXT,
+      delay_days INTEGER NOT NULL DEFAULT 1,
+      delay_hours INTEGER NOT NULL DEFAULT 0,
+      delay_minutes INTEGER NOT NULL DEFAULT 0,
+      subject TEXT NOT NULL,
+      body_text TEXT NOT NULL,
+      body_html TEXT,
+      body_format TEXT NOT NULL DEFAULT 'plain',
+      action_label TEXT NOT NULL,
+      action_path TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
   ]) {
     try {
       db.exec(migration);
@@ -257,6 +286,7 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_email_broadcast_recipients_user_id ON email_broadcast_recipients(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_email_broadcast_clicks_recipient_id ON email_broadcast_clicks(recipient_id)`,
     `CREATE INDEX IF NOT EXISTS idx_email_broadcasts_status_scheduled ON email_broadcasts(status, scheduled_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_drip_sent_sent_at ON email_drip_sent(sent_at)`,
   ]) {
     db.exec(indexSql);
   }
