@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { GalleryMediaEntry } from '../utils/rehearsalOutcomeGallery';
 import { OutcomeVideoPlayer } from './OutcomeVideoPlayer';
@@ -25,6 +26,14 @@ export function OutcomeGalleryLightbox({
   const showNext = () => onIndexChange((index + 1) % items.length);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -45,74 +54,82 @@ export function OutcomeGalleryLightbox({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [index, items.length, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/85" onClick={onClose}>
+  const content = (
+    <div
+      className="fixed inset-0 z-[200] bg-black/90"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      {/* Медиа строго по центру viewport */}
+      <div
+        className="absolute inset-0 flex items-center justify-center px-14 py-16 sm:px-20"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex max-h-full max-w-full items-center justify-center">
+          {item.kind === 'photo' ? (
+            <img
+              src={item.url}
+              alt={`Фото репетиции ${index + 1}`}
+              className="max-h-[calc(100dvh-8rem)] max-w-[calc(100vw-4rem)] rounded-xl object-contain"
+            />
+          ) : (
+            <OutcomeVideoPlayer url={item.url} variant="lightbox" title={`Видео ${index + 1}`} />
+          )}
+        </div>
+      </div>
+
       <button
         type="button"
-        className="absolute right-4 top-4 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+        className="absolute right-3 top-3 z-10 rounded-full bg-black/70 p-2.5 text-white hover:bg-black sm:right-4 sm:top-4"
         onClick={(event) => {
           event.stopPropagation();
           onClose();
         }}
         aria-label="Закрыть"
       >
-        <X size={20} />
+        <X size={22} />
       </button>
 
       {items.length > 1 && (
         <>
           <button
             type="button"
-            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 sm:left-4"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black sm:left-3"
             onClick={(event) => {
               event.stopPropagation();
               showPrev();
             }}
             aria-label="Предыдущее"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={26} />
           </button>
           <button
             type="button"
-            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80 sm:right-4"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black sm:right-3"
             onClick={(event) => {
               event.stopPropagation();
               showNext();
             }}
             aria-label="Следующее"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={26} />
           </button>
         </>
       )}
 
       <div
-        className="flex min-h-0 flex-1 items-center justify-center p-4 pb-2"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-3 px-4 pb-4 pt-8"
         onClick={(event) => event.stopPropagation()}
       >
-        {item.kind === 'photo' ? (
-          <img
-            src={item.url}
-            alt={`Фото репетиции ${index + 1}`}
-            className="max-h-full max-w-full rounded-xl object-contain"
-          />
-        ) : (
-          <div className="w-full max-w-4xl">
-            <OutcomeVideoPlayer url={item.url} title={`Видео репетиции ${index + 1}`} />
-          </div>
-        )}
-      </div>
-
-      <div
-        className="flex shrink-0 flex-col items-center gap-3 px-4 pb-4 pt-2"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {footer}
-        <p className="rounded-full bg-black/60 px-3 py-1 text-xs text-white/90">
+        {footer && <div className="pointer-events-auto">{footer}</div>}
+        <p className="rounded-full bg-black/70 px-3 py-1 text-xs text-white/90">
           {index + 1} / {items.length}
           {item.kind === 'video' ? ' · видео' : ' · фото'}
         </p>
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
