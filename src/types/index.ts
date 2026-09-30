@@ -246,6 +246,8 @@ export interface Rehearsal {
   telegramPlanSentAt?: string;
   /** Итоговые фото репетиции (Pro), URL на S3 */
   outcomePhotoUrls?: string[];
+  /** Итоговые видео репетиции (Pro), URL на S3 */
+  outcomeVideoUrls?: string[];
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'substitute';

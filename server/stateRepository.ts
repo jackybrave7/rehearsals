@@ -423,8 +423,9 @@ export function insertStateEntities(
     `INSERT INTO rehearsals (
       id, theater_id, series_id, date, start_time, end_time, venue_id, location, notes, play_id, performance_id,
       scene_ids, task_ids, actor_ids, attendance, rsvp, participant_order, google_calendar_event_id,
-      dismissed_warning_ids, reminders_sent, reminder_opt_out, telegram_plan_sent_at, outcome_photo_urls
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      dismissed_warning_ids, reminders_sent, reminder_opt_out, telegram_plan_sent_at, outcome_photo_urls,
+      outcome_video_urls
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const rehearsal of state.rehearsals) {
     insertRehearsal.run(
@@ -450,7 +451,8 @@ export function insertStateEntities(
       JSON.stringify(rehearsal.remindersSent ?? []),
       rehearsal.reminderOptOut ? 1 : 0,
       rehearsal.telegramPlanSentAt ?? null,
-      JSON.stringify(rehearsal.outcomePhotoUrls ?? [])
+      JSON.stringify(rehearsal.outcomePhotoUrls ?? []),
+      JSON.stringify(rehearsal.outcomeVideoUrls ?? [])
     );
   }
 
@@ -864,6 +866,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       reminderOptOut: asBool(row.reminder_opt_out as number | null | undefined),
       telegramPlanSentAt: (row.telegram_plan_sent_at as string | null) ?? undefined,
       outcomePhotoUrls: parseJson<string[]>(row.outcome_photo_urls as string | undefined, []),
+      outcomeVideoUrls: parseJson<string[]>(row.outcome_video_urls as string | undefined, []),
       schedule: scheduleByRehearsal.get(String(row.id)) ?? [],
     })
   );

@@ -129,3 +129,85 @@ export async function deleteOutcomePhotoFromS3(url: string): Promise<void> {
     })
   );
 }
+
+export const MAX_OUTCOME_VIDEO_BYTES = 30 * 1024 * 1024;
+
+const ALLOWED_VIDEO_MIME = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+
+export function isAllowedOutcomeVideoMime(mimeType: string): boolean {
+  return ALLOWED_VIDEO_MIME.has(mimeType.toLowerCase());
+}
+
+function extensionForOutcomeVideoMime(mimeType: string): string {
+  switch (mimeType.toLowerCase()) {
+    case 'video/webm':
+      return 'webm';
+    case 'video/quicktime':
+      return 'mov';
+    default:
+      return 'mp4';
+  }
+}
+
+export function buildOutcomeVideoKey(
+  theaterId: string,
+  rehearsalId: string,
+  fileId: string,
+  mimeType: string
+): string {
+  const safeTheater = theaterId.replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeRehearsal = rehearsalId.replace(/[^a-zA-Z0-9_-]/g, '');
+  const ext = extensionForOutcomeVideoMime(mimeType);
+  return `rehearsal-outcome-videos/${safeTheater}/${safeRehearsal}/${fileId}.${ext}`;
+}
+
+export function parseOutcomeVideoKeyFromUrl(url: string): string | null {
+  const config = readS3Config();
+  if (!config) return null;
+
+  const normalized = url.trim();
+  const prefix = `${config.publicBaseUrl}/`;
+  if (!normalized.startsWith(prefix)) return null;
+  const key = normalized.slice(prefix.length);
+  if (!key.startsWith('rehearsal-outcome-videos/')) return null;
+  return key;
+}
+
+export async function uploadOutcomeVideoToS3(
+  buffer: Buffer,
+  key: string,
+  mimeType: string
+): Promise<string> {
+  const config = readS3Config();
+  if (!config) throw new Error('S3_NOT_CONFIGURED');
+
+  const client = createS3Client(config);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+      CacheControl: 'public, max-age=31536000, immutable',
+      ...(process.env.S3_PUBLIC_READ === '1' ? { ACL: 'public-read' as const } : {}),
+    })
+  );
+
+  return `${config.publicBaseUrl}/${key}`;
+}
+
+export async function deleteOutcomeVideoFromS3(url: string): Promise<void> {
+  const config = readS3Config();
+  if (!config) throw new Error('S3_NOT_CONFIGURED');
+
+  const key = parseOutcomeVideoKeyFromUrl(url);
+  if (!key) throw new Error('INVALID_VIDEO_URL');
+
+  const client = createS3Client(config);
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+    })
+  );
+}

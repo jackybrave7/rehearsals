@@ -37,6 +37,7 @@ export const PRICING_COPY = {
     noteMonth: `Или ${PRO_PRICING.yearlyRub.toLocaleString('ru-RU')} ₽ в год — выгоднее на 2 месяца.`,
     noteYear: `${PRO_PRICING.yearlyRub.toLocaleString('ru-RU')} ₽ при оплате за год — это ${Math.round(PRO_PRICING.yearlyRub / 12)} ₽ в месяц.`,
     features: [
+      '<b>Галерея и итоги репетиций</b>: до 50 фото и 10 видео (файлы до 30 МБ или ссылки YouTube, Rutube, Vimeo, VK)',
       '<b>Без лимита постановок</b> и театров',
       '<b>Личные авто-напоминания</b> участникам в Telegram',
       'Шаблоны репетиций и повтор расписания сериями',

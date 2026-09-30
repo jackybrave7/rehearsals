@@ -37,6 +37,7 @@ import { startTelegramLinkPoller } from './telegramLinkPoller.js';
 import { registerActorSelfRoutes } from './actorSelfRoutes.js';
 import { registerRehearsalNotesRoutes } from './rehearsalNotesRoutes.js';
 import { registerRehearsalOutcomePhotoRoutes } from './rehearsalOutcomePhotoRoutes.js';
+import { registerRehearsalOutcomeVideoRoutes } from './rehearsalOutcomeVideoRoutes.js';
 
 // Docker на VPS часто резолвит api.telegram.org в IPv6 без маршрута — fetch таймаутится.
 dns.setDefaultResultOrder('ipv4first');
@@ -66,6 +67,7 @@ registerTelegramRoutes(app);
 registerActorSelfRoutes(app);
 registerRehearsalNotesRoutes(app);
 registerRehearsalOutcomePhotoRoutes(app);
+registerRehearsalOutcomeVideoRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });

@@ -167,9 +167,11 @@ export function stripProOnlyRehearsalFields(
 
   let changed = false;
   const rehearsals = state.rehearsals.map((rehearsal) => {
-    if (!rehearsal.outcomePhotoUrls?.length) return rehearsal;
+    const hasPhotos = Boolean(rehearsal.outcomePhotoUrls?.length);
+    const hasVideos = Boolean(rehearsal.outcomeVideoUrls?.length);
+    if (!hasPhotos && !hasVideos) return rehearsal;
     changed = true;
-    const { outcomePhotoUrls: _removed, ...rest } = rehearsal;
+    const { outcomePhotoUrls: _photos, outcomeVideoUrls: _videos, ...rest } = rehearsal;
     return rest;
   });
 

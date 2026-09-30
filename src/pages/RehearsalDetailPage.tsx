@@ -73,6 +73,7 @@ import { Input, Textarea, Select } from '../components/FormFields';
 import { VenueSelect } from '../components/VenueSelect';
 import { RehearsalWarningsPanel } from '../components/RehearsalWarningsPanel';
 import { RehearsalOutcomePhotosPanel } from '../components/RehearsalOutcomePhotosPanel';
+import { RehearsalOutcomeVideosPanel } from '../components/RehearsalOutcomeVideosPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
@@ -1017,6 +1018,7 @@ export function RehearsalDetailPage() {
 
       <div className="space-y-4">
         <RehearsalOutcomePhotosPanel rehearsal={rehearsal} readOnly={readOnly} />
+        <RehearsalOutcomeVideosPanel rehearsal={rehearsal} readOnly={readOnly} />
 
         <section className="rounded-2xl border border-gold/10 bg-surface/40 px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
