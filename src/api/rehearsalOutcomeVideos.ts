@@ -22,14 +22,21 @@ export function formatOutcomeVideoUploadError(error: unknown): string {
     return `Слишком много видео для одной репетиции (максимум ${MAX_OUTCOME_VIDEOS_PER_REHEARSAL}).`;
   }
   if (code === 'S3_NOT_CONFIGURED') return 'Хранилище не настроено на сервере.';
+  if (code === 'UPLOAD_413' || code === 'PAYLOAD_TOO_LARGE') {
+    return 'Файл слишком большой для загрузки через браузер (лимит 30 МБ). Попробуйте сжать видео или вставьте ссылку с YouTube/Rutube.';
+  }
   if (code === 'UNAUTHORIZED') return 'Сессия истекла — обновите страницу и войдите снова.';
   return 'Не удалось загрузить видео. Проверьте формат и подключение.';
 }
 
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 
+function resolveOutcomeVideoMime(file: File): string | null {
+  return guessVideoMimeFromName(file.name) || file.type || null;
+}
+
 export function validateOutcomeVideoFile(file: File): string | null {
-  const mime = file.type || guessVideoMimeFromName(file.name);
+  const mime = resolveOutcomeVideoMime(file);
   if (!mime || !ALLOWED_VIDEO_TYPES.has(mime)) {
     return 'Поддерживаются MP4, WebM и MOV.';
   }
@@ -66,7 +73,7 @@ export async function uploadRehearsalOutcomeVideo(
   const validationError = validateOutcomeVideoFile(file);
   if (validationError) throw new Error(validationError);
 
-  const mimeType = file.type || guessVideoMimeFromName(file.name) || 'video/mp4';
+  const mimeType = resolveOutcomeVideoMime(file) || 'video/mp4';
   const dataBase64 = await readFileBase64(file);
   const response = await fetch(`${API_BASE}/rehearsals/${rehearsalId}/outcome-videos`, {
     method: 'POST',
@@ -83,6 +90,7 @@ export async function uploadRehearsalOutcomeVideo(
     const data = (await response.json().catch(() => null)) as { error?: string } | null;
     if (response.status === 401) throw new Error('UNAUTHORIZED');
     if (response.status === 402) throw new Error('SUBSCRIPTION_PRO_REQUIRED');
+    if (response.status === 413) throw new Error('UPLOAD_413');
     throw new Error(data?.error ?? `UPLOAD_${response.status}`);
   }
 

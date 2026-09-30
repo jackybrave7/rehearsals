@@ -19,7 +19,7 @@ server {
     index index.html;
 
     # Сохранение состояния через PUT /api/state (до ~25 MB)
-    client_max_body_size 25m;
+    client_max_body_size 45m;
 
     location /api/ {
         proxy_pass http://127.0.0.1:3001;

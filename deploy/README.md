@@ -203,6 +203,7 @@ deploy.bat "описание изменений" --push-only
 | **Upload deploy script** / `dial tcp ... connection refused` | Порт: secret `DEPLOY_SSH_PORT` = **54321**, firewall VPS пропускает 54321 с интернета |
 | **permission denied (publickey)** | В GitHub secret ключ **тот же**, что на сервере в `root/.ssh/authorized_keys`; не `.pub` |
 | **Run deploy** → `npm run build` / exit 1 | Откройте лог шага — ошибка TypeScript/Vite; локально `npm run build` |
+| **413** при загрузке видео ~20–30 МБ | На VPS в nginx: `client_max_body_size 45m;` (см. `deploy/nginx.conf.example`), затем `sudo nginx -t && sudo systemctl reload nginx`. API: лимит JSON 45mb в `server/index.ts`. |
 | **API health check failed** | В логе есть `docker logs rehearsals-api` — часто битый `.env` или нет `npm prune` после сборки |
 | Job **skipped** | Репозиторий не `jackybrave7/rehearsals` (условие `if:` в workflow) |
 

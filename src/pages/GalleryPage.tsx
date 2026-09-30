@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Film, Images, Play } from 'lucide-react';
+import { Images } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { OutcomeGalleryLightbox } from '../components/OutcomeGalleryLightbox';
+import { OutcomeVideoThumbnail } from '../components/OutcomeVideoThumbnail';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { getTheaterRehearsals } from '../store/selectors';
 import { appPaths } from '../navigation/appPaths';
@@ -12,7 +13,6 @@ import {
   groupGalleryMediaByDate,
   type GalleryMediaEntry,
 } from '../utils/rehearsalOutcomeGallery';
-import { outcomeVideoThumbnailUrl } from '../../shared/outcomeVideoEmbed';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
 
 function GalleryMediaTile({
@@ -22,9 +22,6 @@ function GalleryMediaTile({
   entry: GalleryMediaEntry;
   onOpen: () => void;
 }) {
-  const videoThumb =
-    entry.kind === 'video' ? outcomeVideoThumbnailUrl(entry.url) : null;
-
   return (
     <button
       type="button"
@@ -38,23 +35,8 @@ function GalleryMediaTile({
           className="h-full w-full object-cover transition hover:scale-[1.02]"
           loading="lazy"
         />
-      ) : videoThumb ? (
-        <>
-          <img
-            src={videoThumb}
-            alt=""
-            className="h-full w-full object-cover transition hover:scale-[1.02]"
-            loading="lazy"
-          />
-          <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-            <Play size={28} className="text-white drop-shadow" fill="currentColor" />
-          </span>
-        </>
       ) : (
-        <span className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/40 text-white/80 transition hover:bg-black/50">
-          <Film size={28} />
-          <Play size={20} fill="currentColor" />
-        </span>
+        <OutcomeVideoThumbnail url={entry.url} className="h-full w-full transition hover:scale-[1.02]" />
       )}
     </button>
   );

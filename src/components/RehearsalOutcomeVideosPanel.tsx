@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Film, Link2, Loader2, Play, Trash2, X } from 'lucide-react';
+import { Film, Link2, Loader2, Trash2, X } from 'lucide-react';
 import type { Rehearsal } from '../types';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { UpgradePrompt } from './UpgradePrompt';
 import { Button } from './Button';
 import { OutcomeGalleryLightbox } from './OutcomeGalleryLightbox';
+import { OutcomeVideoThumbnail } from './OutcomeVideoThumbnail';
 import {
   MAX_OUTCOME_VIDEOS_PER_REHEARSAL,
   addRehearsalOutcomeVideoLink,
@@ -16,7 +17,6 @@ import {
 } from '../api/rehearsalOutcomeVideos';
 import {
   outcomeVideoProviderLabel,
-  outcomeVideoThumbnailUrl,
   parseEmbeddableVideoLink,
 } from '../../shared/outcomeVideoEmbed';
 import type { GalleryMediaEntry } from '../utils/rehearsalOutcomeGallery';
@@ -278,27 +278,17 @@ export function RehearsalOutcomeVideosPanel({
       ) : (
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scroll-smooth snap-x snap-mandatory">
           {videos.map((url, index) => {
-            const thumb = outcomeVideoThumbnailUrl(url);
             const label = outcomeVideoProviderLabel(url);
             return (
               <div key={url} className="group relative shrink-0 snap-start">
                 <button
                   type="button"
-                  className="relative block h-20 w-32 overflow-hidden rounded-lg border border-gold/15 bg-black/30 sm:h-24 sm:w-40"
+                  className="relative block h-20 w-32 overflow-hidden rounded-lg border border-gold/15 sm:h-24 sm:w-40"
                   onClick={() => setViewerIndex(index)}
                 >
-                  {thumb ? (
-                    <img src={thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-muted">
-                      <Film size={28} />
-                    </span>
-                  )}
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play size={24} className="text-white" fill="currentColor" />
-                  </span>
+                  <OutcomeVideoThumbnail url={url} className="h-full w-full" />
                   {label && (
-                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white/90">
+                    <span className="absolute bottom-1 left-1 z-[1] rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white/90">
                       {label}
                     </span>
                   )}

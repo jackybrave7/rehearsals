@@ -48,7 +48,7 @@ const PORT = Number(process.env.API_PORT ?? 3001);
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '45mb' }));
 
 registerAuthRoutes(app);
 registerFileRoutes(app);
