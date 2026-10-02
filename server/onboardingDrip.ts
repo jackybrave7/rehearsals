@@ -310,4 +310,41 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
     }
     res.status(201).json({ step: serializeStep(step) });
   });
+
+  app.post('/api/admin/onboarding-drip/test-send', async (req, res) => {
+    const session = requirePlatformAdmin(req, res);
+    if (!session) return;
+
+    if (!isMailConfigured()) {
+      res.status(503).json({ error: 'MAIL_NOT_CONFIGURED' });
+      return;
+    }
+
+    const patch = parseStepBody(req);
+    if (!patch.subject?.trim() || !patch.bodyText?.trim() || !patch.bodyHtml?.trim()) {
+      res.status(400).json({ error: 'MISSING_FIELDS' });
+      return;
+    }
+
+    const appUrl = (process.env.APP_URL?.trim() || 'https://rehears.ru').replace(/\/$/, '');
+    const rawPath = patch.actionPath?.trim() || '/app';
+    const actionPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+
+    try {
+      await sendOnboardingDripEmail({
+        to: session.user.email,
+        name: session.user.name?.trim() || session.user.email,
+        subject: `[Тест] ${patch.subject.trim()}`,
+        bodyText: patch.bodyText.trim(),
+        bodyFormat: 'html',
+        bodyHtml: patch.bodyHtml.trim(),
+        actionLabel: patch.actionLabel?.trim() || 'Открыть приложение',
+        actionUrl: `${appUrl}${actionPath}`,
+      });
+      res.json({ ok: true, sentTo: session.user.email });
+    } catch (error) {
+      console.error('[onboarding-drip] test send failed', error);
+      res.status(500).json({ error: 'SEND_FAILED' });
+    }
+  });
 }

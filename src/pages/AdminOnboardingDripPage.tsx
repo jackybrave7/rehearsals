@@ -16,6 +16,7 @@ import {
   deleteAdminDripStep,
   duplicateAdminDripStep,
   fetchAdminOnboardingDrip,
+  sendAdminDripTestEmail,
   updateAdminDripStep,
   updateAdminOnboardingDripSettings,
   type EmailDripStepDto,
@@ -118,6 +119,8 @@ export function AdminOnboardingDripPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EmailDripStepInput | null>(null);
+  const [testSending, setTestSending] = useState(false);
+  const [testNotice, setTestNotice] = useState<string | null>(null);
 
   const previewAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rehears.ru';
 
@@ -159,12 +162,14 @@ export function AdminOnboardingDripPage() {
     if (!data) return;
     setEditingId(null);
     setForm(emptyStepInput(data.meta));
+    setTestNotice(null);
     setEditorOpen(true);
   };
 
   const openEdit = (step: EmailDripStepDto) => {
     setEditingId(step.id);
     setForm(stepToInput(step));
+    setTestNotice(null);
     setEditorOpen(true);
   };
 
@@ -210,6 +215,34 @@ export function AdminOnboardingDripPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
+    }
+  };
+
+  const sendTestEmail = async () => {
+    if (!form?.bodyHtml?.trim()) return;
+    setTestSending(true);
+    setTestNotice(null);
+    setError('');
+    try {
+      const payload: EmailDripStepInput = {
+        ...form,
+        bodyFormat: 'html',
+        bodyHtml: form.bodyHtml.trim(),
+        bodyText: form.bodyText.trim() || plainTextFromHtml(form.bodyHtml),
+      };
+      const result = await sendAdminDripTestEmail(payload);
+      setTestNotice(`Тест отправлен на ${result.sentTo}`);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : '';
+      if (code === 'MAIL_NOT_CONFIGURED') {
+        setError('SMTP не настроен на сервере — тест недоступен.');
+      } else if (code === 'MISSING_FIELDS') {
+        setError('Заполните тему и текст письма перед тестом.');
+      } else {
+        setError('Не удалось отправить тест. Проверьте SMTP и логи сервера.');
+      }
+    } finally {
+      setTestSending(false);
     }
   };
 
@@ -360,6 +393,13 @@ export function AdminOnboardingDripPage() {
               <Button variant="secondary" onClick={() => setEditorOpen(false)}>
                 Отмена
               </Button>
+              <Button
+                variant="secondary"
+                disabled={!data?.mailConfigured || testSending || !form.bodyHtml?.trim()}
+                onClick={() => void sendTestEmail()}
+              >
+                {testSending ? 'Отправка…' : 'Тест на мой email'}
+              </Button>
               <Button onClick={() => void saveStep()} disabled={saving}>
                 Сохранить
               </Button>
@@ -443,6 +483,7 @@ export function AdminOnboardingDripPage() {
               />
             </div>
             <div className="space-y-3 lg:col-span-2">
+              {testNotice && <p className="text-sm text-green-300">{testNotice}</p>}
               <Textarea
                 label="Текст для почтовых клиентов без HTML"
                 rows={4}
@@ -452,6 +493,8 @@ export function AdminOnboardingDripPage() {
               <DripFullEmailEditor
                 html={form.bodyHtml ?? ''}
                 appUrl={previewAppUrl}
+                actionLabel={form.actionLabel ?? 'Открыть приложение'}
+                actionPath={form.actionPath ?? '/app'}
                 onChange={(bodyHtml) => setForm({ ...form, bodyHtml })}
               />
             </div>

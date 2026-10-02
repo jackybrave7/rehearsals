@@ -105,3 +105,21 @@ export async function duplicateAdminDripStep(id: string): Promise<{ step: EmailD
   if (!response.ok) throw new Error(await response.text());
   return response.json() as Promise<{ step: EmailDripStepDto }>;
 }
+
+export async function sendAdminDripTestEmail(
+  body: EmailDripStepInput
+): Promise<{ ok: true; sentTo: string }> {
+  const response = await adminFetch('/admin/onboarding-drip/test-send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (data?.error === 'MAIL_NOT_CONFIGURED') throw new Error('MAIL_NOT_CONFIGURED');
+    if (data?.error === 'MISSING_FIELDS') throw new Error('MISSING_FIELDS');
+    if (data?.error === 'SEND_FAILED') throw new Error('SEND_FAILED');
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<{ ok: true; sentTo: string }>;
+}
