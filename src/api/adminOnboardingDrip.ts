@@ -6,7 +6,11 @@ export interface OnboardingDripSettings {
   launchedAt: string | null;
 }
 
-export type DripConditionType = 'checklist_pending' | 'checklist_done' | 'always';
+export type DripConditionType =
+  | 'checklist_pending'
+  | 'checklist_done'
+  | 'days_after_checklist_done'
+  | 'always';
 
 export interface EmailDripStepDto {
   id: string;

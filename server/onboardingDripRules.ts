@@ -92,14 +92,16 @@ export function seedEmailDripStepsIfEmpty(db: AppDatabase): void {
       delay_days, delay_hours, delay_minutes,
       subject, body_text, body_html, body_format,
       action_label, action_path, created_at, updated_at
-    ) VALUES (?, ?, 1, ?, 'checklist_pending', ?, ?, ?, ?, ?, ?, ?, 'html', ?, ?, ?, ?)`
+    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'html', ?, ?, ?, ?)`
   );
 
   DEFAULT_DRIP_STEP_TEMPLATES.forEach((template, index) => {
+    const conditionType = template.conditionType ?? 'checklist_pending';
     insert.run(
       randomUUID(),
       index,
       template.title,
+      conditionType,
       template.checklistStepId,
       template.delayDays,
       template.delayHours,
@@ -135,10 +137,11 @@ export function syncDefaultDripTemplatesToLatest(db: AppDatabase): void {
       action_label = ?,
       action_path = ?,
       updated_at = ?
-     WHERE condition_checklist_step = ? AND condition_type = 'checklist_pending'`
+     WHERE condition_checklist_step = ? AND condition_type = ?`
   );
 
   for (const template of DEFAULT_DRIP_STEP_TEMPLATES) {
+    const conditionType = template.conditionType ?? 'checklist_pending';
     update.run(
       template.subject,
       template.bodyText,
@@ -147,7 +150,8 @@ export function syncDefaultDripTemplatesToLatest(db: AppDatabase): void {
       template.actionLabel,
       template.actionPath,
       now,
-      template.checklistStepId
+      template.checklistStepId,
+      conditionType
     );
   }
 
@@ -157,20 +161,22 @@ export function syncDefaultDripTemplatesToLatest(db: AppDatabase): void {
       delay_days, delay_hours, delay_minutes,
       subject, body_text, body_html, body_format,
       action_label, action_path, created_at, updated_at
-    ) VALUES (?, ?, 1, ?, 'checklist_pending', ?, ?, 0, 0, ?, ?, ?, 'html', ?, ?, ?, ?)`
+    ) VALUES (?, ?, 1, ?, ?, ?, ?, 0, 0, ?, ?, ?, 'html', ?, ?, ?, ?)`
   );
 
   for (const [index, template] of DEFAULT_DRIP_STEP_TEMPLATES.entries()) {
+    const conditionType = template.conditionType ?? 'checklist_pending';
     const exists = db
       .prepare(
-        `SELECT 1 FROM email_drip_steps WHERE condition_type = 'checklist_pending' AND condition_checklist_step = ?`
+        `SELECT 1 FROM email_drip_steps WHERE condition_type = ? AND condition_checklist_step = ?`
       )
-      .get(template.checklistStepId);
+      .get(conditionType, template.checklistStepId);
     if (exists) continue;
     insert.run(
       randomUUID(),
       index,
       template.title,
+      conditionType,
       template.checklistStepId,
       template.delayDays,
       template.subject,
@@ -227,7 +233,12 @@ function nextSortOrder(db: AppDatabase): number {
 }
 
 function parseConditionType(value: unknown): DripConditionType | null {
-  if (value === 'checklist_pending' || value === 'checklist_done' || value === 'always') {
+  if (
+    value === 'checklist_pending' ||
+    value === 'checklist_done' ||
+    value === 'days_after_checklist_done' ||
+    value === 'always'
+  ) {
     return value;
   }
   return null;

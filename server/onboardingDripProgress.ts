@@ -161,6 +161,34 @@ export function getUserSetupStepProgress(db: AppDatabase, userId: string): UserS
   }));
 }
 
+export function getFirstRehearsalPlanAt(db: AppDatabase, userId: string): string | null {
+  const theaterId = resolvePrimaryTheaterId(db, userId);
+  if (!theaterId) return null;
+
+  const row = db
+    .prepare(
+      `SELECT MIN(r.created_at) AS first_at
+       FROM rehearsals r
+       WHERE r.theater_id = ?
+         AND EXISTS (SELECT 1 FROM schedule_blocks sb WHERE sb.rehearsal_id = r.id)`
+    )
+    .get(theaterId) as { first_at: string | null } | undefined;
+
+  const value = row?.first_at?.trim();
+  return value || null;
+}
+
+export function getChecklistStepAnchorAt(
+  db: AppDatabase,
+  userId: string,
+  stepId: ChecklistStepId
+): string | null {
+  if (stepId === 'rehearsal') {
+    return getFirstRehearsalPlanAt(db, userId);
+  }
+  return null;
+}
+
 export function getFirstPendingSetupStep(
   db: AppDatabase,
   userId: string

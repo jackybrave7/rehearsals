@@ -1,7 +1,7 @@
 import type { Express, Request } from 'express';
 import { getDb } from './db.js';
 import { isMailConfigured, sendOnboardingDripEmail } from './mail.js';
-import { getUserSetupStepProgress, type UserSetupStepProgress } from './onboardingDripProgress.js';
+import { getUserSetupStepProgress, getChecklistStepAnchorAt, type UserSetupStepProgress } from './onboardingDripProgress.js';
 import { getOnboardingDripSettings, updateOnboardingDripSettings } from './onboardingDripSettings.js';
 import {
   CHECKLIST_STEP_OPTIONS,
@@ -62,12 +62,71 @@ function isUserEligibleForDrip(
 
 function isConditionMet(step: EmailDripStep, progress: UserSetupStepProgress[]): boolean {
   if (step.conditionType === 'always') return true;
+  if (step.conditionType === 'days_after_checklist_done') {
+    if (!step.conditionChecklistStep) return false;
+    const item = progress.find((p) => p.id === step.conditionChecklistStep);
+    return Boolean(item?.done);
+  }
   if (!step.conditionChecklistStep) return false;
   const item = progress.find((p) => p.id === step.conditionChecklistStep);
   if (!item) return false;
   if (step.conditionType === 'checklist_pending') return !item.done;
   if (step.conditionType === 'checklist_done') return item.done;
   return false;
+}
+
+function isDelayMet(
+  step: EmailDripStep,
+  user: { id: string; email_verified_at: string | null; created_at: string },
+  db: ReturnType<typeof getDb>,
+  lastSentAt: string | null
+): boolean {
+  if (step.conditionType === 'days_after_checklist_done') {
+    if (!step.conditionChecklistStep) return false;
+    const anchorRaw = getChecklistStepAnchorAt(db, user.id, step.conditionChecklistStep);
+    const anchorMs = parseIsoMs(anchorRaw);
+    if (anchorMs == null) return false;
+    return Date.now() - anchorMs >= dripStepDelayMs(step);
+  }
+
+  const registrationAnchor =
+    parseIsoMs(user.email_verified_at) ?? parseIsoMs(user.created_at);
+  const anchorMs = lastSentAt ? parseIsoMs(lastSentAt) : registrationAnchor;
+  if (anchorMs == null) return false;
+  return Date.now() - anchorMs >= dripStepDelayMs(step);
+}
+
+function findAnchoredDripStep(
+  db: ReturnType<typeof getDb>,
+  user: { id: string; email_verified_at: string | null; created_at: string },
+  steps: EmailDripStep[],
+  progress: UserSetupStepProgress[]
+): EmailDripStep | null {
+  const anchored = steps.filter((s) => s.conditionType === 'days_after_checklist_done');
+  for (const step of anchored) {
+    if (wasDripStepSent(user.id, step.id, db)) continue;
+    if (!isConditionMet(step, progress)) continue;
+    if (!isDelayMet(step, user, db, null)) continue;
+    return step;
+  }
+  return null;
+}
+
+function findSequentialDripStep(
+  db: ReturnType<typeof getDb>,
+  user: { id: string; email_verified_at: string | null; created_at: string },
+  steps: EmailDripStep[],
+  progress: UserSetupStepProgress[],
+  lastSentAt: string | null
+): EmailDripStep | null {
+  for (const step of steps) {
+    if (step.conditionType === 'days_after_checklist_done') continue;
+    if (wasDripStepSent(user.id, step.id, db)) continue;
+    if (!isConditionMet(step, progress)) continue;
+    if (!isDelayMet(step, user, db, lastSentAt)) return null;
+    return step;
+  }
+  return null;
 }
 
 function findDripStepToSend(
@@ -77,21 +136,11 @@ function findDripStepToSend(
   const steps = listEnabledEmailDripSteps(db);
   const progress = getUserSetupStepProgress(db, user.id);
   const lastSentAt = getLastDripSentAt(user.id, db);
-  const registrationAnchor =
-    parseIsoMs(user.email_verified_at) ?? parseIsoMs(user.created_at);
 
-  for (const step of steps) {
-    if (wasDripStepSent(user.id, step.id, db)) continue;
-    if (!isConditionMet(step, progress)) continue;
+  const anchored = findAnchoredDripStep(db, user, steps, progress);
+  if (anchored) return anchored;
 
-    const anchorMs = lastSentAt ? parseIsoMs(lastSentAt) : registrationAnchor;
-    if (anchorMs == null) return null;
-    if (Date.now() - anchorMs < dripStepDelayMs(step)) return null;
-
-    return step;
-  }
-
-  return null;
+  return findSequentialDripStep(db, user, steps, progress, lastSentAt);
 }
 
 function getLastDripSentAt(userId: string, db: ReturnType<typeof getDb>): string | null {
@@ -178,6 +227,7 @@ function parseStepBody(req: Request): Partial<EmailDripStep> & { title?: string;
     conditionType:
       b.conditionType === 'checklist_pending' ||
       b.conditionType === 'checklist_done' ||
+      b.conditionType === 'days_after_checklist_done' ||
       b.conditionType === 'always'
         ? (b.conditionType as DripConditionType)
         : undefined,

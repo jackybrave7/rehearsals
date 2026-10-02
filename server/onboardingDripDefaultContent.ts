@@ -5,11 +5,12 @@ import {
   dripEmailTip,
 } from '../shared/dripEmailBody.js';
 import { wrapFullDripEmailHtml } from '../shared/dripEmailDocument.js';
-import type { ChecklistStepId } from './onboardingDripSteps.js';
+import type { ChecklistStepId, DripConditionType } from './onboardingDripSteps.js';
 
 export interface DefaultDripTemplate {
   title: string;
   checklistStepId: ChecklistStepId;
+  conditionType?: DripConditionType;
   delayDays: number;
   delayHours: number;
   delayMinutes: number;
@@ -21,7 +22,7 @@ export interface DefaultDripTemplate {
 }
 
 /** Увеличивайте при обновлении текстов/скриншотов — существующие шаги в БД подтянутся при старте API. */
-export const DRIP_TEMPLATES_CONTENT_VERSION = 8;
+export const DRIP_TEMPLATES_CONTENT_VERSION = 9;
 
 const INNER_DRIP_STEP_TEMPLATES: DefaultDripTemplate[] = [
   {
@@ -183,6 +184,29 @@ const INNER_DRIP_STEP_TEMPLATES: DefaultDripTemplate[] = [
       dripEmailTip('Первый план не обязан быть идеальным — его можно доработать после репетиции.'),
     actionLabel: 'К репетициям',
     actionPath: '/app/rehearsals',
+  },
+  {
+    title: 'Письмо автора',
+    checklistStepId: 'rehearsal',
+    conditionType: 'days_after_checklist_done',
+    delayDays: 3,
+    delayHours: 0,
+    delayMinutes: 0,
+    subject: 'Лично от автора «Репетиций»',
+    bodyText:
+      'Здравствуйте!\n\nЯ режиссёр небольшого частного театра и по первому образованию инженер. Когда мы готовили спектакль, мне стало трудно держать в голове сцены, людей и календарь — таблицы и чаты не спасали. Так появился сервис «Репетиции», сначала для своей труппы, теперь для вас.\n\nВы уже собрали первую репетицию с планом — спасибо, что пробуете. Мне важно понять по-честному: что оказалось полезным, а что мешает? Чего не хватает, чтобы репетиции по текстам шли спокойнее?\n\nМожно ответить на это письмо или написать через «Поддержку» в приложении — читаю лично.',
+    bodyHtml:
+      dripBodyHtmlFromParagraphs(
+        [
+          'Здравствуйте! Я режиссёр небольшого частного театра и по первому образованию инженер. Когда мы готовили спектакль, мне стало трудно держать в голове сцены, людей и календарь — таблицы и чаты не вытягивали. Так появился «Репетиции»: сначала для своей труппы, теперь для вас.',
+          'Вы уже собрали первую репетицию с планом — спасибо, что пробуете. Мне важно понять по-честному: что оказалось полезным, а что мешает? Чего не хватает, чтобы репетиции по текстам шли спокойнее?',
+          'Ответьте на это письмо или напишите через «Поддержку» — читаю лично. Даже пара предложений поможет сделать сервис лучше.',
+        ],
+        { leadFirst: true }
+      ) +
+      dripEmailTip('P.S. Если удобнее — просто ответьте на email: так письмо попадёт мне напрямую.'),
+    actionLabel: 'Написать в поддержку',
+    actionPath: '/app/support',
   },
   {
     title: 'Telegram — план',

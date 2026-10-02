@@ -10,7 +10,11 @@ export type ChecklistStepId =
   | 'telegram'
   | 'telegram_bot';
 
-export type DripConditionType = 'checklist_pending' | 'checklist_done' | 'always';
+export type DripConditionType =
+  | 'checklist_pending'
+  | 'checklist_done'
+  | 'days_after_checklist_done'
+  | 'always';
 
 export const CHECKLIST_STEP_OPTIONS: Array<{ id: ChecklistStepId; label: string }> = [
   { id: 'theater', label: 'Создать театр' },
@@ -34,17 +38,21 @@ export const DRIP_ACTION_PATH_OPTIONS = [
   { value: '/app/rehearsals', label: 'Репетиции' },
   { value: '/app/settings', label: 'Настройки' },
   { value: '/app/guide', label: 'Руководство' },
+  { value: '/app/support', label: 'Поддержка' },
 ];
 
 export const DRIP_CONDITION_LABELS: Record<DripConditionType, string> = {
   checklist_pending: 'Пока шаг чек-листа не выполнен',
   checklist_done: 'Когда шаг чек-листа выполнен',
+  days_after_checklist_done:
+    'Через N дней после выполнения шага (не ждёт очереди других писем)',
   always: 'Без условия (всегда по очереди)',
 };
 
 export interface DefaultDripTemplate {
   title: string;
   checklistStepId: ChecklistStepId;
+  conditionType?: DripConditionType;
   delayDays: number;
   delayHours: number;
   delayMinutes: number;
