@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Copy, Mail, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, Mail, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner } from '../components/admin/adminUi';
 import { Button } from '../components/Button';
@@ -282,25 +282,31 @@ export function AdminOnboardingDripPage() {
   const meta = data?.meta;
 
   return (
-    <div className="space-y-6">
-      <AdminNav />
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Цепочка писем</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Настраиваемые письма онбординга. Отдельно от ручных рассылок.
-          </p>
+    <div className="space-y-8">
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-gold-light">
+              <Shield size={14} />
+              Админка
+            </div>
+            <h1 className="text-3xl font-bold text-white">Цепочка писем</h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Настраиваемые письма онбординга. Отдельно от ручных рассылок.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void load()} disabled={loading}>
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              Обновить
+            </Button>
+            <Button onClick={openCreate} disabled={!data}>
+              <Plus size={16} />
+              Добавить письмо
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void load()} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            Обновить
-          </Button>
-          <Button onClick={openCreate} disabled={!data}>
-            <Plus size={16} />
-            Добавить письмо
-          </Button>
-        </div>
+        <AdminNav />
       </header>
 
       {error && <AdminErrorBanner error={error} />}
