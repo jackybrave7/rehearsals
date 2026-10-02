@@ -29,6 +29,25 @@ export interface EmailDripStepDto {
   updatedAt: string;
 }
 
+export interface DripStepEngagementStats {
+  stepId: string;
+  title: string;
+  deliveries: number;
+  opens: number;
+  clicks: number;
+  openRate: number;
+  clickRate: number;
+}
+
+export interface DripChainEngagementStats {
+  totalDeliveries: number;
+  totalOpens: number;
+  totalClicks: number;
+  uniqueOpens: number;
+  uniqueClicks: number;
+  steps: DripStepEngagementStats[];
+}
+
 export interface OnboardingDripOverview {
   settings: OnboardingDripSettings;
   mailConfigured: boolean;
@@ -39,6 +58,7 @@ export interface OnboardingDripOverview {
     actionPaths: Array<{ value: string; label: string }>;
   };
   stats: { totalSent: number };
+  engagement: DripChainEngagementStats;
 }
 
 export type EmailDripStepInput = Partial<
@@ -107,7 +127,7 @@ export async function duplicateAdminDripStep(id: string): Promise<{ step: EmailD
 }
 
 export async function sendAdminDripTestEmail(
-  body: EmailDripStepInput
+  body: EmailDripStepInput & { stepId?: string }
 ): Promise<{ ok: true; sentTo: string }> {
   const response = await adminFetch('/admin/onboarding-drip/test-send', {
     method: 'POST',

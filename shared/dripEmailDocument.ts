@@ -60,6 +60,7 @@ export function wrapFullDripEmailHtml(options: {
     actionLabel: options.actionLabel,
     actionUrl: `${DRIP_APP_URL_PLACEHOLDER}${path}`,
     footerNote: ONBOARDING_DRIP_FOOTER_NOTE,
+    design: 'zen',
   });
 }
 

@@ -8,6 +8,7 @@ import {
 } from '../shared/brandedEmail.js';
 import { isFullDripEmailDocument, renderDripEmailHtml } from '../shared/dripEmailDocument.js';
 import { dripBodyHtmlFromPlainText } from '../shared/dripEmailBody.js';
+import { applyDripEmailTracking } from './dripEmailTracking.js';
 
 export interface MailConfig {
   host: string;
@@ -579,6 +580,7 @@ export async function sendOnboardingDripEmail(options: {
   bodyHtml?: string | null;
   actionLabel: string;
   actionUrl: string;
+  dripDeliveryId?: string;
 }): Promise<void> {
   const appUrl = (process.env.APP_URL?.trim() || 'https://rehears.ru').replace(/\/$/, '');
   const greeting = options.name.trim() || options.to;
@@ -607,6 +609,7 @@ export async function sendOnboardingDripEmail(options: {
       actionLabel: options.actionLabel,
       actionUrl: options.actionUrl,
       footerNote: ONBOARDING_DRIP_FOOTER_NOTE,
+      design: 'zen',
     });
   } else {
     const inner = dripBodyHtmlFromPlainText(options.bodyText, { leadFirst: true });
@@ -618,7 +621,12 @@ export async function sendOnboardingDripEmail(options: {
       actionLabel: options.actionLabel,
       actionUrl: options.actionUrl,
       footerNote: ONBOARDING_DRIP_FOOTER_NOTE,
+      design: 'zen',
     });
+  }
+
+  if (options.dripDeliveryId) {
+    html = applyDripEmailTracking(html, options.dripDeliveryId, options.actionUrl);
   }
 
   await sendMail({

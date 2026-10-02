@@ -25,6 +25,7 @@ import {
 } from './onboardingDripRules.js';
 import { getRegistrationMode, isRegistrationApproved } from './platformSettings.js';
 import { isPlatformAdminEmail, requirePlatformAdmin } from './platformAdmin.js';
+import { createDripDelivery, getDripChainEngagementStats } from './dripEmailTracking.js';
 
 const BATCH_SIZE = 30;
 
@@ -136,6 +137,13 @@ export async function processOnboardingDripBatch(): Promise<{ sent: number }> {
 
     try {
       const actionUrl = `${appUrl}${step.actionPath.startsWith('/') ? step.actionPath : `/${step.actionPath}`}`;
+      const deliveryId = createDripDelivery(
+        step.id,
+        user.id,
+        user.email,
+        step.subject,
+        db
+      );
       await sendOnboardingDripEmail({
         to: user.email,
         name: user.name,
@@ -145,6 +153,7 @@ export async function processOnboardingDripBatch(): Promise<{ sent: number }> {
         bodyHtml: step.bodyHtml,
         actionLabel: step.actionLabel,
         actionUrl,
+        dripDeliveryId: deliveryId,
       });
       markDripStepSent(user.id, step.id, db);
       sent += 1;
@@ -230,6 +239,7 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
         actionPaths: DRIP_ACTION_PATH_OPTIONS,
       },
       stats: { totalSent: countDripEmailsSent(db) },
+      engagement: getDripChainEngagementStats(db),
     });
   });
 
@@ -329,8 +339,21 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
     const appUrl = (process.env.APP_URL?.trim() || 'https://rehears.ru').replace(/\/$/, '');
     const rawPath = patch.actionPath?.trim() || '/app';
     const actionPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+    const actionUrl = `${appUrl}${actionPath}`;
 
     try {
+      let dripDeliveryId: string | undefined;
+      const stepId = typeof req.body?.stepId === 'string' ? req.body.stepId.trim() : '';
+      if (stepId) {
+        dripDeliveryId = createDripDelivery(
+          stepId,
+          session.user.id,
+          session.user.email,
+          `[Тест] ${patch.subject.trim()}`,
+          getDb()
+        );
+      }
+
       await sendOnboardingDripEmail({
         to: session.user.email,
         name: session.user.name?.trim() || session.user.email,
@@ -339,7 +362,8 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
         bodyFormat: 'html',
         bodyHtml: patch.bodyHtml.trim(),
         actionLabel: patch.actionLabel?.trim() || 'Открыть приложение',
-        actionUrl: `${appUrl}${actionPath}`,
+        actionUrl,
+        dripDeliveryId,
       });
       res.json({ ok: true, sentTo: session.user.email });
     } catch (error) {

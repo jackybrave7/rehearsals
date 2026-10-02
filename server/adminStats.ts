@@ -5,6 +5,7 @@ import { getDbInfo, listBackupFiles } from './backup.js';
 import { requirePlatformAdmin } from './platformAdmin.js';
 import { getRegistrationMode } from './platformSettings.js';
 import { listUserBroadcastEngagement, type UserBroadcastEngagement } from './broadcastTracking.js';
+import { listUserDripEngagement, type UserDripEngagement } from './dripEmailTracking.js';
 import type { TheaterAccessRole } from './authTypes.js';
 
 export interface AdminUserSummary {
@@ -59,6 +60,7 @@ export interface AdminUserDetail extends AdminUserSummary {
   generatedAt: string;
   theaters: AdminUserTheaterStats[];
   broadcastEngagement: UserBroadcastEngagement[];
+  dripEngagement: UserDripEngagement[];
 }
 
 export interface PlatformStats {
@@ -419,6 +421,7 @@ export function collectAdminUserDetail(
     generatedAt: nowIso,
     theaters,
     broadcastEngagement: listUserBroadcastEngagement(userId, db),
+    dripEngagement: listUserDripEngagement(userId, db),
   };
 }
 

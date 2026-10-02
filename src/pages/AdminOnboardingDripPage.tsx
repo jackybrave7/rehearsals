@@ -21,6 +21,7 @@ import {
   updateAdminOnboardingDripSettings,
   type EmailDripStepDto,
   type EmailDripStepInput,
+  type DripStepEngagementStats,
   type OnboardingDripOverview,
 } from '../api/adminOnboardingDrip';
 
@@ -108,6 +109,10 @@ function stepToInput(step: EmailDripStepDto): EmailDripStepInput {
     actionLabel,
     actionPath,
   };
+}
+
+function pct(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
 }
 
 export function AdminOnboardingDripPage() {
@@ -230,7 +235,10 @@ export function AdminOnboardingDripPage() {
         bodyHtml: form.bodyHtml.trim(),
         bodyText: form.bodyText.trim() || plainTextFromHtml(form.bodyHtml),
       };
-      const result = await sendAdminDripTestEmail(payload);
+      const result = await sendAdminDripTestEmail({
+        ...payload,
+        stepId: editingId ?? undefined,
+      });
       setTestNotice(`Тест отправлен на ${result.sentTo}`);
     } catch (e) {
       const code = e instanceof Error ? e.message : '';
@@ -261,6 +269,14 @@ export function AdminOnboardingDripPage() {
       setError(e instanceof Error ? e.message : 'Ошибка');
     }
   };
+
+  const engagementByStep = useMemo(() => {
+    const map = new Map<string, DripStepEngagementStats>();
+    for (const row of data?.engagement.steps ?? []) {
+      map.set(row.stepId, row);
+    }
+    return map;
+  }, [data?.engagement.steps]);
 
   const settings = data?.settings;
   const meta = data?.meta;
@@ -338,6 +354,34 @@ export function AdminOnboardingDripPage() {
         </p>
       )}
 
+      {data?.engagement && (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Доставлено</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{data.engagement.totalDeliveries}</p>
+          </div>
+          <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Открытия</p>
+            <p className="mt-1 text-2xl font-semibold text-sky-300">{data.engagement.totalOpens}</p>
+            <p className="text-xs text-muted">
+              уник.: {data.engagement.uniqueOpens}
+              {data.engagement.totalDeliveries > 0
+                ? ` · ${pct(data.engagement.uniqueOpens / data.engagement.totalDeliveries)}`
+                : ''}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Клики</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-300">{data.engagement.totalClicks}</p>
+            <p className="text-xs text-muted">уник.: {data.engagement.uniqueClicks}</p>
+          </div>
+          <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Авто-отправок (всего)</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{data.stats.totalSent}</p>
+          </div>
+        </section>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Письма цепочки</h2>
         {sortedSteps.length === 0 && (
@@ -360,6 +404,14 @@ export function AdminOnboardingDripPage() {
                 <p className="mt-2 text-xs text-muted">
                   Задержка: {delayLabel(step)} · {meta ? conditionSummary(step, meta) : ''} · отправок:{' '}
                   {step.sentCount}
+                  {engagementByStep.get(step.id) ? (
+                    <>
+                      {' '}
+                      · открытий: {engagementByStep.get(step.id)!.opens} (
+                      {pct(engagementByStep.get(step.id)!.openRate)}) · кликов:{' '}
+                      {engagementByStep.get(step.id)!.clicks}
+                    </>
+                  ) : null}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1">

@@ -15,6 +15,7 @@ import { registerAdminEmailVerificationRoutes } from './adminEmailVerification.j
 import { registerAdminMailDeliverabilityRoutes } from './adminMailDeliverability.js';
 import { registerAdminBroadcastRoutes } from './adminBroadcast.js';
 import { registerBroadcastTrackingRoutes } from './broadcastTracking.js';
+import { registerDripTrackingRoutes } from './dripEmailTracking.js';
 import { registerSupportTicketRoutes } from './supportTickets.js';
 import { registerAdminSupportTicketRoutes } from './adminSupportTickets.js';
 import type { AppState } from '../src/types/index.js';
@@ -61,6 +62,7 @@ registerAdminMailDeliverabilityRoutes(app);
 registerAdminBroadcastRoutes(app);
 registerOnboardingDripAdminRoutes(app);
 registerBroadcastTrackingRoutes(app);
+registerDripTrackingRoutes(app);
 registerSupportTicketRoutes(app);
 registerAdminSupportTicketRoutes(app);
 registerTelegramRoutes(app);

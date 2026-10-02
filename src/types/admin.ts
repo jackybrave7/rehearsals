@@ -120,10 +120,24 @@ export interface AdminUserTheaterStats {
   rehearsalsUpcoming: number;
 }
 
+export interface UserDripEngagement {
+  deliveryId: string;
+  stepId: string;
+  stepTitle: string;
+  subject: string;
+  sentAt: string;
+  openCount: number;
+  openedAt: string | null;
+  clickCount: number;
+  clickedAt: string | null;
+  clicks: Array<{ url: string; clickedAt: string }>;
+}
+
 export interface AdminUserDetail extends AdminUserSummary {
   generatedAt: string;
   theaters: AdminUserTheaterStats[];
   broadcastEngagement: UserBroadcastEngagement[];
+  dripEngagement: UserDripEngagement[];
 }
 
 export type BroadcastSubscriptionFilter = 'all' | 'free' | 'pro';

@@ -266,6 +266,40 @@ export function getDb(): AppDatabase {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS email_drip_deliveries (
+      id TEXT PRIMARY KEY,
+      step_id TEXT NOT NULL REFERENCES email_drip_steps(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      delivery_status TEXT NOT NULL DEFAULT 'sent',
+      delivery_error TEXT,
+      open_count INTEGER NOT NULL DEFAULT 0,
+      opened_at TEXT,
+      click_count INTEGER NOT NULL DEFAULT 0,
+      clicked_at TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_drip_delivery_links (
+      id TEXT PRIMARY KEY,
+      delivery_id TEXT NOT NULL REFERENCES email_drip_deliveries(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_drip_opens (
+      id TEXT PRIMARY KEY,
+      delivery_id TEXT NOT NULL REFERENCES email_drip_deliveries(id) ON DELETE CASCADE,
+      opened_at TEXT NOT NULL,
+      user_agent TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS email_drip_clicks (
+      id TEXT PRIMARY KEY,
+      delivery_id TEXT NOT NULL REFERENCES email_drip_deliveries(id) ON DELETE CASCADE,
+      link_id TEXT REFERENCES email_drip_delivery_links(id) ON DELETE SET NULL,
+      url TEXT NOT NULL,
+      clicked_at TEXT NOT NULL,
+      user_agent TEXT
+    )`,
   ]) {
     try {
       db.exec(migration);
@@ -288,6 +322,8 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_email_broadcast_clicks_recipient_id ON email_broadcast_clicks(recipient_id)`,
     `CREATE INDEX IF NOT EXISTS idx_email_broadcasts_status_scheduled ON email_broadcasts(status, scheduled_at)`,
     `CREATE INDEX IF NOT EXISTS idx_email_drip_sent_sent_at ON email_drip_sent(sent_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_drip_deliveries_user_id ON email_drip_deliveries(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_email_drip_deliveries_step_id ON email_drip_deliveries(step_id)`,
   ]) {
     db.exec(indexSql);
   }

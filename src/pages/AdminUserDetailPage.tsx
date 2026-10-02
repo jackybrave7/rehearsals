@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -87,6 +87,60 @@ export function AdminUserDetailPage() {
       setProDuration('unlimited');
       setProCustomDate('');
     }
+  }, [detail]);
+
+  const emailHistory = useMemo(() => {
+    if (!detail) return [];
+    type Row = {
+      key: string;
+      kind: 'broadcast' | 'drip';
+      at: string;
+      subject: string;
+      stepTitle?: string;
+      deliveryStatus: 'sent' | 'failed' | 'pending';
+      deliveryError: string | null;
+      openCount: number;
+      openedAt: string | null;
+      clickCount: number;
+      clickedAt: string | null;
+      clicks: Array<{ url: string; clickedAt: string }>;
+    };
+    const rows: Row[] = [];
+
+    for (const item of detail.broadcastEngagement ?? []) {
+      rows.push({
+        key: `b-${item.broadcastId}-${item.sentAt ?? item.broadcastAt}`,
+        kind: 'broadcast',
+        at: item.sentAt ?? item.broadcastAt,
+        subject: item.subject,
+        deliveryStatus: item.deliveryStatus,
+        deliveryError: item.deliveryError,
+        openCount: item.openCount,
+        openedAt: item.openedAt,
+        clickCount: item.clickCount,
+        clickedAt: item.clickedAt,
+        clicks: item.clicks,
+      });
+    }
+
+    for (const item of detail.dripEngagement ?? []) {
+      rows.push({
+        key: `d-${item.deliveryId}`,
+        kind: 'drip',
+        at: item.sentAt,
+        subject: item.subject,
+        stepTitle: item.stepTitle,
+        deliveryStatus: 'sent',
+        deliveryError: null,
+        openCount: item.openCount,
+        openedAt: item.openedAt,
+        clickCount: item.clickCount,
+        clickedAt: item.clickedAt,
+        clicks: item.clicks,
+      });
+    }
+
+    return rows.sort((a, b) => b.at.localeCompare(a.at));
   }, [detail]);
 
   const handleApplyPlan = async () => {
@@ -380,16 +434,17 @@ export function AdminUserDetailPage() {
               Рассылки
             </h2>
             <p className="mb-4 text-sm text-muted">
-              История email-рассылок платформы и взаимодействие этого пользователя с письмами.
+              Ручные рассылки и автоматические письма цепочки онбординга с отслеживанием открытий и кликов.
             </p>
-            {(detail.broadcastEngagement ?? []).length === 0 ? (
-              <p className="text-sm text-muted">Пользователь ещё не получал рассылок с отслеживанием.</p>
+            {emailHistory.length === 0 ? (
+              <p className="text-sm text-muted">Пользователь ещё не получал писем с отслеживанием.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-gold/10 text-muted">
                       <th className="px-3 py-2 font-medium">Дата</th>
+                      <th className="px-3 py-2 font-medium">Тип</th>
                       <th className="px-3 py-2 font-medium">Тема</th>
                       <th className="px-3 py-2 font-medium">Доставка</th>
                       <th className="px-3 py-2 font-medium">Открыто</th>
@@ -397,12 +452,20 @@ export function AdminUserDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(detail.broadcastEngagement ?? []).map((item) => (
-                      <tr key={`${item.broadcastId}-${item.sentAt ?? item.broadcastAt}`} className="border-b border-gold/5">
+                    {emailHistory.map((item) => (
+                      <tr key={item.key} className="border-b border-gold/5">
                         <td className="px-3 py-2 text-muted">
-                          {format(parseISO(item.broadcastAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                          {format(parseISO(item.at), 'd MMM yyyy, HH:mm', { locale: ru })}
                         </td>
-                        <td className="px-3 py-2 text-white">{item.subject}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {item.kind === 'drip' ? 'Цепочка' : 'Рассылка'}
+                        </td>
+                        <td className="px-3 py-2 text-white">
+                          {item.subject}
+                          {item.kind === 'drip' && item.stepTitle ? (
+                            <span className="mt-0.5 block text-xs text-muted">{item.stepTitle}</span>
+                          ) : null}
+                        </td>
                         <td className="px-3 py-2">
                           {item.deliveryStatus === 'sent' ? (
                             <span className="text-emerald-300">отправлено</span>
