@@ -83,8 +83,16 @@ export function getTheaterSetupSteps(state: AppState): TheaterSetupStep[] {
     },
     {
       id: 'telegram',
-      label: 'Подключить Telegram или отправить план',
+      label: 'Отправить план в Telegram или .ics',
       done: planExported,
+      href: appPaths.rehearsals,
+    },
+    {
+      id: 'telegram_bot',
+      label: 'Telegram-бот: чат и участники',
+      done:
+        Boolean(theater?.telegramChatId?.trim()) &&
+        actors.some((actor) => Boolean(actor.telegramChatId?.trim())),
       href: appPaths.settings,
     },
   ];

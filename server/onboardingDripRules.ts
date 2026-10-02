@@ -151,6 +151,38 @@ export function syncDefaultDripTemplatesToLatest(db: AppDatabase): void {
     );
   }
 
+  const insert = db.prepare(
+    `INSERT INTO email_drip_steps (
+      id, sort_order, enabled, title, condition_type, condition_checklist_step,
+      delay_days, delay_hours, delay_minutes,
+      subject, body_text, body_html, body_format,
+      action_label, action_path, created_at, updated_at
+    ) VALUES (?, ?, 1, ?, 'checklist_pending', ?, ?, 0, 0, ?, ?, ?, 'html', ?, ?, ?, ?)`
+  );
+
+  for (const [index, template] of DEFAULT_DRIP_STEP_TEMPLATES.entries()) {
+    const exists = db
+      .prepare(
+        `SELECT 1 FROM email_drip_steps WHERE condition_type = 'checklist_pending' AND condition_checklist_step = ?`
+      )
+      .get(template.checklistStepId);
+    if (exists) continue;
+    insert.run(
+      randomUUID(),
+      index,
+      template.title,
+      template.checklistStepId,
+      template.delayDays,
+      template.subject,
+      template.bodyText,
+      template.bodyHtml,
+      template.actionLabel,
+      template.actionPath,
+      now,
+      now
+    );
+  }
+
   db.prepare(
     `UPDATE platform_settings SET email_drip_templates_version = ? WHERE id = 1`
   ).run(DRIP_TEMPLATES_CONTENT_VERSION);

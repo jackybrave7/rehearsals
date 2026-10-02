@@ -71,6 +71,7 @@ export function getUserSetupStepProgress(db: AppDatabase, userId: string): UserS
   let venues = 0;
   let hasScheduledRehearsal = false;
   let telegramDone = false;
+  let telegramBotDone = false;
 
   if (theaterId) {
     actors = (db.prepare(`SELECT COUNT(*) AS c FROM actors WHERE theater_id = ?`).get(theaterId) as { c: number }).c;
@@ -127,6 +128,19 @@ export function getUserSetupStepProgress(db: AppDatabase, userId: string): UserS
 
     telegramDone =
       Boolean(theaterRow?.telegram_chat_id?.trim()) || guidePlanSent || planSent;
+
+    const linkedActors = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM actors
+           WHERE theater_id = ? AND status = 'active'
+             AND telegram_chat_id IS NOT NULL AND trim(telegram_chat_id) != ''`
+        )
+        .get(theaterId) as { c: number }
+    ).c;
+
+    telegramBotDone =
+      Boolean(theaterRow?.telegram_chat_id?.trim()) && linkedActors >= 1;
   }
 
   const doneById: Record<ChecklistStepId, boolean> = {
@@ -138,6 +152,7 @@ export function getUserSetupStepProgress(db: AppDatabase, userId: string): UserS
     venue: venues >= 1,
     rehearsal: hasScheduledRehearsal,
     telegram: telegramDone,
+    telegram_bot: telegramBotDone,
   };
 
   return CHECKLIST_STEP_OPTIONS.map((step) => ({

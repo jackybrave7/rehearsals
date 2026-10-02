@@ -7,7 +7,8 @@ export type ChecklistStepId =
   | 'cast'
   | 'venue'
   | 'rehearsal'
-  | 'telegram';
+  | 'telegram'
+  | 'telegram_bot';
 
 export type DripConditionType = 'checklist_pending' | 'checklist_done' | 'always';
 
@@ -19,7 +20,8 @@ export const CHECKLIST_STEP_OPTIONS: Array<{ id: ChecklistStepId; label: string 
   { id: 'cast', label: 'Роли в составе' },
   { id: 'venue', label: 'Добавить площадку' },
   { id: 'rehearsal', label: 'Репетиция с планом' },
-  { id: 'telegram', label: 'Telegram или план' },
+  { id: 'telegram', label: 'План в Telegram или .ics' },
+  { id: 'telegram_bot', label: 'Telegram-бот: чат и участники' },
 ];
 
 export const DRIP_ACTION_PATH_OPTIONS = [
