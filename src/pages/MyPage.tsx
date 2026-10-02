@@ -15,7 +15,7 @@ import { useAuth } from '../store/AuthContext';
 import { useDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import type { Actor, ActorUnavailability, AppState, Rehearsal, RehearsalActorNote, RsvpStatus } from '../types';
-import { findLinkedActor, findTheaterWithLinkedActor, getActorScenes, getActorScenesInRehearsal } from '../utils/actorProfile';
+import { findLinkedActor, findTheaterWithLinkedActor, getActorScenes, getActorScenesInRehearsal, canAccessActorCabinet } from '../utils/actorProfile';
 import {
   buildActorPlaySummaries,
   formatMemorizationProgressLabel,
@@ -163,6 +163,8 @@ export function MyPage() {
   }
 
   const linkedActor = findLinkedActor(state, user?.email, theaterId, user?.name);
+  const theaterRole = getTheaterRole(theaterId);
+  const cabinetAccess = canAccessActorCabinet(state, user?.email, user?.name, theaterId, theaterRole);
   const alternateTheater = findTheaterWithLinkedActor(state, user?.email, user?.name);
   const activeTheaterName = state.theaters.find((t) => t.id === theaterId)?.name;
 
@@ -513,6 +515,26 @@ export function MyPage() {
               </p>
             </>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!cabinetAccess && (theaterRole === 'owner' || theaterRole === 'editor')) {
+    return (
+      <div className="space-y-6">
+        <header className={pageHeaderClass}>
+          <h1 className={pageTitleClass}>Моё</h1>
+        </header>
+        <div className={`${sectionClass} text-center`}>
+          <p className="text-sm leading-relaxed text-muted">
+            Карточка «{linkedActor.name}» привязана к вашему email. Чтобы учить текст и отмечать явку как
+            актёр, назначьте себя на роль в составе постановки (
+            <Link to={appPaths.play} className="text-gold-light hover:underline">
+              Постановки и состав
+            </Link>
+            ).
+          </p>
         </div>
       </div>
     );

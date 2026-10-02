@@ -5,6 +5,7 @@ import { AppLogo } from '../AppLogo';
 import { useDesign } from '../../store/DesignContext';
 import { useRehearsalStore } from '../../store/RehearsalContext';
 import { useActorNavMode } from '../../hooks/useActorNavMode';
+import { useActorCabinetAccess } from '../../hooks/useActorCabinetAccess';
 import { TheaterSwitcher } from '../TheaterSwitcher';
 import { WorkContextBar } from '../WorkContextBar';
 import { MobileBottomNav } from '../MobileBottomNav';
@@ -30,7 +31,8 @@ export function ZenShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const { state } = useRehearsalStore();
   const actorOnly = useActorNavMode();
-  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly);
+  const actorCabinetLink = useActorCabinetAccess();
+  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly, actorCabinetLink);
   const primaryNavItems = getPrimaryNavItems(visibleNavItems);
   const secondaryNavItems = getSecondaryNavItems(visibleNavItems);
 

@@ -57,9 +57,25 @@ export const actorNavItems: MainNavItem[] = [
   { to: appPaths.support, icon: LifeBuoy, label: 'Поддержка' },
 ];
 
-export function getNavItemsForUser(playCount: number, actorOnly: boolean): MainNavItem[] {
+const actorCabinetNavItem: MainNavItem = {
+  to: appPaths.my,
+  icon: UserCircle,
+  label: 'Моё',
+  zenLabel: 'Моё',
+};
+
+export function getNavItemsForUser(
+  playCount: number,
+  actorOnly: boolean,
+  actorCabinetLink = false
+): MainNavItem[] {
   if (actorOnly) return actorNavItems;
-  return getVisibleMainNavItems(playCount);
+  const items = getVisibleMainNavItems(playCount);
+  if (!actorCabinetLink) return items;
+  if (items.some((entry) => entry.to === appPaths.my)) return items;
+  const homeIndex = items.findIndex((entry) => entry.to === appPaths.home);
+  const insertAt = homeIndex >= 0 ? homeIndex + 1 : 0;
+  return [...items.slice(0, insertAt), actorCabinetNavItem, ...items.slice(insertAt)];
 }
 
 export function resolveMainNavTitle(pathname: string, variant: 'theater' | 'zen' = 'zen'): string {
@@ -95,7 +111,7 @@ const primaryNavPaths = new Set<string>([
 
 /** Основные разделы — нижняя навигация и верх выезжающего меню. */
 export function getPrimaryNavItems(items: MainNavItem[]): MainNavItem[] {
-  return items.filter((item) => primaryNavPaths.has(item.to));
+  return items.filter((item) => primaryNavPaths.has(item.to) || item.to === appPaths.my);
 }
 
 /** Редкие разделы — блок «Ещё» в мобильном меню. */

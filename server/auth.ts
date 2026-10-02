@@ -14,6 +14,7 @@ import {
 import { getRegistrationMode, getRegistrationNotificationRecipients, isRegistrationApproved } from './platformSettings.js';
 import { normalizeActorEmail, normalizeActorName } from '../src/utils/actorProfile.js';
 import { deleteUserCompletely } from './adminDeleteUser.js';
+import { sendTheaterMemberInviteEmail } from './actorRosterInvite.js';
 
 const SESSION_COOKIE = 'rehearsals_session';
 const SESSION_DAYS = 30;
@@ -163,8 +164,85 @@ function syncOwnerMemberships(db: AppDatabase): void {
   ).run(now);
 }
 
+function syncActorAccessFromRosterAndInvites(
+  db: AppDatabase,
+  user: Pick<AuthUser, 'id' | 'email' | 'name'>
+): void {
+  const email = normalizeActorEmail(user.email);
+  if (!email) return;
+
+  const now = new Date().toISOString();
+
+  const pending = db
+    .prepare(
+      `SELECT theater_id, role FROM theater_pending_invites WHERE email = ?`
+    )
+    .all(email) as Array<{ theater_id: string; role: TheaterAccessRole }>;
+
+  const insertMember = db.prepare(
+    `INSERT INTO theater_members (theater_id, user_id, role, created_at) VALUES (?, ?, ?, ?)`
+  );
+  const updateMemberRole = db.prepare(
+    `UPDATE theater_members SET role = ? WHERE theater_id = ? AND user_id = ?`
+  );
+
+  for (const row of pending) {
+    if (row.role !== 'editor' && row.role !== 'observer' && row.role !== 'actor') continue;
+    const existing = db
+      .prepare(`SELECT role FROM theater_members WHERE theater_id = ? AND user_id = ?`)
+      .get(row.theater_id, user.id) as { role: TheaterAccessRole } | undefined;
+    if (existing?.role === 'owner' || existing?.role === 'editor') {
+      db.prepare(`DELETE FROM theater_pending_invites WHERE theater_id = ? AND email = ?`).run(
+        row.theater_id,
+        email
+      );
+      continue;
+    }
+    if (!existing) {
+      insertMember.run(row.theater_id, user.id, row.role, now);
+    } else if (existing.role === 'observer' || existing.role === 'actor') {
+      updateMemberRole.run(row.role, row.theater_id, user.id);
+    }
+    if (row.role === 'actor') {
+      ensureActorParticipantCard(db, row.theater_id, user);
+    }
+    db.prepare(`DELETE FROM theater_pending_invites WHERE theater_id = ? AND email = ?`).run(
+      row.theater_id,
+      email
+    );
+  }
+
+  const rosterTheaters = db
+    .prepare(
+      `SELECT DISTINCT theater_id FROM actors
+       WHERE status = 'active' AND LOWER(TRIM(COALESCE(email, ''))) = ?`
+    )
+    .all(email) as Array<{ theater_id: string }>;
+
+  const insertActorMember = db.prepare(
+    `INSERT OR IGNORE INTO theater_members (theater_id, user_id, role, created_at) VALUES (?, ?, 'actor', ?)`
+  );
+
+  for (const { theater_id } of rosterTheaters) {
+    const existing = db
+      .prepare(`SELECT role FROM theater_members WHERE theater_id = ? AND user_id = ?`)
+      .get(theater_id, user.id) as { role: TheaterAccessRole } | undefined;
+    if (existing) continue;
+    insertActorMember.run(theater_id, user.id, now);
+    ensureActorParticipantCard(db, theater_id, user);
+  }
+}
+
 function getUserTheaters(db: AppDatabase, userId: string): TheaterAccessInfo[] {
   syncOwnerMemberships(db);
+
+  const userRow = db.prepare(`SELECT id, email, name FROM users WHERE id = ?`).get(userId) as
+    | Pick<AuthUser, 'id' | 'email' | 'name'>
+    | undefined;
+  if (userRow) {
+    syncActorAccessFromRosterAndInvites(db, userRow);
+  }
+
   const rows = db
     .prepare(
       `SELECT theater_id, role FROM theater_members WHERE user_id = ? ORDER BY role, theater_id`
@@ -667,8 +745,14 @@ export function registerAuthRoutes(app: import('express').Express) {
     const user = db.prepare(`SELECT id, email, name FROM users WHERE email = ?`).get(email) as
       | AuthUser
       | undefined;
+
     if (!user) {
-      res.status(404).json({ error: 'USER_NOT_FOUND' });
+      db.prepare(
+        `INSERT INTO theater_pending_invites (theater_id, email, role, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(theater_id, email) DO UPDATE SET role = excluded.role, created_at = excluded.created_at`
+      ).run(theaterId, email, role, new Date().toISOString());
+      sendTheaterMemberInviteEmail(db, theaterId, email, role);
+      res.json({ ok: true, pending: true });
       return;
     }
 
@@ -680,6 +764,8 @@ export function registerAuthRoutes(app: import('express').Express) {
     if (role === 'actor') {
       ensureActorParticipantCard(db, theaterId, user);
     }
+
+    sendTheaterMemberInviteEmail(db, theaterId, email, role);
 
     res.json({ ok: true });
   });

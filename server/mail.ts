@@ -285,6 +285,41 @@ export async function sendProActivatedEmail(to: string, name: string): Promise<v
   });
 }
 
+export async function sendTheaterActorInviteEmail(options: {
+  to: string;
+  theaterName: string;
+  actorName: string;
+  accessRole?: 'editor' | 'observer' | 'actor';
+}): Promise<void> {
+  const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
+  const loginUrl = `${appUrl.replace(/\/$/, '')}/login`;
+  const registerUrl = `${loginUrl}?email=${encodeURIComponent(options.to)}`;
+  const greeting = options.actorName.trim() || options.to;
+  const roleHint =
+    options.accessRole === 'editor'
+      ? 'Вам открыт доступ редактора в театре.'
+      : options.accessRole === 'observer'
+        ? 'Вам открыт доступ наблюдателя в театре.'
+        : 'Вам открыт кабинет актёра: репетиции, явка, учёба текста, недоступность.';
+
+  await sendMail({
+    to: options.to,
+    subject: `Приглашение в «${options.theaterName}» — Репетиции`,
+    msgType: 'transaction',
+    text: [
+      `Здравствуйте, ${greeting}!`,
+      '',
+      `Вас пригласили в театр «${options.theaterName}» в сервисе «Репетиции».`,
+      roleHint,
+      '',
+      'Зарегистрируйтесь или войдите с этим же email — доступ подтянется автоматически:',
+      registerUrl,
+      '',
+      'После входа откройте раздел «Моё», чтобы отмечать явку на репетиции и учить текст.',
+    ].join('\n'),
+  });
+}
+
 export async function sendRegistrationApprovedEmail(to: string, name: string): Promise<void> {
   const appUrl = process.env.APP_URL?.trim() || 'https://rehears.ru';
   const loginUrl = `${appUrl.replace(/\/$/, '')}/login`;

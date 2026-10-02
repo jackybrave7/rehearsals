@@ -85,17 +85,17 @@ function assertActorTheaterAccess(
   }
 
   const role = getTheaterRole(session, theaterId);
-  if (role !== 'actor' && role !== 'owner' && role !== 'editor' && role !== 'observer') {
-    res.status(403).json({ error: 'FORBIDDEN' });
-    return false;
-  }
-
-  if (role !== 'actor') {
+  if (role === 'observer') {
     res.status(403).json({ error: 'ACTOR_ROLE_REQUIRED' });
     return false;
   }
 
-  return true;
+  if (role === 'actor' || role === 'owner' || role === 'editor') {
+    return true;
+  }
+
+  res.status(403).json({ error: 'FORBIDDEN' });
+  return false;
 }
 
 function assertLinkedActor(

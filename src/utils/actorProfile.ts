@@ -1,5 +1,5 @@
 import type { AppState, Actor, Play, PlayRole, Rehearsal, Scene } from '../types';
-import type { AuthSessionPayload } from '../types/auth';
+import type { AuthSessionPayload, TheaterAccessRole } from '../types/auth';
 import { getActorIdsForSceneIds } from './rehearsalActors';
 
 export function normalizeActorEmail(email: string | null | undefined): string {
@@ -59,6 +59,24 @@ export function findLinkedActor(
 }
 
 /** Театр, где у пользователя уже есть карточка участника (для подсказки переключения). */
+/** Кабинет «Моё»: роль actor или владелец/редактор с карточкой в составе и назначением на роль. */
+export function canAccessActorCabinet(
+  state: AppState,
+  userEmail: string | null | undefined,
+  userName: string | null | undefined,
+  theaterId: string | null | undefined,
+  theaterRole: TheaterAccessRole | null | undefined
+): boolean {
+  if (!theaterId || theaterRole === 'observer') return false;
+  if (theaterRole === 'actor') return true;
+  const linked = findLinkedActor(state, userEmail, theaterId, userName);
+  if (!linked) return false;
+  if (theaterRole === 'owner' || theaterRole === 'editor') {
+    return state.castAssignments.some((assignment) => assignment.actorId === linked.id);
+  }
+  return false;
+}
+
 export function findTheaterWithLinkedActor(
   state: AppState,
   userEmail: string | null | undefined,

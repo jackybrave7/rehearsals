@@ -17,6 +17,7 @@ import {
 import { migrateEmbeddedFilesIfNeeded } from './fileMigration.js';
 import { validateSubscriptionLimits, stripProOnlyRehearsalFields } from './subscription.js';
 import { syncDecidedNotesToActorNotes } from '../src/utils/decidedNotesMentions.js';
+import { processActorRosterInvitesAfterSave } from './actorRosterInvite.js';
 
 function getEditableTheaterIds(session: AuthSessionPayload): Set<string> {
   return new Set(
@@ -231,4 +232,6 @@ export function saveStateForUser(
   });
 
   tx();
+
+  processActorRosterInvitesAfterSave(db, dbState, editablePayload, editableIds);
 }

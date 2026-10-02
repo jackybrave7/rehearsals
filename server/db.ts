@@ -300,6 +300,19 @@ export function getDb(): AppDatabase {
       clicked_at TEXT NOT NULL,
       user_agent TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS actor_roster_invites (
+      theater_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      PRIMARY KEY (theater_id, email)
+    )`,
+    `CREATE TABLE IF NOT EXISTS theater_pending_invites (
+      theater_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('editor', 'observer', 'actor')),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (theater_id, email)
+    )`,
   ]) {
     try {
       db.exec(migration);

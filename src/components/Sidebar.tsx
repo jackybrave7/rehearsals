@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useActorNavMode } from '../hooks/useActorNavMode';
+import { useActorCabinetAccess } from '../hooks/useActorCabinetAccess';
 import { getActivePlay, getTheaterPlays } from '../store/selectors';
 import { TheaterSwitcher } from './TheaterSwitcher';
 import { getMainNavLabel, getNavItemsForUser, getSecondaryNavItems } from '../navigation/mainNav';
@@ -29,8 +30,9 @@ type SidebarProps = {
 export function Sidebar({ className = '', drawer = false, onNavigate }: SidebarProps) {
   const { state } = useRehearsalStore();
   const actorOnly = useActorNavMode();
+  const actorCabinetLink = useActorCabinetAccess();
   const activePlay = getActivePlay(state);
-  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly);
+  const visibleNavItems = getNavItemsForUser(getTheaterPlays(state).length, actorOnly, actorCabinetLink);
   const navItems = drawer ? getSecondaryNavItems(visibleNavItems) : visibleNavItems;
   const [collapsed, setCollapsed] = useState(() => (drawer ? false : readCollapsedPreference()));
   const isCollapsed = drawer ? false : collapsed;

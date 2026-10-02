@@ -2,12 +2,20 @@ import { NavLink } from 'react-router-dom';
 import { CalendarDays, Film, LayoutDashboard, MoreHorizontal, UserCircle, Users } from 'lucide-react';
 import { appPaths } from '../navigation/appPaths';
 import { useActorNavMode } from '../hooks/useActorNavMode';
+import { useActorCabinetAccess } from '../hooks/useActorCabinetAccess';
 
 const directorItems = [
   { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', shortLabel: 'Репет.' },
   { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', shortLabel: 'Обзор' },
   { to: appPaths.scenes, icon: Film, label: 'Сцены', shortLabel: 'Сцены' },
   { to: appPaths.actors, icon: Users, label: 'Участники', shortLabel: 'Люди' },
+] as const;
+
+const directorItemsWithMy = [
+  { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', shortLabel: 'Репет.' },
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', shortLabel: 'Обзор' },
+  { to: appPaths.my, icon: UserCircle, label: 'Моё', shortLabel: 'Моё' },
+  { to: appPaths.scenes, icon: Film, label: 'Сцены', shortLabel: 'Сцены' },
 ] as const;
 
 const actorItems = [
@@ -22,7 +30,8 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ variant = 'theater', onMoreClick }: MobileBottomNavProps) {
   const isZen = variant === 'zen';
   const actorOnly = useActorNavMode();
-  const items = actorOnly ? actorItems : directorItems;
+  const actorCabinetLink = useActorCabinetAccess();
+  const items = actorOnly ? actorItems : actorCabinetLink ? directorItemsWithMy : directorItems;
 
   return (
     <nav

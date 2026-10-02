@@ -85,7 +85,9 @@ export function TheaterMembersPanel() {
       const rows = await fetchTheaterMembers(theaterId);
       setMembers(rows);
       setSuccess(
-        `${THEATER_ROLE_LABELS[role]} добавлен: ${normalizedEmail}. Попросите коллегу войти с этим же email и нажать «Проверить доступ».`
+        role === 'actor'
+          ? `${THEATER_ROLE_LABELS[role]}: ${normalizedEmail}. На почту отправлено приглашение — после регистрации с тем же email откроется раздел «Моё».`
+          : `${THEATER_ROLE_LABELS[role]}: ${normalizedEmail}. Приглашение отправлено на email (или попросите коллегу нажать «Проверить доступ» после входа).`
       );
     } catch (addError) {
       setError(addError instanceof Error ? addError.message : 'Не удалось добавить участника');
