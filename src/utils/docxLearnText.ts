@@ -128,7 +128,7 @@ export function paragraphsToLearnScriptText(paragraphs: DocxScriptParagraph[]): 
 
   const flushRemark = () => {
     if (remarkParts.length === 0) return;
-    lines.push(`(${remarkParts.join(' ')})`);
+    lines.push(`(${remarkParts.join('\n')})`);
     remarkParts = [];
   };
 

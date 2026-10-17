@@ -251,7 +251,7 @@ assert(
       html: '<em>(стены) увешана шкурами</em>',
       isEntirelyItalic: true,
     },
-  ]) === '(Вся пещера (стены) увешана шкурами)'
+  ]) === '(Вся пещера\n(стены) увешана шкурами)'
 );
 
 const directionLines = parseSceneLearnLines(

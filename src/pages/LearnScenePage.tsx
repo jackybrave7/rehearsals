@@ -385,7 +385,7 @@ export function LearnScenePage() {
                         ? 'font-semibold text-foreground'
                         : 'font-semibold text-gold-light'
                       : ''
-                  } ${isDirection ? (isZen ? 'italic text-muted' : 'italic text-muted') : ''}`}
+                  } ${isDirection ? (isZen ? 'italic text-muted whitespace-pre-line' : 'italic text-muted whitespace-pre-line') : ''}`}
                 >
                   <span className={isHidden ? blurClass : ''}>
                     <LearnLineText line={line} />
