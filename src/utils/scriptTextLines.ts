@@ -1,10 +1,14 @@
 const CHARACTER_NAME_PART = '[А-ЯA-ZЁ][а-яёА-ЯЁ\\-]+';
-const CHARACTER_NAME = `(?:${CHARACTER_NAME_PART}(?:[\\s-]+${CHARACTER_NAME_PART}){0,3})`;
+/** Суффикс « 1», « 2» — Попутчик 1, Мужчина 2 и т.п. */
+const CHARACTER_NUMBER_SUFFIX = '(?:\\s+\\d+)';
+const CHARACTER_NAME = `(?:${CHARACTER_NAME_PART}(?:[\\s-]+${CHARACTER_NAME_PART}){0,3}${CHARACTER_NUMBER_SUFFIX}?)`;
 const CHARACTER_MULTI_WORD_NAME = `(?:${CHARACTER_NAME_PART}(?:\\s+${CHARACTER_NAME_PART})+)`;
+/** Одно слово с номером — достаточно однозначно для маркера в середине строки. */
+const CHARACTER_NUMBERED_NAME = `(?:${CHARACTER_NAME_PART}${CHARACTER_NUMBER_SUFFIX})`;
 const CHARACTER_ALL_CAPS_NAME = '[А-ЯA-ZЁ]{2,}';
 const CHARACTER_INLINE_REMARK_RE = '\\s*\\([^)]+\\)';
 
-/** Маркер реплики: «Петер:», «Петер.» или «Петер (ремарка).» */
+/** Маркер реплики: «Петер:», «Петер.», «Мужчина 1.» или «Петер (ремарка).» */
 export const CHARACTER_DIALOGUE_INLINE_RE = new RegExp(
   `^(${CHARACTER_NAME})(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]\\s*(.*)$`
 );
@@ -13,9 +17,9 @@ export const CHARACTER_CUE_LINE_RE = new RegExp(
   `^${CHARACTER_NAME}(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]?$`
 );
 
-/** В середине строки — только полное имя или ВСЕ ПРОПИСНЫЕ, чтобы не резать по «Тише.» */
+/** В середине строки — полное имя, имя с номером или ВСЕ ПРОПИСНЫЕ, чтобы не резать по «Тише.» */
 const CHARACTER_MARKER_RE = new RegExp(
-  `(?:^(${CHARACTER_NAME})|(?<=[.!?]\\s)(${CHARACTER_MULTI_WORD_NAME}|${CHARACTER_ALL_CAPS_NAME}))(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]\\s+`,
+  `(?:^(${CHARACTER_NAME})|(?<=[.!?]\\s)(${CHARACTER_MULTI_WORD_NAME}|${CHARACTER_NUMBERED_NAME}|${CHARACTER_ALL_CAPS_NAME}))(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]\\s+`,
   'g'
 );
 

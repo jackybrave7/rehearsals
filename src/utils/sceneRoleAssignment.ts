@@ -26,11 +26,47 @@ function roleNamePrimaryToken(roleName: string): string {
   return roleName.split(/[\s,–-]+/)[0]?.trim().toLowerCase() ?? '';
 }
 
+/** Номер в конце: «мужчина 1» → «1». */
+function trailingCharacterNumber(value: string): string | null {
+  const match = value.trim().match(/\s+(\d+)$/);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Варианты имени из «Елена (Лена)» / «Официант (Нина)»:
+ * полное, без скобок, и содержимое скобок.
+ */
+export function expandRoleNameForms(roleName: string): string[] {
+  const trimmed = roleName.trim();
+  if (!trimmed) return [];
+
+  const forms = [trimmed];
+  const paren = trimmed.match(/\(([^)]+)\)/);
+  if (!paren) return forms;
+
+  const withoutParen = trimmed.replace(/\s*\([^)]+\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  if (withoutParen) forms.push(withoutParen);
+
+  for (const alt of paren[1].split(/[,;/]/)) {
+    const part = alt.trim();
+    if (part) forms.push(part);
+  }
+
+  return [...new Set(forms)];
+}
+
 function characterTokenMatchesRoleName(roleName: string, token: string): boolean {
   const normalizedRoleName = normalizeCharacterToken(roleName).toLowerCase();
   if (!normalizedRoleName || !token) return false;
 
   if (normalizedRoleName === token) return true;
+
+  const roleNum = trailingCharacterNumber(normalizedRoleName);
+  const tokenNum = trailingCharacterNumber(token);
+  // «Мужчина 1» и «Мужчина 2» — разные роли; без номера к ним не матчим.
+  if (roleNum !== null || tokenNum !== null) {
+    return false;
+  }
 
   const primaryToken = roleNamePrimaryToken(normalizedRoleName);
   if (primaryToken === token) return true;
@@ -46,7 +82,9 @@ function characterTokenMatchesRoleName(roleName: string, token: string): boolean
 }
 
 function roleCharacterTokens(role: PlayRole): string[] {
-  return [role.name, ...(role.scriptAliases ?? [])];
+  const fromName = expandRoleNameForms(role.name);
+  const fromAliases = (role.scriptAliases ?? []).flatMap((alias) => expandRoleNameForms(alias));
+  return [...new Set([...fromName, ...fromAliases])];
 }
 
 export function characterTokenMatchesRole(role: PlayRole, characterName: string): boolean {
@@ -59,7 +97,9 @@ export function characterTokenMatchesRole(role: PlayRole, characterName: string)
 /** Совпадает ли подпись в тексте (Петер:, Михель:) с именем роли строки. */
 export function isCharacterLabelForRole(roleName: string | undefined, label: string): boolean {
   if (!roleName || !label) return false;
-  return characterTokenMatchesRoleName(roleName, normalizeCharacterToken(label).toLowerCase());
+  return expandRoleNameForms(roleName).some((form) =>
+    characterTokenMatchesRoleName(form, normalizeCharacterToken(label).toLowerCase())
+  );
 }
 
 export function findCharacterRoleId(
@@ -72,10 +112,8 @@ export function findCharacterRoleId(
 
   const roles = playRoles.filter((role) => role.playId === playId && role.kind === 'character');
 
-  const byAlias = roles.find((role) => characterTokenMatchesRole(role, characterName));
-  if (byAlias) return byAlias.id;
-
-  return roles.find((role) => role.description?.toLowerCase().includes(token))?.id;
+  // Только имя / алиасы / формы в скобках — без description.includes (ложные «жених» → Игорь).
+  return roles.find((role) => characterTokenMatchesRole(role, characterName))?.id;
 }
 
 const EXCLUDED_CUES = new Set([
@@ -98,6 +136,12 @@ function isExcludedCharacterCue(name: string): boolean {
   return /^сцена\s+\d+/i.test(norm) || /^акт\s+\d+/i.test(norm);
 }
 
+/** Следующий заголовок сцены в «протекающем» тексте тела — не брать реплики чужой сцены. */
+function isSceneBoundaryLine(line: string): boolean {
+  const trimmed = line.trim().replace(/^#{1,6}\s+/, '');
+  return /^сцена\s+\d+/i.test(trimmed);
+}
+
 function addCharacterName(names: Set<string>, raw: string): void {
   const normalized = normalizeCharacterToken(raw);
   if (!normalized || isExcludedCharacterCue(normalized)) return;
@@ -110,6 +154,8 @@ export function extractCharacterNamesFromScriptText(raw: string): string[] {
   const lines = expandScriptTextToLines(raw);
 
   for (const line of lines) {
+    if (isSceneBoundaryLine(line)) break;
+
     const inlineDialogue = line.match(CHARACTER_DIALOGUE_INLINE_RE);
     if (inlineDialogue) {
       addCharacterName(names, inlineDialogue[1]);
