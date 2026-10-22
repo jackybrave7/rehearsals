@@ -12,6 +12,8 @@ import { getActorScenesInRehearsal } from './actorProfile';
 import { groupActorScenesByPlay } from './actorMyPage';
 import { formatActorRsvpStatusLine } from './rehearsalRsvp';
 import { REMINDER_TYPE_LABELS, type ReminderType } from './reminders';
+import { getRehearsalExportNoteSections } from './rehearsalDecidedNotesSummary';
+import { formatDecidedNotesLineForDecisionsExport } from './decidedNotesMentions';
 
 const blockTypeLabels: Record<ScheduleBlock['type'], string> = {
   scene: 'Сцена',
@@ -549,11 +551,11 @@ function buildMessages(state: AppState, rehearsal: Rehearsal): TelegramExport {
     }
   }
 
-  if (rehearsal.notes?.trim()) {
-    plainLines.push(...section('📝 ЗАМЕТКИ'));
-    htmlLines.push(telegramSection('📝 ЗАМЕТКИ'));
-    plainLines.push(rehearsal.notes.trim());
-    htmlLines.push(escapeHtml(rehearsal.notes.trim()));
+  for (const noteSection of getRehearsalExportNoteSections(rehearsal)) {
+    plainLines.push(...section(noteSection.title));
+    htmlLines.push(telegramSection(noteSection.title));
+    plainLines.push(noteSection.body);
+    htmlLines.push(escapeHtml(noteSection.body).replace(/\n/g, '<br>'));
   }
 
   return {
@@ -623,9 +625,9 @@ export function buildActorReminderTelegramBotMessage(
     }
   }
 
-  if (rehearsal.notes?.trim()) {
-    lines.push(telegramSection('📝 Заметки').trim());
-    lines.push(escapeHtml(truncateTelegramText(rehearsal.notes, 240)));
+  for (const noteSection of getRehearsalExportNoteSections(rehearsal)) {
+    lines.push(telegramSection(noteSection.title).trim());
+    lines.push(escapeHtml(truncateTelegramText(noteSection.body, 400)));
   }
 
   return lines.join('\n');
@@ -743,4 +745,122 @@ export async function copyRehearsalTelegramMessage(
 ): Promise<void> {
   const { text } = buildMessages(state, rehearsal);
   await navigator.clipboard.writeText(text);
+}
+
+function joinDecisionsTelegramHtml(lines: string[]): string {
+  return lines.map((line) => (line === '' ? '<br>' : line)).join('<br>');
+}
+
+function buildRehearsalDecisionsMessages(
+  state: AppState,
+  rehearsal: Rehearsal
+): TelegramExport | null {
+  const plainLines: string[] = [];
+  const htmlLines: string[] = [];
+  let itemNumber = 0;
+  let hasContent = false;
+
+  const playHeader = formatRehearsalPlayHeader(state, rehearsal);
+  const dateLabel = format(parseISO(rehearsal.date), 'EEEE, d MMMM yyyy', { locale: ru });
+  const capitalizedDate = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+  const timeRange = `${rehearsal.startTime} – ${rehearsal.endTime}`;
+
+  plainLines.push('✅ РЕШЕНИЯ И КОРРЕКТИРОВКИ');
+  htmlLines.push('<b>✅ РЕШЕНИЯ И КОРРЕКТИРОВКИ</b>');
+  plainLines.push('');
+  htmlLines.push('');
+  plainLines.push(playHeader);
+  htmlLines.push(`<b>${escapeHtml(playHeader)}</b>`);
+  plainLines.push(`📅 ${capitalizedDate}`);
+  htmlLines.push(`📅 ${escapeHtml(capitalizedDate)}`);
+  plainLines.push(`⏰ ${timeRange}`);
+  htmlLines.push(`⏰ ${escapeHtml(timeRange)}`);
+  plainLines.push('');
+  plainLines.push('---');
+  htmlLines.push('');
+  htmlLines.push('---');
+
+  for (const block of rehearsal.schedule) {
+    const raw = block.decidedNotes?.trim();
+    if (!raw) continue;
+
+    hasContent = true;
+    plainLines.push('');
+    htmlLines.push('');
+
+    const sceneHeader = `👉 ${block.title}`;
+    plainLines.push(sceneHeader);
+    htmlLines.push(`<b>${escapeHtml(sceneHeader)}</b>`);
+    plainLines.push('');
+    htmlLines.push('');
+
+    for (const rawLine of raw.split('\n')) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      itemNumber += 1;
+      const bodyPlain = formatDecidedNotesLineForDecisionsExport(
+        state,
+        rehearsal,
+        line,
+        block.sceneId,
+        false
+      );
+      const bodyHtml = formatDecidedNotesLineForDecisionsExport(
+        state,
+        rehearsal,
+        line,
+        block.sceneId,
+        true
+      );
+      plainLines.push(`${itemNumber}. ${bodyPlain}`);
+      htmlLines.push(`${itemNumber}. ${bodyHtml}`);
+    }
+  }
+
+  if (!hasContent) return null;
+
+  const joinedHtml = joinDecisionsTelegramHtml(htmlLines);
+
+  return {
+    text: plainLines.join('\n'),
+    html: `<div>${joinedHtml}</div>`,
+    botHtml: joinedHtml,
+  };
+}
+
+export function buildRehearsalDecisionsTelegramPreviewHtml(
+  state: AppState,
+  rehearsal: Rehearsal
+): string {
+  const messages = buildRehearsalDecisionsMessages(state, rehearsal);
+  return messages?.html ?? '';
+}
+
+export function buildRehearsalDecisionsTelegramMessage(
+  state: AppState,
+  rehearsal: Rehearsal
+): string {
+  return buildRehearsalDecisionsMessages(state, rehearsal)?.text ?? '';
+}
+
+export function buildRehearsalDecisionsTelegramBotMessage(
+  state: AppState,
+  rehearsal: Rehearsal,
+  options?: { initiatedBy?: string }
+): string {
+  const body = buildRehearsalDecisionsMessages(state, rehearsal)?.botHtml;
+  if (!body) return '';
+  const initiatedBy = options?.initiatedBy?.trim();
+  if (!initiatedBy) return body;
+  return `${body}\n\n<i>/ ${escapeHtml(initiatedBy)} /</i>`;
+}
+
+export async function copyRehearsalDecisionsTelegramMessage(
+  state: AppState,
+  rehearsal: Rehearsal
+): Promise<void> {
+  const message = buildRehearsalDecisionsMessages(state, rehearsal);
+  if (!message) return;
+  await navigator.clipboard.writeText(message.text);
 }

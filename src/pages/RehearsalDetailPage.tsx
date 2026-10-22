@@ -24,10 +24,15 @@ import { fetchTelegramStatus, sendTelegramHtmlMessage } from '../api/telegram';
 import { fetchRehearsalRsvp } from '../api/rehearsalRsvp';
 import { resolveRehearsalLocation } from '../utils/venue';
 import {
+  buildRehearsalDecisionsTelegramBotMessage,
+  buildRehearsalDecisionsTelegramMessage,
+  buildRehearsalDecisionsTelegramPreviewHtml,
   buildRehearsalTelegramBotMessage,
   buildRehearsalTelegramMessage,
+  copyRehearsalDecisionsTelegramMessage,
   copyRehearsalTelegramMessage,
 } from '../utils/rehearsalTelegramExport';
+import { DECIDED_NOTES_FIELD_LABEL } from '../utils/decidedNotesLabels';
 import { formatReminderKindLabel } from '../utils/reminders';
 import { getSceneShortLabel } from '../utils/sceneLabels';
 import {
@@ -76,6 +81,7 @@ import { RehearsalOutcomePhotosPanel } from '../components/RehearsalOutcomePhoto
 import { RehearsalOutcomeVideosPanel } from '../components/RehearsalOutcomeVideosPanel';
 import { RehearsalPlanningPanel } from '../components/RehearsalPlanningPanel';
 import { RehearsalScheduleEditor } from '../components/RehearsalScheduleEditor';
+import { RehearsalSummaryNotesPanel } from '../components/RehearsalSummaryNotesPanel';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
 import { markGuidePlanExported } from '../utils/guidePlanExport';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -131,7 +137,9 @@ export function RehearsalDetailPage() {
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [telegramModalOpen, setTelegramModalOpen] = useState(false);
+  const [decisionsTelegramModalOpen, setDecisionsTelegramModalOpen] = useState(false);
   const [telegramCopied, setTelegramCopied] = useState(false);
+  const [decisionsTelegramCopied, setDecisionsTelegramCopied] = useState(false);
   const [telegramConfigured, setTelegramConfigured] = useState(false);
   const [telegramSending, setTelegramSending] = useState(false);
   const [telegramSendError, setTelegramSendError] = useState<string | null>(null);
@@ -158,9 +166,9 @@ export function RehearsalDetailPage() {
 
   useEffect(() => {
     const theaterId = rehearsal?.theaterId ?? state.activeTheaterId;
-    if (!telegramModalOpen || !theaterId) return;
+    if ((!telegramModalOpen && !decisionsTelegramModalOpen) || !theaterId) return;
     void fetchTelegramStatus(theaterId).then((status) => setTelegramConfigured(status.configured));
-  }, [telegramModalOpen, rehearsal?.theaterId, state.activeTheaterId]);
+  }, [telegramModalOpen, decisionsTelegramModalOpen, rehearsal?.theaterId, state.activeTheaterId]);
 
   useEffect(() => {
     if (!id) return;
@@ -615,6 +623,11 @@ export function RehearsalDetailPage() {
   };
 
   const telegramMessage = buildRehearsalTelegramMessage(state, rehearsal);
+  const decisionsTelegramMessage = buildRehearsalDecisionsTelegramMessage(state, rehearsal);
+  const decisionsTelegramPreviewHtml = buildRehearsalDecisionsTelegramPreviewHtml(
+    state,
+    rehearsal
+  );
 
   const handleCopyTelegram = async () => {
     try {
@@ -663,6 +676,50 @@ export function RehearsalDetailPage() {
     setTelegramModalOpen(true);
   };
 
+  const openDecisionsTelegramExport = () => {
+    setDecisionsTelegramCopied(false);
+    setTelegramSendError(null);
+    setTelegramSent(false);
+    setDecisionsTelegramModalOpen(true);
+  };
+
+  const handleCopyDecisionsTelegram = async () => {
+    try {
+      await copyRehearsalDecisionsTelegramMessage(state, rehearsal);
+      setDecisionsTelegramCopied(true);
+      window.setTimeout(() => setDecisionsTelegramCopied(false), 2000);
+    } catch {
+      setDecisionsTelegramCopied(false);
+    }
+  };
+
+  const handleSendDecisionsTelegram = async () => {
+    const theaterId = rehearsal.theaterId ?? state.activeTheaterId;
+    if (!theaterId) {
+      setTelegramSendError('Не выбран театр для отправки');
+      return;
+    }
+    const body = buildRehearsalDecisionsTelegramBotMessage(state, rehearsal, {
+      initiatedBy: user?.name?.trim() || user?.email,
+    });
+    if (!body) {
+      setTelegramSendError('Нет решений и корректировок в блоках плана');
+      return;
+    }
+    setTelegramSending(true);
+    setTelegramSendError(null);
+    setTelegramSent(false);
+    try {
+      await sendTelegramHtmlMessage(theaterId, body);
+      setTelegramSent(true);
+      window.setTimeout(() => setTelegramSent(false), 3000);
+    } catch (error) {
+      setTelegramSendError(error instanceof Error ? error.message : 'Не удалось отправить');
+    } finally {
+      setTelegramSending(false);
+    }
+  };
+
   return (
     <div className="min-w-0 space-y-5 overflow-x-hidden sm:space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -705,6 +762,7 @@ export function RehearsalDetailPage() {
           title={calendarTitle}
           location={rehearsalLocation}
           onTelegram={openTelegramExport}
+          onTelegramDecisions={readOnly ? undefined : openDecisionsTelegramExport}
           onPlanExported={() => markGuidePlanExported(dispatch)}
           onEdit={readOnly ? undefined : openEditRehearsal}
           onDelete={readOnly ? undefined : deleteRehearsal}
@@ -1017,6 +1075,7 @@ export function RehearsalDetailPage() {
       </div>
 
       <div className="space-y-4">
+        <RehearsalSummaryNotesPanel rehearsal={rehearsal} readOnly={readOnly} />
         <RehearsalOutcomePhotosPanel rehearsal={rehearsal} readOnly={readOnly} />
         <RehearsalOutcomeVideosPanel rehearsal={rehearsal} readOnly={readOnly} />
 
@@ -1320,12 +1379,12 @@ export function RehearsalDetailPage() {
           />
           {blockForm.type !== 'break' && (
             <MentionTextarea
-              label="Решения и заметки"
+              label={DECIDED_NOTES_FIELD_LABEL}
               value={blockForm.decidedNotes ?? ''}
               onChange={(decidedNotes) => setBlockForm({ ...blockForm, decidedNotes })}
               options={buildMentionOptions(state, rehearsal, blockForm.sceneId)}
               rows={4}
-              placeholder="Опишите решения. Введите @, чтобы адресовать строку актёру или роли."
+              placeholder="Опишите решения и корректировки. Введите @, чтобы упомянуть роль или актёра."
             />
           )}
         </div>
@@ -1376,6 +1435,60 @@ export function RehearsalDetailPage() {
           {telegramSendError && (
             <p className="text-sm text-red-300">{telegramSendError}</p>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={decisionsTelegramModalOpen}
+        onClose={() => setDecisionsTelegramModalOpen(false)}
+        title="Telegram: решения и корректировки"
+        xl
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {decisionsTelegramCopied && (
+              <span className="text-sm text-emerald-300">Скопировано в буфер обмена</span>
+            )}
+            {telegramSent && (
+              <span className="text-sm text-emerald-300">Отправлено в Telegram</span>
+            )}
+            <Button variant="secondary" onClick={() => setDecisionsTelegramModalOpen(false)}>
+              Закрыть
+            </Button>
+            <Button onClick={handleCopyDecisionsTelegram} disabled={!decisionsTelegramMessage}>
+              <Copy size={16} />
+              {decisionsTelegramCopied ? 'Скопировано' : 'Скопировать'}
+            </Button>
+            {telegramConfigured && (
+              <Button
+                onClick={handleSendDecisionsTelegram}
+                disabled={telegramSending || !decisionsTelegramMessage}
+              >
+                <Send size={16} />
+                {telegramSending ? 'Отправка…' : 'Отправить в Telegram'}
+              </Button>
+            )}
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Отдельное сообщение: постановка, дата, затем по сценам список решений. Упоминания @
+            подставляют «Персонаж — актёр @telegram»; каждая строка поля — отдельный пункт
+            списка.
+          </p>
+          {decisionsTelegramPreviewHtml ? (
+            <div
+              className="min-h-[20rem] w-full resize-y overflow-auto rounded-xl border border-gold/15 bg-background/60 px-4 py-3 text-sm leading-relaxed text-white [&_a]:text-sky-300 [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: decisionsTelegramPreviewHtml }}
+            />
+          ) : (
+            <p className="text-sm text-muted">Нет решений и корректировок в блоках плана.</p>
+          )}
+          <p className="text-xs text-muted">
+            Так сообщение уйдёт в Telegram: жирным — заголовки и имена персонажей, пустые строки
+            между блоками. «Скопировать» кладёт в буфер текст без разметки.
+          </p>
+          {telegramSendError && <p className="text-sm text-red-300">{telegramSendError}</p>}
         </div>
       </Modal>
     </div>

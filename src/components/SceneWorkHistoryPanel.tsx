@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { SceneWorkHistoryEntry } from '../utils/sceneRehearsalHistory';
 import { DecidedNotesDisplay } from './DecidedNotesDisplay';
+import { DECIDED_NOTES_FIELD_LABEL } from '../utils/decidedNotesLabels';
 
 function historyCountLabel(count: number): string {
   const mod10 = count % 10;
@@ -59,7 +60,7 @@ export function SceneWorkHistoryPanel({ history }: SceneWorkHistoryPanelProps) {
               )}
               {block.decidedNotes?.trim() && (
                 <p>
-                  Решения и заметки: <DecidedNotesDisplay text={block.decidedNotes.trim()} />
+                  {DECIDED_NOTES_FIELD_LABEL}: <DecidedNotesDisplay text={block.decidedNotes.trim()} />
                 </p>
               )}
             </div>

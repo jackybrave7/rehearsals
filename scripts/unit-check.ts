@@ -17,6 +17,7 @@ import {
   parseDecidedNotesMentions,
   syncDecidedNotesToActorNotes,
 } from '../src/utils/decidedNotesMentions.ts';
+import { buildRehearsalSummaryFromDecidedNotes } from '../src/utils/rehearsalDecidedNotesSummary.ts';
 import type { AppState, PlayRole } from '../src/types.ts';
 
 function assert(name: string, condition: boolean): void {
@@ -352,6 +353,12 @@ assert(
 assert(
   'mention display strips markup',
   formatDecidedNotesForDisplay(formatMention('Анна', 'actor', 'actor-1')) === '@Анна'
+);
+assert(
+  'rehearsal summary from decided notes',
+  buildRehearsalSummaryFromDecidedNotes(mentionState.rehearsals[0]!.schedule).includes(
+    '18:00 · Сцена 1'
+  )
 );
 
 const synced = syncDecidedNotesToActorNotes(mentionState);

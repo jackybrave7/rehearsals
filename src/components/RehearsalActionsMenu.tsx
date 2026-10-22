@@ -3,12 +3,14 @@ import { CalendarPlus, Download, MoreVertical, Pencil, Send, Trash2 } from 'luci
 import type { Rehearsal } from '../types';
 import { downloadRehearsalIcs, openGoogleCalendar } from '../utils/rehearsalCalendar';
 import { useMaxLg } from '../hooks/useMaxLg';
+import { countScheduleBlocksWithDecidedNotes } from '../utils/rehearsalDecidedNotesSummary';
 
 interface RehearsalActionsMenuProps {
   rehearsal: Rehearsal;
   title: string;
   location?: string;
   onTelegram?: () => void;
+  onTelegramDecisions?: () => void;
   onPlanExported?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -46,6 +48,7 @@ export function RehearsalActionsMenu({
   title,
   location,
   onTelegram,
+  onTelegramDecisions,
   onPlanExported,
   onEdit,
   onDelete,
@@ -53,6 +56,7 @@ export function RehearsalActionsMenu({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const isMobile = useMaxLg();
+  const hasDecidedNotes = countScheduleBlocksWithDecidedNotes(rehearsal.schedule) > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -139,6 +143,13 @@ export function RehearsalActionsMenu({
                 icon={<Send size={16} />}
                 label="Telegram"
                 onClick={closeAnd(onTelegram)}
+              />
+            ) : null}
+            {onTelegramDecisions && hasDecidedNotes ? (
+              <MenuItem
+                icon={<Send size={16} />}
+                label="Telegram (решения)"
+                onClick={closeAnd(onTelegramDecisions)}
               />
             ) : null}
             {onDelete ? (

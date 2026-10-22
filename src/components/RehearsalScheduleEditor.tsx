@@ -21,6 +21,7 @@ import { Modal } from './Modal';
 import { SceneScriptLink } from './SceneScriptLink';
 import { addMinutes, formatDuration, timeToMinutes } from '../utils/time';
 import { DecidedNotesDisplay } from './DecidedNotesDisplay';
+import { DECIDED_NOTES_FIELD_LABEL } from '../utils/decidedNotesLabels';
 import { PlayIcon } from './PlayIcon';
 import {
   appendScheduleFromRehearsalItems,
@@ -514,7 +515,7 @@ export function RehearsalScheduleEditor({
                         )}
                         {block.decidedNotes?.trim() && (
                           <div className="space-y-1 rounded-lg bg-gold/5 px-3 py-2 text-xs text-muted">
-                            <p className="font-medium text-gold-light">Решения и заметки</p>
+                            <p className="font-medium text-gold-light">{DECIDED_NOTES_FIELD_LABEL}</p>
                             <ExpandableText text={block.decidedNotes.trim()}>
                               <DecidedNotesDisplay text={block.decidedNotes.trim()} />
                             </ExpandableText>

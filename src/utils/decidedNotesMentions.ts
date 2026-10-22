@@ -1,4 +1,4 @@
-import type { AppState, Rehearsal, RehearsalActorNote } from '../types';
+import type { Actor, AppState, Rehearsal, RehearsalActorNote } from '../types';
 import { generateId } from './id';
 import { resolveRehearsalPerformanceId } from './rehearsalActors';
 
@@ -62,6 +62,153 @@ export function formatDecidedNotesForDisplay(text: string): string {
   return text.replace(MENTION_PATTERN, '@$1');
 }
 
+function resolveMentionPlayId(
+  state: AppState,
+  rehearsal: Rehearsal,
+  sceneId?: string
+): string | undefined {
+  const scene = sceneId ? state.scenes.find((item) => item.id === sceneId) : undefined;
+  return rehearsal.playId ?? scene?.playId;
+}
+
+function findCastAssignmentForRole(
+  state: AppState,
+  rehearsal: Rehearsal,
+  roleId: string,
+  sceneId?: string
+) {
+  const playId = resolveMentionPlayId(state, rehearsal, sceneId);
+  if (!playId) return undefined;
+
+  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
+  return state.castAssignments.find(
+    (item) =>
+      item.roleId === roleId &&
+      item.playId === playId &&
+      (!performanceId || item.performanceId === performanceId)
+  );
+}
+
+function findPrimaryRoleNameForActor(
+  state: AppState,
+  rehearsal: Rehearsal,
+  actorId: string,
+  sceneId?: string
+): string | undefined {
+  const playId = resolveMentionPlayId(state, rehearsal, sceneId);
+  if (!playId) return undefined;
+
+  const performanceId = resolveRehearsalPerformanceId(state, rehearsal);
+  const assignment = state.castAssignments.find(
+    (item) =>
+      item.actorId === actorId &&
+      item.playId === playId &&
+      (!performanceId || item.performanceId === performanceId)
+  );
+  return assignment ? state.playRoles.find((role) => role.id === assignment.roleId)?.name : undefined;
+}
+
+function formatActorTelegramPlain(actor: Actor): string {
+  const username = actor.telegramUsername?.replace(/^@+/, '').trim();
+  return username ? `${actor.name} @${username}` : actor.name;
+}
+
+function formatActorTelegramHtml(actor: Actor): string {
+  const username = actor.telegramUsername?.replace(/^@+/, '').trim();
+  if (!username) return escapeTelegramHtml(actor.name);
+  return `${escapeTelegramHtml(actor.name)} <a href="https://t.me/${escapeTelegramHtml(username)}">@${escapeTelegramHtml(username)}</a>`;
+}
+
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function resolveActorForMention(
+  state: AppState,
+  rehearsal: Rehearsal,
+  type: MentionTargetType,
+  id: string,
+  sceneId?: string
+): Actor | undefined {
+  if (type === 'actor') {
+    return state.actors.find((item) => item.id === id);
+  }
+  const assignment = findCastAssignmentForRole(state, rehearsal, id, sceneId);
+  return assignment
+    ? state.actors.find((item) => item.id === assignment.actorId)
+    : undefined;
+}
+
+function characterLabelForMention(
+  state: AppState,
+  rehearsal: Rehearsal,
+  type: MentionTargetType,
+  id: string,
+  label: string,
+  sceneId?: string
+): string {
+  if (type === 'role') return label;
+  return findPrimaryRoleNameForActor(state, rehearsal, id, sceneId) ?? label;
+}
+
+function formatMentionTokenForDecisions(
+  state: AppState,
+  rehearsal: Rehearsal,
+  type: MentionTargetType,
+  id: string,
+  label: string,
+  sceneId?: string,
+  html = false
+): string {
+  const characterLabel = characterLabelForMention(state, rehearsal, type, id, label, sceneId);
+  const actor = resolveActorForMention(state, rehearsal, type, id, sceneId);
+  if (!actor) {
+    return html ? escapeTelegramHtml(characterLabel) : characterLabel;
+  }
+
+  const actorPart = html ? formatActorTelegramHtml(actor) : formatActorTelegramPlain(actor);
+  if (html) {
+    return `<b>${escapeTelegramHtml(characterLabel)}</b> — ${actorPart}`;
+  }
+  return `${characterLabel} — ${actorPart}`;
+}
+
+/** Одна строка «Решения и корректировки» для Telegram: персонаж — актёр @username и текст. */
+export function formatDecidedNotesLineForDecisionsExport(
+  state: AppState,
+  rehearsal: Rehearsal,
+  line: string,
+  sceneId?: string,
+  html = false
+): string {
+  let output = '';
+  let lastIndex = 0;
+
+  for (const match of line.matchAll(MENTION_PATTERN)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) {
+      const chunk = line.slice(lastIndex, index);
+      output += html ? escapeTelegramHtml(chunk) : chunk;
+    }
+
+    const type = match[2] as MentionTargetType;
+    const id = match[3];
+    const label = match[1];
+    output += formatMentionTokenForDecisions(state, rehearsal, type, id, label, sceneId, html);
+    lastIndex = index + match[0].length;
+  }
+
+  if (lastIndex < line.length) {
+    const tail = line.slice(lastIndex);
+    output += html ? escapeTelegramHtml(tail) : tail;
+  }
+
+  return output.trim();
+}
+
 function noteSyncKey(scheduleBlockId: string, actorId: string, text: string): string {
   return `${scheduleBlockId}|${actorId}|${text}`;
 }
@@ -91,35 +238,27 @@ export function buildMentionOptions(
   );
 
   const options: MentionOption[] = [];
-  const seenActor = new Set<string>();
-  const seenRole = new Set<string>();
 
   for (const assignment of assignments) {
     const actor = state.actors.find((item) => item.id === assignment.actorId);
     const role = state.playRoles.find((item) => item.id === assignment.roleId);
     if (!actor || !role) continue;
 
-    if (!seenRole.has(role.id)) {
-      seenRole.add(role.id);
-      options.push({
-        id: `role:${role.id}`,
-        label: role.name,
-        hint: actor.name,
-        insertText: formatMention(role.name, 'role', role.id),
-        searchText: `${role.name} ${actor.name}`.toLowerCase(),
-      });
-    }
+    options.push({
+      id: `role:${assignment.id}`,
+      label: role.name,
+      hint: actor.name,
+      insertText: formatMention(role.name, 'role', role.id),
+      searchText: `${role.name} ${actor.name}`.toLowerCase(),
+    });
 
-    if (!seenActor.has(actor.id)) {
-      seenActor.add(actor.id);
-      options.push({
-        id: `actor:${actor.id}`,
-        label: actor.name,
-        hint: role.name,
-        insertText: formatMention(actor.name, 'actor', actor.id),
-        searchText: actor.name.toLowerCase(),
-      });
-    }
+    options.push({
+      id: `actor:${assignment.id}`,
+      label: actor.name,
+      hint: role.name,
+      insertText: formatMention(actor.name, 'actor', actor.id),
+      searchText: `${actor.name} ${role.name}`.toLowerCase(),
+    });
   }
 
   return options.sort((a, b) => a.label.localeCompare(b.label, 'ru'));

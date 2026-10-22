@@ -399,8 +399,8 @@ export function MentionTextarea({
               insertMention(option);
             }}
           >
-            <span>{option.label}</span>
-            {option.hint && <span className="truncate text-xs text-muted">{option.hint}</span>}
+            <span className="min-w-0 truncate">{option.label}</span>
+            {option.hint && <span className="max-w-[10rem] shrink-0 truncate text-xs text-muted">{option.hint}</span>}
           </button>
         ))}
       </div>
