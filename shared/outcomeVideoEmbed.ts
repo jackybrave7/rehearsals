@@ -1,4 +1,4 @@
-export type EmbeddableVideoProvider = 'youtube' | 'rutube' | 'vimeo' | 'vk';
+export type EmbeddableVideoProvider = 'youtube' | 'rutube' | 'vimeo' | 'vk' | 'kinescope';
 
 export interface EmbeddableVideo {
   provider: EmbeddableVideoProvider;
@@ -21,6 +21,8 @@ const EMBED_HOSTS = new Set([
   'www.vk.com',
   'vkvideo.ru',
   'www.vkvideo.ru',
+  'kinescope.io',
+  'www.kinescope.io',
 ]);
 
 function tryParseUrl(input: string): URL | null {
@@ -106,6 +108,30 @@ function parseVimeo(parsed: URL): EmbeddableVideo | null {
   };
 }
 
+function parseKinescope(parsed: URL): EmbeddableVideo | null {
+  const host = parsed.hostname.replace(/^www\./, '');
+  if (host !== 'kinescope.io') return null;
+
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  let videoId: string | null = null;
+
+  if (parts[0] === 'embed' && parts[1]) {
+    videoId = parts[1];
+  } else if (parts.length === 1) {
+    videoId = parts[0]!;
+  }
+
+  if (!videoId || !/^[a-zA-Z0-9_-]{4,64}$/.test(videoId)) return null;
+
+  const canonicalUrl = `https://kinescope.io/${videoId}`;
+  return {
+    provider: 'kinescope',
+    canonicalUrl,
+    embedUrl: `https://kinescope.io/embed/${videoId}`,
+    thumbnailUrl: null,
+  };
+}
+
 function parseVk(parsed: URL): EmbeddableVideo | null {
   const host = parsed.hostname.replace(/^www\./, '');
   if (host !== 'vk.com' && host !== 'vkvideo.ru') return null;
@@ -137,7 +163,8 @@ export function parseEmbeddableVideoLink(input: string): EmbeddableVideo | null 
     parseYouTube(parsed) ??
     parseRutube(parsed) ??
     parseVimeo(parsed) ??
-    parseVk(parsed)
+    parseVk(parsed) ??
+    parseKinescope(parsed)
   );
 }
 
@@ -175,6 +202,8 @@ export function outcomeVideoProviderLabel(url: string): string | null {
       return 'Vimeo';
     case 'vk':
       return 'VK Видео';
+    case 'kinescope':
+      return 'Kinescope';
     default:
       return null;
   }

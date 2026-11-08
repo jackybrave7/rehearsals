@@ -148,7 +148,7 @@ export function RehearsalOutcomeVideosPanel({
       return;
     }
     if (!parseEmbeddableVideoLink(trimmed)) {
-      setError('Поддерживаются YouTube, Rutube, Vimeo и VK Видео.');
+      setError('Поддерживаются YouTube, Rutube, Vimeo, VK и Kinescope.');
       return;
     }
     if (atLimit) {
@@ -216,7 +216,7 @@ export function RehearsalOutcomeVideosPanel({
         <UpgradePrompt
           compact
           title="Видео итога — Pro"
-          description="До 10 роликов: загрузка до 30 МБ или ссылка с YouTube, Rutube, Vimeo и VK."
+          description="До 10 роликов: загрузка до 30 МБ или ссылка с YouTube, Rutube, Vimeo, VK и Kinescope."
         />
       </section>
     );
@@ -294,7 +294,7 @@ export function RehearsalOutcomeVideosPanel({
             type="url"
             value={linkDraft}
             onChange={(event) => setLinkDraft(event.target.value)}
-            placeholder="https://youtube.com/… или rutube.ru/video/…"
+            placeholder="https://youtube.com/…, rutube.ru/… или kinescope.io/…"
             className="min-w-0 flex-1 rounded-lg border border-gold/15 bg-background/50 px-3 py-2 text-sm"
             disabled={addingLink || atLimit}
           />

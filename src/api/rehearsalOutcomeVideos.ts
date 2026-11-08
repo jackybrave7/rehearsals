@@ -14,7 +14,7 @@ export function formatOutcomeVideoUploadError(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
   if (code === 'FILE_TOO_LARGE') return 'Видео слишком большое. Максимум — 30 МБ.';
   if (code === 'INVALID_VIDEO_LINK') {
-    return 'Не удалось распознать ссылку. Поддерживаются YouTube, Rutube, Vimeo и VK Видео.';
+    return 'Не удалось распознать ссылку. Поддерживаются YouTube, Rutube, Vimeo, VK и Kinescope.';
   }
   if (code === 'INVALID_VIDEO_TYPE') return 'Поддерживаются MP4, WebM и MOV.';
   if (code === 'SUBSCRIPTION_PRO_REQUIRED') return 'Итоговые видео доступны на тарифе Pro.';

@@ -25,6 +25,17 @@ describe('parseEmbeddableVideoLink', () => {
     assert.equal(parsed?.embedUrl, 'https://player.vimeo.com/video/123456789');
   });
 
+  it('parses Kinescope watch and embed links', () => {
+    const watch = parseEmbeddableVideoLink('https://kinescope.io/202589431');
+    assert.equal(watch?.provider, 'kinescope');
+    assert.equal(watch?.canonicalUrl, 'https://kinescope.io/202589431');
+    assert.equal(watch?.embedUrl, 'https://kinescope.io/embed/202589431');
+
+    const embed = parseEmbeddableVideoLink('https://kinescope.io/embed/202589431?autoplay=0');
+    assert.equal(embed?.canonicalUrl, 'https://kinescope.io/202589431');
+    assert.equal(embed?.embedUrl, 'https://kinescope.io/embed/202589431');
+  });
+
   it('rejects unknown hosts', () => {
     assert.equal(parseEmbeddableVideoLink('https://example.com/video/1'), null);
   });
