@@ -12,7 +12,7 @@ export interface UploadedOutcomePhoto {
 export function formatOutcomePhotoUploadError(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
   if (code === 'FILE_TOO_LARGE') return 'Фото слишком большое. Максимум — 10 МБ.';
-  if (code === 'INVALID_IMAGE_TYPE') return 'Поддерживаются только JPEG, PNG, WebP и GIF.';
+  if (code === 'INVALID_IMAGE_TYPE') return 'Поддерживаются JPEG, PNG, WebP, GIF и HEIC.';
   if (code === 'SUBSCRIPTION_PRO_REQUIRED') return 'Итоговые фото доступны на тарифе Pro.';
   if (code === 'TOO_MANY_PHOTOS') {
     return `Слишком много фото для одной репетиции (максимум ${MAX_OUTCOME_PHOTOS_PER_REHEARSAL}).`;
@@ -23,11 +23,41 @@ export function formatOutcomePhotoUploadError(error: unknown): string {
 }
 
 const MAX_OUTCOME_PHOTO_BYTES = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+]);
+
+const PHOTO_EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+export function resolveOutcomePhotoMimeType(file: File): string | null {
+  const type = file.type?.toLowerCase().trim();
+  if (type && ALLOWED_IMAGE_TYPES.has(type)) return type;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (!ext) return null;
+  const fromExt = PHOTO_EXT_TO_MIME[ext];
+  return fromExt && ALLOWED_IMAGE_TYPES.has(fromExt) ? fromExt : null;
+}
+
+export function isOutcomePhotoFile(file: File): boolean {
+  return resolveOutcomePhotoMimeType(file) !== null;
+}
 
 export function validateOutcomePhotoFile(file: File): string | null {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    return 'Поддерживаются только JPEG, PNG, WebP и GIF.';
+  if (!resolveOutcomePhotoMimeType(file)) {
+    return 'Поддерживаются JPEG, PNG, WebP, GIF и HEIC.';
   }
   if (file.size > MAX_OUTCOME_PHOTO_BYTES) {
     return 'Фото слишком большое. Максимум — 10 МБ.';
@@ -61,7 +91,7 @@ export async function uploadRehearsalOutcomePhoto(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: file.name,
-      mimeType: file.type || 'image/jpeg',
+      mimeType: resolveOutcomePhotoMimeType(file) || 'image/jpeg',
       dataBase64,
     }),
   });

@@ -45,7 +45,14 @@ function createS3Client(config: S3Config): S3Client {
   });
 }
 
-const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_IMAGE_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+]);
 
 export function isAllowedOutcomePhotoMime(mimeType: string): boolean {
   return ALLOWED_IMAGE_MIME.has(mimeType.toLowerCase());

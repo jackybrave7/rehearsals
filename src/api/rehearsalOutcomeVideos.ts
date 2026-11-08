@@ -32,7 +32,14 @@ export function formatOutcomeVideoUploadError(error: unknown): string {
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 
 function resolveOutcomeVideoMime(file: File): string | null {
-  return guessVideoMimeFromName(file.name) || file.type || null;
+  const type = file.type?.toLowerCase().trim();
+  if (type && ALLOWED_VIDEO_TYPES.has(type)) return type;
+  return guessVideoMimeFromName(file.name);
+}
+
+export function isOutcomeVideoFile(file: File): boolean {
+  const mime = resolveOutcomeVideoMime(file);
+  return Boolean(mime && ALLOWED_VIDEO_TYPES.has(mime));
 }
 
 export function validateOutcomeVideoFile(file: File): string | null {

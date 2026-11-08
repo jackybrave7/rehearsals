@@ -13,6 +13,7 @@ import {
   deleteRehearsalOutcomeVideo,
   formatOutcomeVideoUploadError,
   uploadRehearsalOutcomeVideo,
+  isOutcomeVideoFile,
   validateOutcomeVideoFile,
 } from '../api/rehearsalOutcomeVideos';
 import {
@@ -43,6 +44,7 @@ export function RehearsalOutcomeVideosPanel({
   const [error, setError] = useState<string | null>(null);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const videos = rehearsal.outcomeVideoUrls ?? [];
   const slotsLeft = MAX_OUTCOME_VIDEOS_PER_REHEARSAL - videos.length;
@@ -111,6 +113,32 @@ export function RehearsalOutcomeVideosPanel({
     setUploading(false);
     setUploadProgress(null);
     if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const handleVideoDragOver = (event: React.DragEvent<HTMLElement>) => {
+    if (readOnly || uploading) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const handleVideoDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    setDragOver(false);
+  };
+
+  const handleVideoDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDragOver(false);
+    if (readOnly || uploading) return;
+
+    const files = Array.from(event.dataTransfer.files).filter(isOutcomeVideoFile);
+    if (files.length === 0) {
+      setError('Перетащите видеофайл: MP4, WebM или MOV.');
+      return;
+    }
+    void handleUploadFiles(files);
   };
 
   const handleAddLink = async () => {
@@ -195,7 +223,17 @@ export function RehearsalOutcomeVideosPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+    <section
+      className={`rounded-2xl border bg-surface/40 p-5 transition-colors ${
+        dragOver && !readOnly
+          ? 'border-gold/50 bg-gold/5 ring-1 ring-gold/30'
+          : 'border-gold/10'
+      }`}
+      onDragEnter={readOnly ? undefined : handleVideoDragOver}
+      onDragOver={readOnly ? undefined : handleVideoDragOver}
+      onDragLeave={readOnly ? undefined : handleVideoDragLeave}
+      onDrop={readOnly ? undefined : handleVideoDrop}
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Видео итога</h2>
@@ -203,7 +241,7 @@ export function RehearsalOutcomeVideosPanel({
             {videos.length} / {MAX_OUTCOME_VIDEOS_PER_REHEARSAL}
             {uploadProgress
               ? ` · загрузка ${uploadProgress.current} из ${uploadProgress.total}`
-              : ' · файл до 30 МБ или ссылка с хостинга'}
+              : ' · файл до 30 МБ, ссылка или перетащите видео сюда'}
           </p>
         </div>
         {!readOnly && (
@@ -274,7 +312,11 @@ export function RehearsalOutcomeVideosPanel({
       {error && <p className="mb-3 text-sm text-red-300">{error}</p>}
 
       {videos.length === 0 ? (
-        <p className="text-sm text-muted">Пока нет видео итога репетиции.</p>
+        <p className="text-sm text-muted">
+          {dragOver && !readOnly
+            ? 'Отпустите, чтобы загрузить видео'
+            : 'Пока нет видео итога репетиции.'}
+        </p>
       ) : (
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scroll-smooth snap-x snap-mandatory">
           {videos.map((url, index) => {

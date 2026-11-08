@@ -10,6 +10,7 @@ import {
   deleteRehearsalOutcomePhoto,
   formatOutcomePhotoUploadError,
   uploadRehearsalOutcomePhoto,
+  isOutcomePhotoFile,
   validateOutcomePhotoFile,
 } from '../api/rehearsalOutcomePhotos';
 
@@ -33,6 +34,7 @@ export function RehearsalOutcomePhotosPanel({
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const photos = rehearsal.outcomePhotoUrls ?? [];
   const slotsLeft = MAX_OUTCOME_PHOTOS_PER_REHEARSAL - photos.length;
@@ -145,6 +147,32 @@ export function RehearsalOutcomePhotosPanel({
     if (inputRef.current) inputRef.current.value = '';
   };
 
+  const handlePhotoDragOver = (event: React.DragEvent<HTMLElement>) => {
+    if (readOnly || uploading) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const handlePhotoDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    setDragOver(false);
+  };
+
+  const handlePhotoDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDragOver(false);
+    if (readOnly || uploading) return;
+
+    const files = Array.from(event.dataTransfer.files).filter(isOutcomePhotoFile);
+    if (files.length === 0) {
+      setError('Перетащите изображение: JPEG, PNG, WebP, GIF или HEIC.');
+      return;
+    }
+    void handleUploadFiles(files);
+  };
+
   const handleDelete = async (url: string, index: number) => {
     setDeletingUrl(url);
     setError(null);
@@ -184,7 +212,17 @@ export function RehearsalOutcomePhotosPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-gold/10 bg-surface/40 p-5">
+    <section
+      className={`rounded-2xl border bg-surface/40 p-5 transition-colors ${
+        dragOver && !readOnly
+          ? 'border-gold/50 bg-gold/5 ring-1 ring-gold/30'
+          : 'border-gold/10'
+      }`}
+      onDragEnter={readOnly ? undefined : handlePhotoDragOver}
+      onDragOver={readOnly ? undefined : handlePhotoDragOver}
+      onDragLeave={readOnly ? undefined : handlePhotoDragLeave}
+      onDrop={readOnly ? undefined : handlePhotoDrop}
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
@@ -196,7 +234,7 @@ export function RehearsalOutcomePhotosPanel({
               ? ` · загрузка ${uploadProgress.current} из ${uploadProgress.total}`
               : photos.length > 0
                 ? ' · листайте, клик — просмотр'
-                : ' · до 10 МБ, пакетом'}
+                : ' · до 10 МБ, пакетом или перетащите сюда'}
           </p>
         </div>
         {!readOnly && (
@@ -204,7 +242,7 @@ export function RehearsalOutcomePhotosPanel({
             <input
               ref={inputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif"
               multiple
               className="sr-only"
               onChange={(event) => {
@@ -235,7 +273,11 @@ export function RehearsalOutcomePhotosPanel({
       {error && <p className="mb-3 text-sm text-red-300">{error}</p>}
 
       {photos.length === 0 ? (
-        <p className="text-sm text-muted">Пока нет фото итога репетиции.</p>
+        <p className="text-sm text-muted">
+          {dragOver && !readOnly
+            ? 'Отпустите, чтобы загрузить фото'
+            : 'Пока нет фото итога репетиции.'}
+        </p>
       ) : (
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scroll-smooth snap-x snap-mandatory">
           {photos.map((url, index) => (
