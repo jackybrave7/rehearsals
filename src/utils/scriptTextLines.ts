@@ -13,8 +13,14 @@ export const CHARACTER_DIALOGUE_INLINE_RE = new RegExp(
   `^(${CHARACTER_NAME})(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]\\s*(.*)$`
 );
 
+const CHARACTER_CUE_DASH_REMARK_RE = '\\s+-\\s+[^.\\n]+';
+
 export const CHARACTER_CUE_LINE_RE = new RegExp(
-  `^${CHARACTER_NAME}(?:${CHARACTER_INLINE_REMARK_RE})?\\s*[:.]?$`
+  `^${CHARACTER_NAME}(?:${CHARACTER_INLINE_REMARK_RE})?${CHARACTER_CUE_DASH_REMARK_RE}?\\s*[:.]?$`
+);
+
+export const CHARACTER_CUE_NAME_CAPTURE_RE = new RegExp(
+  `^(${CHARACTER_NAME})(?:${CHARACTER_INLINE_REMARK_RE})?${CHARACTER_CUE_DASH_REMARK_RE}?\\s*[:.]?$`
 );
 
 /** В середине строки — полное имя, имя с номером или ВСЕ ПРОПИСНЫЕ, чтобы не резать по «Тише.» */

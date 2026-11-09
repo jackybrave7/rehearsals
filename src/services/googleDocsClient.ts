@@ -197,7 +197,7 @@ export async function loadGoogleDocumentSceneInsights(
     descriptions: buildSceneDescriptionsFromTexts(bodyTexts),
     roleIds:
       resolvedPlayId && playRoles.length > 0
-        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, resolvedPlayId)
+        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, resolvedPlayId, scenes)
         : new Map(),
   };
 }

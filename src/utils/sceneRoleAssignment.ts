@@ -1,6 +1,7 @@
 import type { PlayRole } from '../types';
 import {
   CHARACTER_CUE_LINE_RE,
+  CHARACTER_CUE_NAME_CAPTURE_RE,
   CHARACTER_DIALOGUE_INLINE_RE,
   expandScriptTextToLines,
 } from './scriptTextLines';
@@ -148,6 +149,25 @@ function addCharacterName(names: Set<string>, raw: string): void {
   names.add(normalized);
 }
 
+/** Персонажи из строки «Сцена 31. Бланш, Митч, Мексиканка.» */
+export function extractCharacterNamesFromSceneTitle(title: string): string[] {
+  const trimmed = title.trim();
+  if (!trimmed) return [];
+
+  const withoutHeading = trimmed.replace(/^сцена\s+\d+\s*\.?\s*/i, '').trim();
+  if (!withoutHeading) return [];
+
+  const names: string[] = [];
+  for (const chunk of withoutHeading.split(/[,;]/)) {
+    const primary = chunk.split('/')[0]?.trim() ?? '';
+    if (!primary) continue;
+    const normalized = normalizeCharacterToken(primary.replace(/\.+$/, ''));
+    if (!normalized || isExcludedCharacterCue(normalized)) continue;
+    names.push(normalized);
+  }
+  return [...new Set(names)];
+}
+
 /** Имена персонажей по репликам в тексте сцены (не из заголовка). */
 export function extractCharacterNamesFromScriptText(raw: string): string[] {
   const names = new Set<string>();
@@ -163,19 +183,19 @@ export function extractCharacterNamesFromScriptText(raw: string): string[] {
     }
 
     if (CHARACTER_CUE_LINE_RE.test(line)) {
-      addCharacterName(names, line);
+      const cueMatch = line.match(CHARACTER_CUE_NAME_CAPTURE_RE);
+      addCharacterName(names, cueMatch?.[1] ?? line);
     }
   }
 
   return [...names];
 }
 
-export function buildSceneRoleIdsFromScriptText(
-  text: string,
+function roleIdsFromCharacterNames(
+  names: string[],
   playRoles: PlayRole[],
   playId: string
 ): string[] {
-  const names = extractCharacterNamesFromScriptText(text);
   return [
     ...new Set(
       names
@@ -185,14 +205,38 @@ export function buildSceneRoleIdsFromScriptText(
   ];
 }
 
+export function buildSceneRoleIdsFromScriptText(
+  text: string,
+  playRoles: PlayRole[],
+  playId: string,
+  sceneTitle?: string
+): string[] {
+  const names = [
+    ...extractCharacterNamesFromScriptText(text),
+    ...extractCharacterNamesFromSceneTitle(sceneTitle ?? ''),
+  ];
+  return roleIdsFromCharacterNames(names, playRoles, playId);
+}
+
 export function buildSceneRoleIdsFromTexts(
   texts: Map<string, string>,
   playRoles: PlayRole[],
-  playId: string
+  playId: string,
+  scenes?: Array<{ id: string; title?: string }>
 ): Map<string, string[]> {
+  const titleById =
+    scenes === undefined
+      ? null
+      : new Map(scenes.map((scene) => [scene.id, scene.title ?? ''] as const));
+
   const result = new Map<string, string[]>();
   for (const [sceneId, text] of texts.entries()) {
-    const roleIds = buildSceneRoleIdsFromScriptText(text, playRoles, playId);
+    const roleIds = buildSceneRoleIdsFromScriptText(
+      text,
+      playRoles,
+      playId,
+      titleById?.get(sceneId)
+    );
     if (roleIds.length > 0) result.set(sceneId, roleIds);
   }
   return result;

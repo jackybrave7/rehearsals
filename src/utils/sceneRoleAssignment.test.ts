@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { PlayRole } from '../types';
 import {
   buildSceneRoleIdsFromScriptText,
+  extractCharacterNamesFromSceneTitle,
   extractCharacterNamesFromScriptText,
   findCharacterRoleId,
   isCharacterLabelForRole,
@@ -97,5 +98,43 @@ describe('role name forms', () => {
     assert.equal(findCharacterRoleId(cast, PLAY_ID, 'Лена'), 'elena');
     assert.equal(findCharacterRoleId(cast, PLAY_ID, 'Елена'), 'elena');
     assert.ok(isCharacterLabelForRole('Елена (Лена)', 'Лена'));
+  });
+});
+
+describe('scene title cast list', () => {
+  const streetcarCast: PlayRole[] = [
+    { id: 'blanche', playId: PLAY_ID, kind: 'character', name: 'Бланш' },
+    { id: 'mex', playId: PLAY_ID, kind: 'character', name: 'Мексиканка' },
+    { id: 'doc', playId: PLAY_ID, kind: 'character', name: 'Врач' },
+    { id: 'ward', playId: PLAY_ID, kind: 'character', name: 'Надзирательница' },
+  ];
+
+  it('reads names after scene number in title', () => {
+    const names = extractCharacterNamesFromSceneTitle(
+      'Сцена 37. Бланш, Стелла, Юнис, Врач, Надзирательница, Стэнли, Митч.'
+    );
+    assert.ok(names.includes('Врач'));
+    assert.ok(names.includes('Надзирательница'));
+    assert.ok(names.includes('Бланш'));
+  });
+
+  it('links roles from title even without dialogue cues in body', () => {
+    const body = 'На улице появились ВРАЧ и НАДЗИРАТЕЛЬНИЦА.';
+    const roleIds = buildSceneRoleIdsFromScriptText(
+      body,
+      streetcarCast,
+      PLAY_ID,
+      'Сцена 37. Бланш, Юнис, Врач, Надзирательница.'
+    );
+    assert.ok(roleIds.includes('doc'));
+    assert.ok(roleIds.includes('ward'));
+    assert.ok(roleIds.includes('blanche'));
+  });
+
+  it('parses cue with dash remark', () => {
+    const text = 'ВРАЧ - женщина.\nБЛАНШ. Привет.';
+    const roleIds = buildSceneRoleIdsFromScriptText(text, streetcarCast, PLAY_ID);
+    assert.ok(roleIds.includes('doc'));
+    assert.ok(roleIds.includes('blanche'));
   });
 });

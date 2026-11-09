@@ -144,7 +144,7 @@ export async function handleParseScriptImport(req: Request, res: Response): Prom
     const bodyTexts = extractSceneBodyTextsFromPlainText(text, anchors, scenesWithAnchors);
     const roleIds =
       playId && playRoles.length > 0
-        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, playId)
+        ? buildSceneRoleIdsFromTexts(bodyTexts, playRoles, playId, scenesWithAnchors)
         : new Map<string, string[]>();
 
     res.json({

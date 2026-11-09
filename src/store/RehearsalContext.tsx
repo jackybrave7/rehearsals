@@ -1053,7 +1053,16 @@ function reducer(state: AppState, action: Action): AppState {
           if (scene.playId !== action.payload.playId) return scene;
           const roleIds = updateMap.get(scene.id);
           if (!roleIds) return scene;
-          if (onlyIfEmpty && (scene.roleIds?.length ?? 0) > 0) return scene;
+          if (onlyIfEmpty && (scene.roleIds?.length ?? 0) > 0) {
+            const merged = [...new Set([...(scene.roleIds ?? []), ...roleIds])];
+            if (
+              merged.length === (scene.roleIds?.length ?? 0) &&
+              (scene.roleIds ?? []).every((id) => merged.includes(id))
+            ) {
+              return scene;
+            }
+            return { ...scene, roleIds: merged };
+          }
           return { ...scene, roleIds };
         }),
       };
