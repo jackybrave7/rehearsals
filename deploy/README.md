@@ -131,6 +131,10 @@ docker run -d \
 
 Зависимости ставятся при деплое (`deploy/remote-deploy.sh`); контейнер только запускает API. Старый вариант с `npm install` внутри контейнера при каждом restart больше не нужен.
 
+### Откат ветки онбординга
+
+Если на прод попала ветка `feature/onboarding-engagement` и нужна версия **до** этих изменений: см. [`docs/ONBOARDING-ROLLBACK.md`](../docs/ONBOARDING-ROLLBACK.md), тег `pre-onboarding-engagement` (коммит `357498a`).
+
 `TELEGRAM_BOT_TOKEN` задаётся в `/var/www/rehearsals/.env` (не в git). После правки — `docker restart rehearsals-api`.
 
 ## Обновление после изменений в git
