@@ -136,6 +136,7 @@ export function getDb(): AppDatabase {
     `ALTER TABLE theaters ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE theaters ADD COLUMN reminder_settings TEXT`,
     `ALTER TABLE theaters ADD COLUMN timezone TEXT`,
+    `ALTER TABLE theaters ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE actors ADD COLUMN telegram_chat_id TEXT`,
     `ALTER TABLE users ADD COLUMN subscription_plan TEXT NOT NULL DEFAULT 'free'`,
     `ALTER TABLE plays ADD COLUMN archived_at TEXT`,
@@ -313,6 +314,16 @@ export function getDb(): AppDatabase {
       created_at TEXT NOT NULL,
       PRIMARY KEY (theater_id, email)
     )`,
+    `ALTER TABLE users ADD COLUMN last_login_at TEXT`,
+    `ALTER TABLE users ADD COLUMN last_active_at TEXT`,
+    `CREATE TABLE IF NOT EXISTS user_onboarding_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      theater_id TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE (user_id, event_type)
+    )`,
   ]) {
     try {
       db.exec(migration);
@@ -336,6 +347,7 @@ export function getDb(): AppDatabase {
     `CREATE INDEX IF NOT EXISTS idx_email_broadcasts_status_scheduled ON email_broadcasts(status, scheduled_at)`,
     `CREATE INDEX IF NOT EXISTS idx_email_drip_sent_sent_at ON email_drip_sent(sent_at)`,
     `CREATE INDEX IF NOT EXISTS idx_email_drip_deliveries_user_id ON email_drip_deliveries(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_user_onboarding_events_user_id ON user_onboarding_events(user_id, created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_email_drip_deliveries_step_id ON email_drip_deliveries(step_id)`,
   ]) {
     db.exec(indexSql);

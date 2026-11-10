@@ -103,6 +103,16 @@ export interface AdminUserSummary {
     rehearsalsLast30Days: number;
     openTasks: number;
   };
+  lastLoginAt: string | null;
+  lastActiveAt: string | null;
+  telegramConnected: boolean;
+}
+
+export interface UserOnboardingEvent {
+  eventType: string;
+  label: string;
+  createdAt: string;
+  theaterId: string | null;
 }
 
 export interface AdminUserTheaterStats {
@@ -138,6 +148,7 @@ export interface AdminUserDetail extends AdminUserSummary {
   theaters: AdminUserTheaterStats[];
   broadcastEngagement: UserBroadcastEngagement[];
   dripEngagement: UserDripEngagement[];
+  onboardingEvents: UserOnboardingEvent[];
 }
 
 export type BroadcastSubscriptionFilter = 'all' | 'free' | 'pro';

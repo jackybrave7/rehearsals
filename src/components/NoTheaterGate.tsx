@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { useAuth } from '../store/AuthContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useCreateTheater } from '../hooks/useCreateTheater';
+import { useInstallDemoTheater } from '../hooks/useInstallDemoTheater';
 import { Button } from './Button';
 import { WelcomeOnboardingModal } from './WelcomeOnboardingModal';
+import { DemoTheaterBanner } from './DemoTheaterBanner';
+import { TheaterSetupProgressStrip } from './guide/TheaterSetupProgressStrip';
 import { appPaths } from '../navigation/appPaths';
+import { useOnboardingMilestones } from '../hooks/useOnboardingMilestones';
 
 const welcomeStorageKey = (userId: string) => `rehearsals-welcome-seen:${userId}`;
 
@@ -13,7 +18,18 @@ function NoTheaterAccess() {
   const { user, logout, refreshSession, canCreateTheater } = useAuth();
   const { retryConnection } = useRehearsalStore();
   const { createTheater } = useCreateTheater();
+  const { installDemoTheater } = useInstallDemoTheater();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('tryDemo') !== '1' || !canCreateTheater) return;
+    void installDemoTheater().finally(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tryDemo');
+      setSearchParams(next, { replace: true });
+    });
+  }, [canCreateTheater, installDemoTheater, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -40,6 +56,7 @@ function NoTheaterAccess() {
         open={welcomeOpen}
         onClose={markWelcomeSeen}
         onCreateTheater={canCreateTheater ? createTheater : undefined}
+        onTryDemo={canCreateTheater ? installDemoTheater : undefined}
       />
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <h1 className="text-2xl font-bold text-white">Добро пожаловать</h1>
@@ -58,7 +75,15 @@ function NoTheaterAccess() {
           )}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          {canCreateTheater ? <Button onClick={() => void createTheater()}>Создать театр</Button> : null}
+          {canCreateTheater ? (
+            <>
+              <Button onClick={() => void createTheater()}>Создать театр</Button>
+              <Button variant="secondary" onClick={() => void installDemoTheater()}>
+                <Sparkles size={16} />
+                Попробовать на примере
+              </Button>
+            </>
+          ) : null}
           <Button variant="secondary" onClick={checkAccess}>
             Проверить доступ
           </Button>
@@ -78,10 +103,28 @@ function NoTheaterAccess() {
   );
 }
 
+function TryDemoDeepLink() {
+  const { canCreateTheater } = useAuth();
+  const { installDemoTheater } = useInstallDemoTheater();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('tryDemo') !== '1' || !canCreateTheater) return;
+    void installDemoTheater().finally(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tryDemo');
+      setSearchParams(next, { replace: true });
+    });
+  }, [canCreateTheater, installDemoTheater, searchParams, setSearchParams]);
+
+  return null;
+}
+
 export function NoTheaterGate() {
   const { theaters } = useAuth();
   const { ready, loadError } = useRehearsalStore();
   const location = useLocation();
+  useOnboardingMilestones();
 
   const bypassWithoutTheater =
     location.pathname === appPaths.support || location.pathname.startsWith(`${appPaths.admin}/`);
@@ -90,5 +133,12 @@ export function NoTheaterGate() {
     return <NoTheaterAccess />;
   }
 
-  return <Outlet />;
+  return (
+    <div className="space-y-4">
+      <TryDemoDeepLink />
+      <DemoTheaterBanner />
+      <TheaterSetupProgressStrip />
+      <Outlet />
+    </div>
+  );
 }

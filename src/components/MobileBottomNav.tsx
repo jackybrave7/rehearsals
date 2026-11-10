@@ -6,14 +6,14 @@ import { useActorCabinetAccess } from '../hooks/useActorCabinetAccess';
 
 const directorItems = [
   { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', shortLabel: 'Репет.' },
-  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', shortLabel: 'Обзор' },
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Сейчас', shortLabel: 'Сейчас' },
   { to: appPaths.scenes, icon: Film, label: 'Сцены', shortLabel: 'Сцены' },
   { to: appPaths.actors, icon: Users, label: 'Участники', shortLabel: 'Люди' },
 ] as const;
 
 const directorItemsWithMy = [
   { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции', shortLabel: 'Репет.' },
-  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', shortLabel: 'Обзор' },
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Сейчас', shortLabel: 'Сейчас' },
   { to: appPaths.my, icon: UserCircle, label: 'Моё', shortLabel: 'Моё' },
   { to: appPaths.scenes, icon: Film, label: 'Сцены', shortLabel: 'Сцены' },
 ] as const;

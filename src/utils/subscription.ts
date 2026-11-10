@@ -14,9 +14,17 @@ export function isPlayReadOnly(play: Pick<Play, 'archivedAt'>): boolean {
   return Boolean(play.archivedAt);
 }
 
+const demoTheaterIds = (state: AppState) =>
+  new Set(state.theaters.filter((theater) => theater.isDemo).map((theater) => theater.id));
+
 export function countOwnedActivePlays(state: AppState, ownedTheaterIds: Set<string>): number {
+  const demoIds = demoTheaterIds(state);
   return state.plays.filter(
-    (play) => play.theaterId && ownedTheaterIds.has(play.theaterId) && isPlayActive(play)
+    (play) =>
+      play.theaterId &&
+      ownedTheaterIds.has(play.theaterId) &&
+      !demoIds.has(play.theaterId) &&
+      isPlayActive(play)
   ).length;
 }
 
@@ -24,6 +32,15 @@ export function getOwnedTheaterIdsFromAccess(
   theaters: Array<{ theaterId: string; role: string }>
 ): Set<string> {
   return new Set(theaters.filter((entry) => entry.role === 'owner').map((entry) => entry.theaterId));
+}
+
+export function countOwnedNonDemoTheaters(
+  state: AppState,
+  ownedTheaterIds: Set<string>
+): number {
+  return state.theaters.filter(
+    (theater) => ownedTheaterIds.has(theater.id) && !theater.isDemo
+  ).length;
 }
 
 export function canCreateTheater(ownedTheaterCount: number, isPro: boolean): boolean {

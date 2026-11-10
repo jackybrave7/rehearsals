@@ -26,7 +26,7 @@ export function BetaVersionBanner() {
         color: 'var(--color-warning-text)',
       }}
     >
-      Бетта-версия,{' '}
+      Бета-версия,{' '}
       <Link
         to={appPaths.support}
         className="font-medium underline underline-offset-2 hover:opacity-80"

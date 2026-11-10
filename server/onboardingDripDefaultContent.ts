@@ -22,32 +22,32 @@ export interface DefaultDripTemplate {
 }
 
 /** Увеличивайте при обновлении текстов/скриншотов — существующие шаги в БД подтянутся при старте API. */
-export const DRIP_TEMPLATES_CONTENT_VERSION = 9;
+export const DRIP_TEMPLATES_CONTENT_VERSION = 11;
 
 const INNER_DRIP_STEP_TEMPLATES: DefaultDripTemplate[] = [
   {
-    title: 'Создать театр',
+    title: 'Попробовать на примере',
     checklistStepId: 'theater',
     delayDays: 2,
     delayHours: 0,
     delayMinutes: 0,
-    subject: 'Первый шаг — создать театр',
+    subject: 'Попробуйте демо — готовый план за пару кликов',
     bodyText:
-      'В начале пути всё кажется перегруженным — так бывает у любой команды. Хорошая новость: первый шаг самый короткий.\n\nСоздайте театр в боковом меню: «Театр → + Новый». Укажите название и часовой пояс — появится пространство, куда дальше добавятся люди и постановки.\n\nПодробный путь с картинками — в руководстве, раздел «Быстрый старт».',
+      'В начале пути всё кажется перегруженным — так бывает у любой команды. Можно не начинать с пустого листа.\n\nНажмите «Попробовать на примере»: появится готовый театр с постановкой, сценами и репетицией с планом. Так сразу видно, как сервис помогает в реальной работе.\n\nКогда будете готовы — создайте свой театр в меню «Театр → + Новый».',
     bodyHtml:
       dripBodyHtmlFromParagraphs(
         [
-          'В начале пути всё кажется перегруженным — так бывает у любой команды. Вы уже сделали главное — зарегистрировались. Дальше — небольшими шагами, мы рядом.',
-          'Первый шаг — создать театр: в боковом меню «Театр → + Новый». Название и часовой пояс — и у команды появится своё пространство для расписания и планов репетиций.',
+          'В начале пути всё кажется перегруженным — так бывает у любой команды. Вы уже сделали главное — зарегистрировались.',
+          'Самый быстрый старт — демо-постановка: театр, сцены и репетиция с планом уже на месте. Откройте карточку репетиции и при желании отправьте план в Telegram или .ics.',
+          'Свой коллектив можно создать позже — в меню «Театр → + Новый».',
         ],
         { leadFirst: true }
       ) +
-      dripEmailGuideImage('sozdanie-teatra-v-bokovom-menyu', 'Создание театра в боковом меню') +
       dripEmailTip(
-        `Если что-то непонятно — откройте ${dripEmailInlineLink('/app/guide', 'руководство')}: там тот же путь, но с иллюстрациями.`
+        `Пошаговый путь с иллюстрациями — в ${dripEmailInlineLink('/app/guide', 'руководстве')}, раздел «Быстрый старт».`
       ),
-    actionLabel: 'Создать театр',
-    actionPath: '/app/overview',
+    actionLabel: 'Попробовать на примере',
+    actionPath: '/app/overview?tryDemo=1',
   },
   {
     title: 'Участники',
@@ -227,8 +227,8 @@ const INNER_DRIP_STEP_TEMPLATES: DefaultDripTemplate[] = [
       ) +
       dripEmailGuideImage('otpravka-plana-v-telegram', 'Отправка плана в Telegram', 'gif') +
       dripEmailTip('Первую отправку можно сделать даже до полной настройки бота — главное, чтобы план дошёл до людей.'),
-    actionLabel: 'К репетициям',
-    actionPath: '/app/rehearsals',
+    actionLabel: 'Поделиться планом',
+    actionPath: '/app/rehearsals?planShare=1',
   },
   {
     title: 'Telegram-бот',
@@ -252,7 +252,7 @@ const INNER_DRIP_STEP_TEMPLATES: DefaultDripTemplate[] = [
         `Пошагово с картинками — ${dripEmailInlineLink('/app/guide#доступ-роли-telegram', 'руководство')}, блок про Telegram.`
       ),
     actionLabel: 'Настройки Telegram',
-    actionPath: '/app/settings',
+    actionPath: '/app/settings?tab=theater&focus=telegram',
   },
 ];
 

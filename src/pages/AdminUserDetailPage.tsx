@@ -387,6 +387,50 @@ export function AdminUserDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
+            <h2 className="mb-2 text-lg font-semibold text-white">Сессия и онбординг</h2>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-muted">Последний вход</dt>
+                <dd className="text-white">
+                  {detail.lastLoginAt
+                    ? format(parseISO(detail.lastLoginAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Последняя активность (сохранение)</dt>
+                <dd className="text-white">
+                  {detail.lastActiveAt
+                    ? format(parseISO(detail.lastActiveAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Telegram (чат театра)</dt>
+                <dd className={detail.telegramConnected ? 'text-emerald-300' : 'text-muted'}>
+                  {detail.telegramConnected ? 'Подключён' : 'Нет'}
+                </dd>
+              </div>
+            </dl>
+            {detail.onboardingEvents?.length ? (
+              <ul className="mt-4 space-y-2 border-t border-gold/10 pt-4 text-sm">
+                {detail.onboardingEvents.map((event) => (
+                  <li key={event.eventType} className="flex flex-wrap justify-between gap-2">
+                    <span className="text-white">{event.label}</span>
+                    <span className="text-muted">
+                      {format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 border-t border-gold/10 pt-4 text-sm text-muted">
+                События онбординга появятся после действий пользователя в приложении.
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-gold/10 bg-surface/60 p-5">
             <h2 className="mb-2 text-lg font-semibold text-white">Email</h2>
             <p className="mb-4 text-sm text-muted">
               Статус:{' '}

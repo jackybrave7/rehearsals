@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
@@ -11,6 +11,8 @@ import {
   MapPin,
   Send,
   UserPlus,
+  CalendarPlus,
+  Download,
 } from 'lucide-react';
 import { RehearsalActionsMenu } from '../components/RehearsalActionsMenu';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -94,6 +96,8 @@ import {
 } from '../utils/rehearsalInsights';
 import { appPaths } from '../navigation/appPaths';
 import { saveLastRehearsalVisit } from '../utils/lastRehearsalVisit';
+import { downloadRehearsalIcs, openGoogleCalendar } from '../utils/rehearsalCalendar';
+import { getActiveTheater } from '../store/selectors';
 import {
   countRsvpSummary,
   formatRsvpSummaryLine,
@@ -101,6 +105,10 @@ import {
   rsvpLabels,
   rsvpShortLabels,
 } from '../utils/rehearsalRsvp';
+import {
+  canMarkRehearsalAttendance,
+  resolveAttendanceValue,
+} from '../utils/rehearsalAttendance';
 
 const blockTypeLabels: Record<Exclude<ScheduleBlockType, 'etude'>, string> = {
   scene: 'Сцена',
@@ -132,7 +140,9 @@ export function RehearsalDetailPage() {
   const { user } = useAuth();
   const { confirm } = useConfirmDialog();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const rehearsal = state.rehearsals.find((r) => r.id === id);
+  const canMarkAttendance = rehearsal ? canMarkRehearsalAttendance(rehearsal) : false;
 
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -194,6 +204,14 @@ export function RehearsalDetailPage() {
       window.removeEventListener('focus', onFocus);
     };
   }, [id, dispatch]);
+
+  useEffect(() => {
+    if (!rehearsal || searchParams.get('share') !== 'telegram') return;
+    setTelegramModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('share');
+    setSearchParams(next, { replace: true });
+  }, [rehearsal?.id, searchParams, setSearchParams]);
 
   const rehearsalInsights = useMemo(() => {
     if (!rehearsal) {
@@ -659,7 +677,7 @@ export function RehearsalDetailPage() {
         type: 'UPDATE_REHEARSAL',
         payload: { ...rehearsal, telegramPlanSentAt: new Date().toISOString() },
       });
-      markGuidePlanExported(dispatch);
+      markGuidePlanExported(dispatch, theaterId);
       setTelegramSent(true);
       window.setTimeout(() => setTelegramSent(false), 3000);
     } catch (error) {
@@ -756,14 +774,51 @@ export function RehearsalDetailPage() {
           </div>
           {rehearsal.notes && <LinkifiedText text={rehearsal.notes} className="mt-3 text-muted" />}
         </div>
-        <div className="shrink-0 self-start sm:self-auto">
+        <div className="flex w-full shrink-0 flex-col gap-2 self-start sm:w-auto sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="!px-3 !py-2 text-sm" onClick={openTelegramExport}>
+              <Send size={16} />
+              Поделиться планом
+            </Button>
+            <Button
+              variant="secondary"
+              className="!px-3 !py-2 text-sm"
+              onClick={() =>
+                openGoogleCalendar(rehearsal, calendarTitle, rehearsalLocation)
+              }
+              aria-label="Добавить в Google Календарь"
+            >
+              <CalendarPlus size={16} />
+              <span className="hidden sm:inline">Google</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="!px-3 !py-2 text-sm"
+              onClick={() => {
+                const theater = getActiveTheater(state);
+                downloadRehearsalIcs(
+                  rehearsal,
+                  calendarTitle,
+                  rehearsalLocation,
+                  theater?.timezone
+                );
+                markGuidePlanExported(dispatch, theater?.id);
+              }}
+              aria-label="Скачать файл .ics"
+            >
+              <Download size={16} />
+              <span className="hidden sm:inline">.ics</span>
+            </Button>
+          </div>
         <RehearsalActionsMenu
           rehearsal={rehearsal}
           title={calendarTitle}
           location={rehearsalLocation}
           onTelegram={openTelegramExport}
           onTelegramDecisions={readOnly ? undefined : openDecisionsTelegramExport}
-          onPlanExported={() => markGuidePlanExported(dispatch)}
+          onPlanExported={() =>
+            markGuidePlanExported(dispatch, rehearsal.theaterId ?? state.activeTheaterId)
+          }
           onEdit={readOnly ? undefined : openEditRehearsal}
           onDelete={readOnly ? undefined : deleteRehearsal}
         />
@@ -804,19 +859,19 @@ export function RehearsalDetailPage() {
               Участники
             </h2>
             <p className="participants-hint mb-3 text-xs leading-relaxed">
-              Перетащите за ⋮⋮ для порядка. Добавьте замену или техника вручную. Статус посещаемости
-              влияет на историю и Telegram. RSVP приходит из Telegram-бота или задаётся вручную.
+              Перетащите за ⋮⋮ для порядка. Подтверждение участия — до репетиции; фактическое присутствие
+              — после её начала.
             </p>
             {rehearsal.actorIds.length > 0 && (
               <p className="mb-3 text-xs font-medium text-gold-light">
-                RSVP: {formatRsvpSummaryLine(rsvpSummary)}
+                Подтверждение участия: {formatRsvpSummaryLine(rsvpSummary)}
               </p>
             )}
             {participantActors.length > 0 ? (
               <div className="space-y-2">
                 {participantActors.map((actor, index) => {
                   const selected = rehearsal.actorIds.includes(actor!.id);
-                  const attendance = rehearsal.attendance?.[actor!.id] ?? (selected ? 'present' : 'absent');
+                  const attendance = resolveAttendanceValue(rehearsal, actor!.id, selected);
                   const rsvpStatus = rehearsal.rsvp?.[actor!.id];
                   const unavailable = isActorUnavailable(actor!, rehearsal.date, {
                     startTime: rehearsal.startTime,
@@ -897,16 +952,19 @@ export function RehearsalDetailPage() {
                           {rsvpStatus && (
                             <span
                               className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${rsvpColors[rsvpStatus]}`}
-                              title={`RSVP: ${rsvpLabels[rsvpStatus]}`}
+                              title={`Подтверждение: ${rsvpLabels[rsvpStatus]}`}
                             >
                               {rsvpShortLabels[rsvpStatus]} {rsvpLabels[rsvpStatus]}
                             </span>
                           )}
                         </div>
+                        <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted">
+                          Подтверждение участия
+                        </p>
                         {readOnly ? (
                           !rsvpStatus && (
-                            <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-muted">
-                              RSVP: {rsvpEmptyLabel}
+                            <span className="mt-1 inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-muted">
+                              {rsvpEmptyLabel}
                             </span>
                           )
                         ) : (
@@ -915,10 +973,10 @@ export function RehearsalDetailPage() {
                             onChange={(event) =>
                               updateRsvp(actor!.id, event.target.value as RsvpStatus | '')
                             }
-                            className={`mt-2 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
+                            className={`mt-1 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none ${
                               rsvpStatus ? rsvpColors[rsvpStatus] : 'border-white/10 bg-white/5 text-muted'
                             }`}
-                            aria-label={`RSVP: ${actor!.name}`}
+                            aria-label={`Подтверждение участия: ${actor!.name}`}
                           >
                             <option value="" className="bg-surface text-white">
                               {rsvpEmptyLabel}
@@ -930,20 +988,34 @@ export function RehearsalDetailPage() {
                             ))}
                           </select>
                         )}
+                        <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-muted">
+                          Фактическое присутствие
+                        </p>
                         <select
-                          value={attendance}
-                          disabled={readOnly}
-                          onChange={(event) =>
-                            updateAttendance(actor!.id, event.target.value as AttendanceStatus)
-                          }
-                          className={`mt-3 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${attendanceColors[attendance]}`}
+                          value={attendance || ''}
+                          disabled={readOnly || !selected || !canMarkAttendance}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (!value) return;
+                            updateAttendance(actor!.id, value as AttendanceStatus);
+                          }}
+                          className={`mt-1 w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                            attendance && canMarkAttendance
+                              ? attendanceColors[attendance]
+                              : 'border-white/10 bg-white/5 text-muted'
+                          }`}
                           aria-label={`Присутствие: ${actor!.name}`}
                         >
-                          {Object.entries(attendanceLabels).map(([value, label]) => (
-                            <option key={value} value={value} className="bg-surface text-white">
-                              {label}
-                            </option>
-                          ))}
+                          <option value="" className="bg-surface text-white">
+                            {canMarkAttendance ? 'Не отмечено' : 'После начала репетиции'}
+                          </option>
+                          {canMarkAttendance
+                            ? Object.entries(attendanceLabels).map(([value, label]) => (
+                                <option key={value} value={value} className="bg-surface text-white">
+                                  {label}
+                                </option>
+                              ))
+                            : null}
                         </select>
                       </div>
                     </div>
@@ -1420,11 +1492,6 @@ export function RehearsalDetailPage() {
         }
       >
         <div className="space-y-4">
-          <p className="text-sm text-muted">
-            Telegram не принимает ссылки из буфера браузера. При «Скопировать» под каждой сценой
-            будет строка 🔗 — она кликабельна в чате. Чтобы названия сцен были ссылками, подключите
-            чат театра в настройках и нажмите «Отправить в Telegram».
-          </p>
           <textarea
             readOnly
             value={telegramMessage}
@@ -1432,6 +1499,21 @@ export function RehearsalDetailPage() {
             className="w-full resize-y rounded-xl border border-gold/15 bg-background/60 px-4 py-3 font-mono text-sm leading-relaxed text-white focus:border-gold/30 focus:outline-none"
             onFocus={(event) => event.target.select()}
           />
+          {!telegramConfigured ? (
+            <div className="rounded-xl border border-gold/15 bg-background/30 px-4 py-3 text-sm text-muted">
+              <p>Чтобы отправить сообщение прямо в чат театра, подключите Telegram.</p>
+              <Link
+                to={`${appPaths.settings}?tab=theater&focus=telegram`}
+                className="mt-2 inline-flex text-gold-light hover:underline"
+              >
+                Подключить чат театра
+              </Link>
+            </div>
+          ) : null}
+          <p className="text-xs text-muted">
+            Telegram не принимает ссылки из буфера браузера. При «Скопировать» под сценами будет 🔗
+            — в чате она кликабельна. Кликабельные названия сцен — через «Отправить в Telegram».
+          </p>
           {telegramSendError && (
             <p className="text-sm text-red-300">{telegramSendError}</p>
           )}

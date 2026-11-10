@@ -14,6 +14,7 @@ import { ActorAvatar } from './ActorAvatar';
 import { fetchTheaterMembers } from '../api/auth';
 import { normalizeActorEmail, normalizeActorName } from '../utils/actorProfile';
 import { formatScriptAliasesInput, parseScriptAliasesInput } from '../utils/sceneRoleAssignment';
+import { CastQuickAssignRow } from './CastQuickAssignRow';
 
 interface CastDistributionPanelProps {
   playId: string;
@@ -317,14 +318,16 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
           <h4 className="text-sm font-medium text-gold-light">{title}</h4>
           {!readOnly && (
             <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => openCreateRole(kind)}>
-              <Plus size={14} /> Роль
+              <Plus size={14} /> Добавить роль
             </Button>
           )}
         </div>
 
         {roles.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gold/15 px-4 py-3 text-sm text-muted">
-            Список ролей пуст
+            {kind === 'character'
+              ? 'Пока нет ролей — добавьте первую строкой выше.'
+              : 'Список ролей пуст'}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gold/10">
@@ -342,7 +345,7 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
               <thead className="bg-background/40 text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">Роль</th>
-                  <th className="px-4 py-3 font-medium">Участники</th>
+                  <th className="px-4 py-3 font-medium">Участник</th>
                   {!readOnly && <th className="px-4 py-3 font-medium" />}
                 </tr>
               </thead>
@@ -415,7 +418,7 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
                               onClick={() => openAssignModal(role)}
                             >
                               <UserPlus size={14} />
-                              Добавить
+                              Назначить актёра
                             </Button>
                           ) : null}
                         </div>
@@ -427,6 +430,8 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
                             variant="ghost"
                             className="!px-2 !py-1"
                             onClick={() => openEditRole(role)}
+                            aria-label={`Редактировать роль «${role.name}»`}
+                            title="Редактировать роль"
                           >
                             <Pencil size={14} />
                           </Button>
@@ -460,22 +465,22 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
             постановочной и технической группах
           </p>
         </div>
+        {performances.length > 1 || readOnly ? null : (
+          <p className="text-xs text-muted">
+            Состав по основному показу — дополнительные показы можно добавить позже.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
-          {!readOnly && !activePerformance?.isDefault && sourcePerformanceId && (
+          {!readOnly && performances.length > 1 && !activePerformance?.isDefault && sourcePerformanceId && (
             <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={copyCastFromDefault}>
               <Copy size={14} />
               Скопировать из основного
             </Button>
           )}
-          {!readOnly && (
-            <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={openCreatePerformance}>
-              <Plus size={14} />
-              Новый показ
-            </Button>
-          )}
         </div>
       </div>
 
+      {performances.length > 1 ? (
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Показы постановки">
         <span className="text-xs uppercase tracking-wide text-muted">Показ:</span>
         {performances.map((performance) => (
@@ -514,7 +519,29 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
             )}
           </div>
         ))}
+        {!readOnly && (
+          <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={openCreatePerformance}>
+            <Plus size={14} />
+            Новый показ
+          </Button>
+        )}
       </div>
+      ) : !readOnly ? (
+        <details className="rounded-xl border border-gold/10 bg-background/20 p-3 text-sm">
+          <summary className="cursor-pointer text-muted">Другие показы (необязательно)</summary>
+          <p className="mt-2 text-xs text-muted">
+            Второй состав или выездной показ — отдельный состав на другую дату.
+          </p>
+          <Button
+            variant="secondary"
+            className="mt-3 !px-3 !py-1.5 text-sm"
+            onClick={openCreatePerformance}
+          >
+            <Plus size={14} />
+            Новый показ
+          </Button>
+        </details>
+      ) : null}
 
       {activePerformance && (
         <div className="rounded-xl border border-gold/10 bg-background/20 px-4 py-3">
@@ -562,6 +589,14 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
           </div>
         </div>
       )}
+
+      {!readOnly && activePerformance ? (
+        <CastQuickAssignRow
+          playId={playId}
+          performance={activePerformance}
+          onAssign={assignActor}
+        />
+      ) : null}
 
       {renderRoleTable(characterRoles, 'Роли в постановке', 'character')}
       {renderRoleTable(crewRoles, 'Постановочная группа', 'crew')}
@@ -643,7 +678,7 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
             label="Название"
             value={performanceForm.name}
             onChange={(e) => setPerformanceForm({ ...performanceForm, name: e.target.value })}
-            placeholder="Премьера, Показ 2..."
+            placeholder="Основной состав, Показ 2..."
           />
           <Textarea
             label="Описание"
@@ -711,8 +746,8 @@ export function CastDistributionPanel({ playId, readOnly: readOnlyProp = false }
                         </span>
                       )}
                       {!normalizeActorEmail(actor.email) && (
-                        <span className="mt-0.5 inline-block rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-200">
-                          нет email — личный кабинет не откроется
+                        <span className="mt-0.5 inline-block text-xs text-muted">
+                          Кабинет позже — email необязателен для назначения
                         </span>
                       )}
                     </span>

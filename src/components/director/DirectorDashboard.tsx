@@ -40,6 +40,7 @@ import { pageTitleClass } from '../../utils/pageLayout';
 import { PlayMiniIcon } from './PlayMiniIcon';
 import { PlayOverviewMini } from '../../pages/OverviewPage';
 import { TheaterSetupChecklist } from '../guide/TheaterSetupChecklist';
+import { getNextSetupStep, getTheaterSetupProgress } from '../../utils/guideOnboarding';
 import { sendTelegramHtmlMessage } from '../../api/telegram';
 import { buildRehearsalTelegramBotMessage } from '../../utils/rehearsalTelegramExport';
 import { markGuidePlanExported } from '../../utils/guidePlanExport';
@@ -101,12 +102,41 @@ function AttentionList({
   items,
   variant,
   onPlayNavigate,
+  setupCompleted,
+  setupTotal,
+  setupNextHref,
+  setupNextLabel,
 }: {
   items: AttentionItem[];
   variant: 'theater' | 'zen';
   onPlayNavigate: (playId: string) => void;
+  setupCompleted: number;
+  setupTotal: number;
+  setupNextHref?: string;
+  setupNextLabel?: string;
 }) {
   if (items.length === 0) {
+    if (setupTotal > 0 && setupCompleted < setupTotal && setupNextHref && setupNextLabel) {
+      return (
+        <Link
+          to={setupNextHref}
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+            variant === 'zen'
+              ? 'border-border/60 bg-black/[0.02] hover:bg-black/[0.04]'
+              : 'border-gold/15 bg-background/30 hover:border-gold/30'
+          }`}
+        >
+          <AlertTriangle
+            size={16}
+            className={`mt-0.5 shrink-0 ${variant === 'zen' ? 'text-amber-700' : 'text-amber-300'}`}
+          />
+          <span className="min-w-0 flex-1">
+            Настройка театра: {setupCompleted} из {setupTotal}. Дальше — {setupNextLabel}
+          </span>
+          <ChevronRight size={16} className="mt-0.5 shrink-0 opacity-40" />
+        </Link>
+      );
+    }
     return (
       <p
         className={`flex items-center gap-2 text-sm ${
@@ -177,6 +207,8 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
   }, [state.activeTheaterId, theaterRehearsals, nextRehearsal]);
   const premiereAlerts = useMemo(() => buildPremiereAlerts(state), [state]);
   const attentionItems = useMemo(() => buildAttentionItems(state), [state]);
+  const setupProgress = useMemo(() => getTheaterSetupProgress(state), [state]);
+  const setupNext = useMemo(() => getNextSetupStep(state), [state]);
   const premiereStrip = useMemo(() => buildPremiereStrip(state), [state]);
   const urgencyHint = useMemo(() => getScheduleUrgencyHint(premiereAlerts), [premiereAlerts]);
   const readinessStats = useMemo(() => getTheaterReadinessStats(state), [state]);
@@ -213,7 +245,7 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
         type: 'UPDATE_REHEARSAL',
         payload: { ...nextRehearsal, telegramPlanSentAt: sentAt },
       });
-      markGuidePlanExported(dispatch);
+      markGuidePlanExported(dispatch, theaterId);
     } catch (error) {
       setTelegramError(error instanceof Error ? error.message : 'Не удалось отправить');
     } finally {
@@ -233,7 +265,7 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
     <div className={variant === 'zen' ? 'space-y-5 sm:space-y-7' : 'space-y-4 sm:space-y-6'}>
       {variant === 'theater' && (
         <header>
-          <h1 className={pageTitleClass}>Обзор</h1>
+          <h1 className={pageTitleClass}>Сейчас</h1>
           <p className="mt-0.5 hidden text-sm text-muted sm:block">Рабочий стол режиссёра</p>
         </header>
       )}
@@ -426,7 +458,15 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
         >
           Требует внимания
         </h2>
-        <AttentionList items={attentionItems} variant={variant} onPlayNavigate={handlePlayNavigate} />
+        <AttentionList
+          items={attentionItems}
+          variant={variant}
+          onPlayNavigate={handlePlayNavigate}
+          setupCompleted={setupProgress.completed}
+          setupTotal={setupProgress.total}
+          setupNextHref={setupNext?.href}
+          setupNextLabel={setupNext?.label}
+        />
       </section>
 
       {/* 4. Полоса премьер */}

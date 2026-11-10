@@ -3,6 +3,7 @@ import { CalendarPlus, Download, MoreVertical, Pencil, Send, Trash2 } from 'luci
 import type { Rehearsal } from '../types';
 import { downloadRehearsalIcs, openGoogleCalendar } from '../utils/rehearsalCalendar';
 import { useMaxLg } from '../hooks/useMaxLg';
+import { useRehearsalStore } from '../store/RehearsalContext';
 import { countScheduleBlocksWithDecidedNotes } from '../utils/rehearsalDecidedNotesSummary';
 
 interface RehearsalActionsMenuProps {
@@ -30,6 +31,8 @@ function MenuItem({
   return (
     <button
       type="button"
+      role="menuitem"
+      aria-label={label}
       onClick={onClick}
       className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
         danger
@@ -53,9 +56,11 @@ export function RehearsalActionsMenu({
   onEdit,
   onDelete,
 }: RehearsalActionsMenuProps) {
+  const { state } = useRehearsalStore();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const isMobile = useMaxLg();
+  const theaterTimezone = state.theaters.find((t) => t.id === rehearsal.theaterId)?.timezone;
   const hasDecidedNotes = countScheduleBlocksWithDecidedNotes(rehearsal.schedule) > 0;
 
   useEffect(() => {
@@ -134,7 +139,7 @@ export function RehearsalActionsMenu({
               icon={<Download size={16} />}
               label="Файл .ics"
               onClick={closeAnd(() => {
-                downloadRehearsalIcs(rehearsal, title, location);
+                downloadRehearsalIcs(rehearsal, title, location, theaterTimezone);
                 onPlanExported?.();
               })}
             />

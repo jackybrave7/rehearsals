@@ -25,7 +25,7 @@ import { WeekCalendar, getWeekStart } from '../components/WeekCalendar';
 import { VenueSelect } from '../components/VenueSelect';
 import { TheaterScenePicker } from '../components/TheaterScenePicker';
 import { resolveRehearsalLocation } from '../utils/venue';
-import { mergeActorsForNewScenes } from '../utils/rehearsalActors';
+import { mergeActorsForNewScenes, mergeActorsForSceneIds } from '../utils/rehearsalActors';
 import { isActorUnavailable, getActorUnavailabilityReason } from '../utils/actorAvailability';
 import {
   getRehearsalWarnings,
@@ -40,6 +40,9 @@ import { getArchivedPlaysInRehearsal, rehearsalInvolvesActor, rehearsalInvolvesP
 import { CalendarPlayMarkers } from '../components/CalendarPlayMarkers';
 import { getRehearsalEventLabel, getRehearsalPlayMarkers } from '../utils/rehearsalCalendarMarkers';
 import { isRehearsalEnded } from '../utils/rehearsalOutcomePhotos';
+import { buildScheduleFromRehearsalItems } from '../utils/schedulePlan';
+import { formatSceneCountLabel } from '../utils/ruPlural';
+import { usePlanShareDeepLink } from '../hooks/usePlanShareDeepLink';
 
 const CALENDAR_FILTERS_KEY = 'rehearsals-calendar-filters';
 
@@ -76,6 +79,7 @@ const emptyRehearsal = (date: string, theaterId?: string): Omit<Rehearsal, 'id'>
 
 export function RehearsalsPage() {
   const { state, dispatch, readOnly } = useRehearsalStore();
+  usePlanShareDeepLink();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [calendarMode, setCalendarMode] = useState<'month' | 'week'>('month');
@@ -167,7 +171,7 @@ export function RehearsalsPage() {
   );
 
   const createWarnings = useMemo(
-    () => getRehearsalWarnings(state, draftRehearsal),
+    () => getRehearsalWarnings(state, draftRehearsal, { skipEmptyPlanWarning: true }),
     [state, draftRehearsal]
   );
 
@@ -221,10 +225,29 @@ export function RehearsalsPage() {
 
   const handleSave = () => {
     if (readOnly) return;
+    const playId = form.playId ?? activePlay?.id ?? theaterPlays[0]?.id;
+    const linkedScenes = rehearsalScenes.filter((scene) => form.sceneIds.includes(scene.id));
+    const schedule =
+      form.sceneIds.length > 0
+        ? buildScheduleFromRehearsalItems(
+            form.startTime,
+            form.sceneIds,
+            form.taskIds,
+            linkedScenes,
+            theaterTasks.filter((task) => form.taskIds.includes(task.id))
+          )
+        : [];
     const rehearsal: Rehearsal = {
       ...form,
       id: generateId(),
       theaterId: form.theaterId ?? state.activeTheaterId ?? undefined,
+      playId,
+      schedule,
+      actorIds: mergeActorsForSceneIds(
+        state,
+        { ...form, playId, actorIds: form.actorIds },
+        form.sceneIds
+      ),
     };
     dispatch({ type: 'ADD_REHEARSAL', payload: rehearsal });
     setModalOpen(false);
@@ -502,7 +525,7 @@ export function RehearsalsPage() {
                         </p>
                       )}
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
-                        {r.sceneIds.length > 0 && <span>{r.sceneIds.length} сцен</span>}
+                        {r.sceneIds.length > 0 && <span>{formatSceneCountLabel(r.sceneIds.length)}</span>}
                         {r.taskIds.length > 0 && <span>{r.taskIds.length} задач</span>}
                         {r.schedule.length > 0 && <span>{r.schedule.length} блоков в плане</span>}
                       </div>
@@ -540,7 +563,7 @@ export function RehearsalsPage() {
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Отмена
             </Button>
-            <Button onClick={handleSave}>Создать и открыть план</Button>
+            <Button onClick={handleSave}>Создать и сформировать план</Button>
           </div>
         }
       >
@@ -567,6 +590,10 @@ export function RehearsalsPage() {
               />
             )}
           </div>
+
+          <p className="rounded-lg border border-gold/10 bg-background/30 px-3 py-2 text-xs text-muted">
+            Дальше соберём план по времени из выбранных сцен.
+          </p>
 
           {(createWarnings.length > 0 ||
             createConflicts.length > 0 ||
@@ -600,7 +627,7 @@ export function RehearsalsPage() {
             <div className="rounded-xl border border-gold/15 bg-surface/40 p-4">
               <p className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
                 <Sparkles size={16} className="text-gold" />
-                Предложить даты — все ожидаемые участники свободны
+                Предложить даты — нет известных ограничений
               </p>
               <div className="flex flex-wrap gap-2">
                 {suggestedSlots.map((slot) => (

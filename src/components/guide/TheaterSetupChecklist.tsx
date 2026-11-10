@@ -6,8 +6,11 @@ import { useAuth } from '../../store/AuthContext';
 import { useDesign } from '../../store/DesignContext';
 import {
   getTheaterSetupProgress,
+  getNextSetupStep,
   isGuideChecklistHidden,
+  isOnboardingChecklistSkipped,
   setGuideChecklistHidden,
+  setOnboardingChecklistSkipped,
 } from '../../utils/guideOnboarding';
 import { appPaths } from '../../navigation/appPaths';
 
@@ -21,15 +24,15 @@ export function TheaterSetupChecklist({ variant = 'theater' }: TheaterSetupCheck
   const { isZen } = useDesign();
   const theme = variant ?? (isZen ? 'zen' : 'theater');
   const [hidden, setHidden] = useState(isGuideChecklistHidden);
+  const [skipped, setSkipped] = useState(isOnboardingChecklistSkipped);
   const canEdit = canEditTheater(state.activeTheaterId);
   const { steps, completed, total, allDone } = useMemo(
     () => getTheaterSetupProgress(state),
     [state]
   );
-  const firstIncomplete = steps.findIndex((s) => !s.done);
-  const currentStep = firstIncomplete === -1 ? total : firstIncomplete + 1;
+  const nextStep = useMemo(() => getNextSetupStep(state), [state]);
 
-  if (!canEdit || hidden || allDone) return null;
+  if (!canEdit || hidden || skipped || allDone) return null;
 
   const cardClass =
     theme === 'zen'
@@ -42,21 +45,41 @@ export function TheaterSetupChecklist({ variant = 'theater' }: TheaterSetupCheck
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Быстрый старт</p>
           <h2 className="text-lg font-semibold text-foreground">
-            Настройка театра: шаг {currentStep} из {total}
+            Настройка театра: выполнено {completed} из {total}
           </h2>
+          {nextStep ? (
+            <p className="mt-0.5 text-xs text-muted">
+              Дальше:{' '}
+              <Link to={nextStep.href} className="text-gold-light hover:underline">
+                {nextStep.label}
+              </Link>
+            </p>
+          ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setGuideChecklistHidden(true);
-            setHidden(true);
-          }}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted hover:text-foreground"
-          aria-label="Скрыть чеклист"
-        >
-          <X size={14} />
-          Скрыть
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setOnboardingChecklistSkipped(true);
+              setSkipped(true);
+            }}
+            className="text-xs text-gold-light hover:underline"
+          >
+            Пропустить, настрою позже
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setGuideChecklistHidden(true);
+              setHidden(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted hover:text-foreground"
+            aria-label="Скрыть чеклист"
+          >
+            <X size={14} />
+            Скрыть
+          </button>
+        </div>
       </div>
       <ol className="space-y-1 px-3 py-3">
         {steps.map((step) => (

@@ -1,14 +1,10 @@
+import {
+  THEATER_SETUP_STEP_DEFINITIONS,
+  type TheaterSetupStepId,
+} from '../shared/theaterSetupSteps.js';
+
 /** Шаги чек-листа — условия отправки писем цепочки. */
-export type ChecklistStepId =
-  | 'theater'
-  | 'actors'
-  | 'play'
-  | 'scenes'
-  | 'cast'
-  | 'venue'
-  | 'rehearsal'
-  | 'telegram'
-  | 'telegram_bot';
+export type ChecklistStepId = TheaterSetupStepId;
 
 export type DripConditionType =
   | 'checklist_pending'
@@ -16,20 +12,12 @@ export type DripConditionType =
   | 'days_after_checklist_done'
   | 'always';
 
-export const CHECKLIST_STEP_OPTIONS: Array<{ id: ChecklistStepId; label: string }> = [
-  { id: 'theater', label: 'Создать театр' },
-  { id: 'actors', label: 'Участники театра' },
-  { id: 'play', label: 'Добавить постановку' },
-  { id: 'scenes', label: 'Добавить сцены (от 3)' },
-  { id: 'cast', label: 'Роли в составе' },
-  { id: 'venue', label: 'Добавить площадку' },
-  { id: 'rehearsal', label: 'Репетиция с планом' },
-  { id: 'telegram', label: 'План в Telegram или .ics' },
-  { id: 'telegram_bot', label: 'Telegram-бот: чат и участники' },
-];
+export const CHECKLIST_STEP_OPTIONS: Array<{ id: ChecklistStepId; label: string }> =
+  THEATER_SETUP_STEP_DEFINITIONS.map((step) => ({ id: step.id, label: step.label }));
 
 export const DRIP_ACTION_PATH_OPTIONS = [
-  { value: '/app/overview', label: 'Обзор / театр' },
+  { value: '/app/overview', label: 'Сейчас / театр' },
+  { value: '/app/overview?tryDemo=1', label: 'Демо-постановка (tryDemo)' },
   { value: '/app/actors', label: 'Участники' },
   { value: '/app/play', label: 'Постановки' },
   { value: '/app/scenes', label: 'Сцены' },
@@ -37,6 +25,8 @@ export const DRIP_ACTION_PATH_OPTIONS = [
   { value: '/app/venues', label: 'Площадки' },
   { value: '/app/rehearsals', label: 'Репетиции' },
   { value: '/app/settings', label: 'Настройки' },
+  { value: '/app/settings?tab=theater&focus=telegram', label: 'Настройки → Telegram театра' },
+  { value: '/app/rehearsals?planShare=1', label: 'Репетиция → поделиться планом' },
   { value: '/app/guide', label: 'Руководство' },
   { value: '/app/support', label: 'Поддержка' },
 ];

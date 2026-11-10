@@ -7,6 +7,11 @@ import { getRegistrationMode } from './platformSettings.js';
 import { listUserBroadcastEngagement, type UserBroadcastEngagement } from './broadcastTracking.js';
 import { listUserDripEngagement, type UserDripEngagement } from './dripEmailTracking.js';
 import type { TheaterAccessRole } from './authTypes.js';
+import {
+  listOnboardingEventsForUser,
+  userHasTheaterTelegram,
+  type UserOnboardingEventRow,
+} from './onboardingEvents.js';
 
 export interface AdminUserSummary {
   id: string;
@@ -39,6 +44,9 @@ export interface AdminUserSummary {
     rehearsalsLast30Days: number;
     openTasks: number;
   };
+  lastLoginAt: string | null;
+  lastActiveAt: string | null;
+  telegramConnected: boolean;
 }
 
 export interface AdminUserTheaterStats {
@@ -61,6 +69,7 @@ export interface AdminUserDetail extends AdminUserSummary {
   theaters: AdminUserTheaterStats[];
   broadcastEngagement: UserBroadcastEngagement[];
   dripEngagement: UserDripEngagement[];
+  onboardingEvents: UserOnboardingEventRow[];
 }
 
 export interface PlatformStats {
@@ -175,6 +184,8 @@ function mapUserSummaryRow(
     subscription_pro_expires_at: string | null;
     email_verified_at: string | null;
     registration_approved_at: string | null;
+    last_login_at: string | null;
+    last_active_at: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -243,6 +254,9 @@ function mapUserSummaryRow(
       ),
       openTasks: countInUserTheaters(db, userId, 'tasks', 'theater_id', 'completed = 0'),
     },
+    lastLoginAt: row.last_login_at,
+    lastActiveAt: row.last_active_at,
+    telegramConnected: userHasTheaterTelegram(db, userId),
   };
 }
 
@@ -262,6 +276,8 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
          u.subscription_pro_expires_at,
          u.email_verified_at,
          u.registration_approved_at,
+         u.last_login_at,
+         u.last_active_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
@@ -281,6 +297,8 @@ export function collectAdminUsers(db: AppDatabase = getDb()): AdminUserSummary[]
     subscription_pro_expires_at: string | null;
     email_verified_at: string | null;
     registration_approved_at: string | null;
+    last_login_at: string | null;
+    last_active_at: string | null;
     has_password: number;
     has_google: number;
     active_sessions: number;
@@ -336,6 +354,8 @@ export function collectAdminUserDetail(
          u.subscription_pro_expires_at,
          u.email_verified_at,
          u.registration_approved_at,
+         u.last_login_at,
+         u.last_active_at,
          CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
          CASE WHEN u.google_sub IS NOT NULL THEN 1 ELSE 0 END AS has_google,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
@@ -356,6 +376,8 @@ export function collectAdminUserDetail(
         subscription_pro_expires_at: string | null;
         email_verified_at: string | null;
         registration_approved_at: string | null;
+        last_login_at: string | null;
+        last_active_at: string | null;
         has_password: number;
         has_google: number;
         active_sessions: number;
@@ -422,6 +444,7 @@ export function collectAdminUserDetail(
     theaters,
     broadcastEngagement: listUserBroadcastEngagement(userId, db),
     dripEngagement: listUserDripEngagement(userId, db),
+    onboardingEvents: listOnboardingEventsForUser(db, userId),
   };
 }
 

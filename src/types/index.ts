@@ -3,6 +3,8 @@ export type ActorStatus = 'active' | 'archived';
 export interface Theater {
   id: string;
   name: string;
+  /** Учебный театр-пример; не учитывается в лимите Free и удаляется одной кнопкой */
+  isDemo?: boolean;
   notes?: string;
   /** IANA-часовой пояс театра (напоминания, расписание). По умолчанию Europe/Moscow */
   timezone?: string;

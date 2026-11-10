@@ -7,6 +7,7 @@ export async function fetchRehearsalRsvp(
   const response = await fetch(`${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/rsvp`, {
     credentials: 'include',
   });
+  if (response.status === 404) return {};
   if (!response.ok) throw new Error(`REHEARSAL_RSVP_${response.status}`);
   const data = (await response.json()) as { rsvp: Record<string, RsvpStatus> };
   return data.rsvp;

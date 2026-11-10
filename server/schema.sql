@@ -22,7 +22,18 @@ CREATE TABLE IF NOT EXISTS users (
   email_verification_token_hash TEXT,
   email_verification_expires_at TEXT,
   terms_accepted_at TEXT,
-  registration_approved_at TEXT
+  registration_approved_at TEXT,
+  last_login_at TEXT,
+  last_active_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS user_onboarding_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  theater_id TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (user_id, event_type)
 );
 
 CREATE TABLE IF NOT EXISTS platform_settings (
@@ -47,7 +58,8 @@ CREATE TABLE IF NOT EXISTS theaters (
   owner_user_id TEXT REFERENCES users(id),
   telegram_chat_id TEXT,
   reminder_settings TEXT NOT NULL DEFAULT '{}',
-  timezone TEXT
+  timezone TEXT,
+  is_demo INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS theater_members (

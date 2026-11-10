@@ -141,7 +141,7 @@ export function buildStoneHeartCast(playId: string, actorByName: Record<string, 
   const premierePerformance: Performance = {
     id: generateId(),
     playId,
-    name: 'Премьера',
+    name: 'Основной состав',
     date: '2026-07-11',
     startTime: '18:00',
     description: 'Библиотека им. Неверова',

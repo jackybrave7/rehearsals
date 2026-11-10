@@ -11,6 +11,8 @@ import {
   Sparkles,
   Wand2,
   X,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { ExpandableText } from './ExpandableText';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -50,6 +52,7 @@ import {
   isScheduleBlockCompletable,
 } from '../utils/rehearsalScheduleCompletion';
 import type { Play, Rehearsal, Scene, ScheduleBlock, ScheduleBlockType, Task } from '../types';
+import { useMaxLg } from '../hooks/useMaxLg';
 
 const blockTypeLabels: Record<ScheduleBlockType, string> = {
   scene: 'Сцена',
@@ -127,6 +130,7 @@ export function RehearsalScheduleEditor({
   readOnly = false,
 }: RehearsalScheduleEditorProps) {
   const { state } = useRehearsalStore();
+  const isMobile = useMaxLg();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [generatePlanModalOpen, setGeneratePlanModalOpen] = useState(false);
@@ -139,12 +143,24 @@ export function RehearsalScheduleEditor({
   const exceedsWindow =
     planSchedule.length > 0 &&
     timeToMinutes(planEndTime) > timeToMinutes(rehearsal.endTime);
+  const undistributedMinutes =
+    planSchedule.length > 0
+      ? Math.max(0, timeToMinutes(rehearsal.endTime) - timeToMinutes(planEndTime))
+      : 0;
   const showCompletionMarks = canMarkScheduleCompletion(rehearsal);
   const pastRehearsal = isPastRehearsalDay(rehearsal);
   const completionStats = getScheduleCompletionStats(planSchedule);
 
   const applySchedule = (schedule: ScheduleBlock[]) => {
     onScheduleChange(recalculateScheduleStartTimes(schedule, rehearsal.startTime));
+  };
+
+  const moveBlockByOffset = (blockId: string, offset: number) => {
+    const fromIndex = planSchedule.findIndex((block) => block.id === blockId);
+    if (fromIndex === -1) return;
+    const toIndex = fromIndex + offset;
+    if (toIndex < 0 || toIndex >= planSchedule.length) return;
+    applySchedule(moveScheduleBlock(planSchedule, blockId, toIndex, rehearsal.startTime));
   };
 
   const openGeneratePlanModal = () => {
@@ -340,6 +356,18 @@ export function RehearsalScheduleEditor({
         </div>
       </div>
 
+      {undistributedMinutes > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <p className="font-medium">
+            Не распределено {formatDuration(undistributedMinutes)} (план до {planEndTime}, репетиция до{' '}
+            {rehearsal.endTime})
+          </p>
+          <p className="mt-1 text-xs text-amber-100/90">
+            Растяните сцены, добавьте перерыв или разминку, либо сократите время окончания репетиции.
+          </p>
+        </div>
+      )}
+
       {(linkedScenes.length > 0 || linkedTasks.length > 0) && planSchedule.length === 0 && (
         <p className="text-xs text-muted">
           Перетащите сцены и задачи из колонки слева (за иконку ⋮⋮) или нажмите «Сформировать план».
@@ -532,6 +560,7 @@ export function RehearsalScheduleEditor({
                               variant="ghost"
                               className="!px-2 !py-1"
                               onClick={() => onEditBlock(block)}
+                              aria-label={`Редактировать блок «${block.title}»`}
                             >
                               <Pencil size={14} />
                             </Button>
@@ -544,9 +573,31 @@ export function RehearsalScheduleEditor({
                       </div>
                     </div>
                     {!readOnly && (
-                      <div className="schedule-block-actions mt-2 flex gap-1 sm:hidden">
+                      <div className="schedule-block-actions mt-2 flex flex-wrap gap-1 sm:hidden">
                         {blockPlay && blockScene && (
                           <SceneScriptLink play={blockPlay} scene={blockScene} />
+                        )}
+                        {isMobile && planSchedule.length > 1 && (
+                          <>
+                            <Button
+                              variant="secondary"
+                              className="!px-2 !py-1.5 text-xs"
+                              disabled={index === 0}
+                              onClick={() => moveBlockByOffset(block.id, -1)}
+                              aria-label="Переместить блок выше"
+                            >
+                              <ChevronUp size={14} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              className="!px-2 !py-1.5 text-xs"
+                              disabled={index === planSchedule.length - 1}
+                              onClick={() => moveBlockByOffset(block.id, 1)}
+                              aria-label="Переместить блок ниже"
+                            >
+                              <ChevronDown size={14} />
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="secondary"

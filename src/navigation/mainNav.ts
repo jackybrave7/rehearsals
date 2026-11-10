@@ -29,7 +29,7 @@ export type MainNavItem = {
 
 /** Единый порядок: обзор → репетиции → … */
 export const mainNavItems: MainNavItem[] = [
-  { to: appPaths.home, icon: LayoutDashboard, label: 'Обзор', zenLabel: 'Сейчас' },
+  { to: appPaths.home, icon: LayoutDashboard, label: 'Сейчас', zenLabel: 'Сейчас' },
   { to: appPaths.rehearsals, icon: CalendarDays, label: 'Репетиции' },
   {
     to: appPaths.overview,

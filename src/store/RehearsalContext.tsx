@@ -474,10 +474,16 @@ function runOneTimeMigrations(state: AppState): AppState {
 }
 
 function migratePerformances(state: AppState): AppState {
-  let performances: Performance[] = state.performances.map((p) => ({
-    ...p,
-    description: p.description ?? p.notes,
-  }));
+  let performances: Performance[] = state.performances.map((p) => {
+    const base = {
+      ...p,
+      description: p.description ?? p.notes,
+    };
+    if (p.isDefault && p.name === 'Премьера') {
+      return { ...base, name: 'Основной состав' };
+    }
+    return base;
+  });
   let castAssignments = state.castAssignments.map((a) => ({ ...a }));
 
   for (const play of state.plays) {
@@ -664,6 +670,7 @@ type Action =
   | { type: 'UPDATE_APP_META'; payload: NonNullable<AppState['appMeta']> }
   | { type: 'SET_ACTIVE_THEATER'; payload: string }
   | { type: 'ADD_THEATER'; payload: Theater }
+  | { type: 'INSTALL_DEMO_THEATER'; payload: import('../data/demoTheater').DemoInstallBundle }
   | { type: 'UPDATE_THEATER'; payload: Theater }
   | { type: 'DELETE_THEATER'; payload: string }
   | { type: 'SET_ACTIVE_PLAY'; payload: string }
@@ -763,6 +770,23 @@ function reducer(state: AppState, action: Action): AppState {
         activeTheaterId: action.payload.id,
         activePlayId: null,
       };
+    case 'INSTALL_DEMO_THEATER': {
+      const bundle = action.payload;
+      return {
+        ...state,
+        theaters: [...state.theaters.filter((t) => t.id !== bundle.theater.id), bundle.theater],
+        actors: [...state.actors, ...bundle.actors],
+        plays: [...state.plays, bundle.play],
+        playRoles: [...state.playRoles, ...bundle.playRoles],
+        performances: [...state.performances, ...bundle.performances],
+        castAssignments: [...state.castAssignments, ...bundle.castAssignments],
+        scenes: [...state.scenes, ...bundle.scenes],
+        venues: [...state.venues, ...bundle.venues],
+        rehearsals: [...state.rehearsals, bundle.rehearsal],
+        activeTheaterId: bundle.theater.id,
+        activePlayId: bundle.play.id,
+      };
+    }
     case 'UPDATE_THEATER':
       return {
         ...state,
@@ -771,7 +795,8 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       };
     case 'DELETE_THEATER': {
-      if (state.theaters.length <= 1) return state;
+      const deleting = state.theaters.find((theater) => theater.id === action.payload);
+      if (state.theaters.length <= 1 && !deleting?.isDemo) return state;
       const theaters = state.theaters.filter((theater) => theater.id !== action.payload);
       const activeTheaterId =
         state.activeTheaterId === action.payload ? theaters[0]?.id ?? null : state.activeTheaterId;

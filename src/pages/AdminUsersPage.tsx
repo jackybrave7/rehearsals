@@ -38,6 +38,15 @@ function emailVerifiedClass(verified: boolean): string {
   return verified ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200';
 }
 
+function formatAdminTimestamp(iso: string | null): string {
+  if (!iso) return '—';
+  try {
+    return format(parseISO(iso), 'd MMM yyyy, HH:mm', { locale: ru });
+  } catch {
+    return '—';
+  }
+}
+
 export function AdminUsersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = searchParams.get('filter') === 'pending' ? 'pending' : 'all';
@@ -222,11 +231,14 @@ export function AdminUsersPage() {
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Регистрация</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
-                <th className="px-4 py-3 font-medium">Вход</th>
+                <th className="px-4 py-3 font-medium">Авторизация</th>
+                <th className="px-4 py-3 font-medium">Последний вход</th>
+                <th className="px-4 py-3 font-medium">Активность</th>
+                <th className="px-4 py-3 font-medium">Telegram</th>
                 <th className="px-4 py-3 font-medium">Тариф</th>
                 <th className="px-4 py-3 font-medium">Театры</th>
                 <th className="px-4 py-3 font-medium">Контент</th>
-                <th className="px-4 py-3 font-medium">Активность</th>
+                <th className="px-4 py-3 font-medium">Репетиции</th>
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
@@ -284,6 +296,19 @@ export function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted">{authLabel(user)}</td>
+                  <td className="px-4 py-3 text-muted">{formatAdminTimestamp(user.lastLoginAt)}</td>
+                  <td className="px-4 py-3 text-muted">{formatAdminTimestamp(user.lastActiveAt)}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        user.telegramConnected
+                          ? 'bg-emerald-500/15 text-emerald-200'
+                          : 'bg-white/5 text-muted'
+                      }`}
+                    >
+                      {user.telegramConnected ? 'Чат' : '—'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${

@@ -273,9 +273,11 @@ export function assignOrphanTheaters(db: AppDatabase, userId: string) {
 function createSession(db: AppDatabase, userId: string, res: Response): AuthUser {
   const token = randomBytes(32).toString('hex');
   const sessionId = uuidv4();
+  const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`
   ).run(sessionId, userId, hashToken(token), sessionExpiryIso());
+  db.prepare(`UPDATE users SET last_login_at = ? WHERE id = ?`).run(now, userId);
   setSessionCookie(res, token);
 
   const user = db.prepare(`SELECT id, email, name, password_hash FROM users WHERE id = ?`).get(userId) as UserRow;
