@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookMarked } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import guideSource from '../content/guide.md?raw';
+import { THEATER_SETUP_STEP_COUNT } from '../../shared/theaterSetupSteps';
+import { ruPlural } from '../utils/ruPlural';
 import { GuideRenderer } from '../components/guide/GuideRenderer';
 import { GuideSearch } from '../components/guide/GuideSearch';
 import { GuideToc } from '../components/guide/GuideToc';
@@ -57,8 +59,14 @@ function collectDetailsIds(headings: ReturnType<typeof parseGuideMarkdown>['head
   return ids;
 }
 
+function patchGuideMarkdown(source: string): string {
+  const stepWord = ruPlural(THEATER_SETUP_STEP_COUNT, 'шаг', 'шага', 'шагов');
+  const phrase = `${THEATER_SETUP_STEP_COUNT} ${stepWord}`;
+  return source.replace(/\{\{SETUP_STEP_PHRASE\}\}/g, phrase);
+}
+
 export function GuidePage() {
-  const parsed = useMemo(() => parseGuideMarkdown(guideSource), []);
+  const parsed = useMemo(() => parseGuideMarkdown(patchGuideMarkdown(guideSource)), []);
   const { state } = useRehearsalStore();
   const { getTheaterRole } = useAuth();
   const { isZen } = useDesign();
@@ -251,13 +259,13 @@ export function GuidePage() {
           />
 
           <p className="mt-8 border-t border-gold/10 pt-4 text-xs text-muted">
-            Скрыли чеклист на обзоре?{' '}
+            Скрыли чеклист на «Сейчас»?{' '}
             <button
               type="button"
               className="text-gold-light underline"
               onClick={() => {
                 restoreGuideChecklist();
-                setCopyMessage('Чеклист снова на обзоре');
+                setCopyMessage('Чеклист снова на «Сейчас»');
                 window.setTimeout(() => setCopyMessage(null), 2000);
               }}
             >

@@ -131,7 +131,7 @@ export function TheaterScenePicker({
 
       {performance && (
         <p className="text-xs text-muted">
-          Состав: {formatPerformanceLabel(performance)} — наведите на персонажа, чтобы увидеть актёра
+          Состав: {formatPerformanceLabel(performance)} — нажмите на персонажа, чтобы увидеть актёра
         </p>
       )}
 

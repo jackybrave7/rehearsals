@@ -1,5 +1,5 @@
 import { Check, Palette, Sparkles, Drama, AlertTriangle, LogOut, Clock, Bell, BarChart3, Send, Building2, Settings2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
@@ -73,6 +73,7 @@ export function SettingsPage() {
   const activeTheater = getActiveTheater(state);
   const theaterReminders = resolveTheaterReminderSettings(activeTheater ?? {}, state.appMeta);
   const theaterTimezone = resolveTheaterTimezone(activeTheater);
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<SettingsTab>('general');
   const [adminRevealOpen, setAdminRevealOpen] = useState(false);
   const [profileName, setProfileName] = useState(user?.name ?? '');
@@ -104,6 +105,21 @@ export function SettingsPage() {
   useEffect(() => {
     setTelegramChatInput(activeTheater?.telegramChatId ?? '');
   }, [activeTheater?.id, activeTheater?.telegramChatId]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'theater') setTab('theater');
+    if (searchParams.get('focus') !== 'telegram') return;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (tab !== 'theater' || searchParams.get('focus') !== 'telegram') return;
+    const element = document.getElementById('telegram-theater');
+    if (!element) return;
+    window.requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [tab, searchParams]);
 
   const saveProfile = async () => {
     setProfileSaving(true);
@@ -585,7 +601,7 @@ export function SettingsPage() {
         <>
           <TheaterMembersPanel />
 
-          <section className="space-y-4">
+          <section id="telegram-theater" className="scroll-mt-28 space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted">
               <Send size={16} />
               Telegram чат театра

@@ -23,6 +23,7 @@ import { SceneWorkHistoryPanel } from '../components/SceneWorkHistoryPanel';
 import { GoogleDocsLinksPanel } from '../components/GoogleDocsLinksPanel';
 import { ScriptImportPanel } from '../components/ScriptImportPanel';
 import { GuideContextHelp } from '../components/guide/GuideContextHelp';
+import { CollapsibleOptionalSection } from '../components/CollapsibleOptionalSection';
 import { SceneScriptLink, ActScriptLink } from '../components/SceneScriptLink';
 import { SceneTimingHint, getSuggestedRehearsalMinutes } from '../components/SceneTimingHint';
 import { PremiereBanner } from '../components/PremiereBanner';
@@ -387,7 +388,7 @@ export function ScenesPage() {
           </p>
           {selectedPerformance && (
             <p className="mt-1 text-xs text-muted">
-              Состав при наведении:{' '}
+              Состав: нажмите на персонажа (или наведите) —{' '}
               <Link to={appPaths.play} className="text-gold-light hover:underline">
                 {formatPerformanceLabel(selectedPerformance)}
               </Link>
@@ -858,93 +859,105 @@ export function ScenesPage() {
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="Акт 1, сц. 2 — Трактир"
           />
-          <Textarea
-            label="Описание / фрагмент текста"
-            value={form.description ?? ''}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Текст сцены для прогноза хронометража (знаки с пробелами). Если есть Google Docs — точнее подсчитать оттуда."
-          />
-          <div className="rounded-xl border border-gold/10 bg-black/20 p-3">
-            <SceneTimingHint scene={formPreviewScene} appMeta={state.appMeta} />
-            <Button
-              type="button"
-              variant="secondary"
-              className="mt-3"
-              onClick={() =>
-                setForm({
-                  ...form,
-                  estimatedMinutes: getSuggestedRehearsalMinutes(formPreviewScene, state.appMeta),
-                })
-              }
-            >
-              Подставить прогноз в «На репетицию»
-            </Button>
-            {timingSettings.charsPerAuthorPage > 0 && (
-              <p className="mt-2 text-[11px] text-muted/70">
-                1 а.л. = {timingSettings.charsPerAuthorPage.toLocaleString('ru-RU')} зн. ·{' '}
-                {timingSettings.performanceMinutesPerAuthorPage} мин спектакль · ×
-                {timingSettings.rehearsalMultiplier} на репетицию
-              </p>
-            )}
-          </div>
-          <Textarea
-            label="Режиссёрские заметки (не для Telegram)"
-            value={form.directorNotes ?? ''}
-            onChange={(e) => setForm({ ...form, directorNotes: e.target.value })}
-          />
-          {characterRoles.length > 0 && (
-            <div>
-              <p className="mb-2 text-sm text-muted">Персонажи в сцене</p>
-              <div className="flex flex-wrap gap-2">
-                {characterRoles.map((role) => {
-                  const selected = (form.roleIds ?? []).includes(role.id);
-                  return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => toggleRole(role.id)}
-                      className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                        selected
-                          ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
-                          : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      {role.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          <Select
-            label="Статус"
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value as SceneStatus })}
-            options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
-          />
-          <Select
-            label="Приоритет"
-            value={form.priority ?? 'medium'}
-            onChange={(e) => setForm({ ...form, priority: e.target.value as ScenePriority })}
-            options={priorityFilterOrder.map((value) => ({
-              value,
-              label: priorityLabels[value],
-            }))}
-          />
-          {activePlay.documentUrl && (
-            <Input
-              label="Ссылка на фрагмент Google Docs"
-              value={scriptLinkInput}
-              onChange={(e) => setScriptLinkInput(e.target.value)}
-              placeholder="Вставьте ссылку с #heading=… или #bookmark=…"
-            />
-          )}
-          {form.scriptAnchor && !scriptLinkInput && (
-            <p className="text-xs text-muted">
-              Привязан якорь {form.scriptAnchor.type === 'heading' ? 'заголовка' : 'закладки'}:{' '}
-              {form.scriptAnchor.id}
-            </p>
-          )}
+          {(() => {
+            const sceneExtraFields = (
+              <>
+                <Textarea
+                  label="Описание / фрагмент текста"
+                  value={form.description ?? ''}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Текст сцены для прогноза хронометража (знаки с пробелами). Если есть Google Docs — точнее подсчитать оттуда."
+                />
+                <div className="rounded-xl border border-gold/10 bg-black/20 p-3">
+                  <SceneTimingHint scene={formPreviewScene} appMeta={state.appMeta} />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="mt-3"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        estimatedMinutes: getSuggestedRehearsalMinutes(formPreviewScene, state.appMeta),
+                      })
+                    }
+                  >
+                    Подставить прогноз в «На репетицию»
+                  </Button>
+                  {timingSettings.charsPerAuthorPage > 0 && (
+                    <p className="mt-2 text-[11px] text-muted/70">
+                      1 а.л. = {timingSettings.charsPerAuthorPage.toLocaleString('ru-RU')} зн. ·{' '}
+                      {timingSettings.performanceMinutesPerAuthorPage} мин спектакль · ×
+                      {timingSettings.rehearsalMultiplier} на репетицию
+                    </p>
+                  )}
+                </div>
+                <Textarea
+                  label="Режиссёрские заметки (не для Telegram)"
+                  value={form.directorNotes ?? ''}
+                  onChange={(e) => setForm({ ...form, directorNotes: e.target.value })}
+                />
+                {characterRoles.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-sm text-muted">Персонажи в сцене</p>
+                    <div className="flex flex-wrap gap-2">
+                      {characterRoles.map((role) => {
+                        const selected = (form.roleIds ?? []).includes(role.id);
+                        return (
+                          <button
+                            key={role.id}
+                            type="button"
+                            onClick={() => toggleRole(role.id)}
+                            className={`rounded-full px-3 py-1 text-sm transition-colors ${
+                              selected
+                                ? 'bg-gold/20 text-gold-light ring-1 ring-gold/30'
+                                : 'bg-white/5 text-muted hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            {role.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <Select
+                  label="Статус"
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as SceneStatus })}
+                  options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
+                />
+                <Select
+                  label="Приоритет"
+                  value={form.priority ?? 'medium'}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value as ScenePriority })}
+                  options={priorityFilterOrder.map((value) => ({
+                    value,
+                    label: priorityLabels[value],
+                  }))}
+                />
+                {activePlay.documentUrl && (
+                  <Input
+                    label="Ссылка на фрагмент Google Docs"
+                    value={scriptLinkInput}
+                    onChange={(e) => setScriptLinkInput(e.target.value)}
+                    placeholder="Вставьте ссылку с #heading=… или #bookmark=…"
+                  />
+                )}
+                {form.scriptAnchor && !scriptLinkInput && (
+                  <p className="text-xs text-muted">
+                    Привязан якорь {form.scriptAnchor.type === 'heading' ? 'заголовка' : 'закладки'}:{' '}
+                    {form.scriptAnchor.id}
+                  </p>
+                )}
+              </>
+            );
+            if (editing) return sceneExtraFields;
+            return (
+              <CollapsibleOptionalSection hint="Текст, хронометраж, роли и статус — необязательно на первом шаге.">
+                {sceneExtraFields}
+              </CollapsibleOptionalSection>
+            );
+          })()}
         </div>
       </Modal>
     </div>

@@ -3,11 +3,16 @@ import { useSubscription } from './useSubscription';
 import { useAuth } from '../store/AuthContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { generateId } from '../utils/id';
-import { canCreateTheater as canCreateTheaterByPlan } from '../utils/subscription';
+import {
+  canCreateTheater as canCreateTheaterByPlan,
+  countOwnedNonDemoTheaters,
+  getOwnedTheaterIdsFromAccess,
+} from '../utils/subscription';
 
 export function useCreateTheater() {
-  const { dispatch } = useRehearsalStore();
-  const { grantTheaterAccess, theaters: accessTheaters, canCreateTheater: canCreateTheaterRole } = useAuth();
+  const { dispatch, state } = useRehearsalStore();
+  const { grantTheaterAccess, theaters: accessTheaters, canCreateTheater: canCreateTheaterRole } =
+    useAuth();
   const { isPro } = useSubscription();
   const { prompt, alert } = useConfirmDialog();
 
@@ -22,12 +27,15 @@ export function useCreateTheater() {
       return false;
     }
 
-    const ownedCount = accessTheaters.filter((entry) => entry.role === 'owner').length;
+    const ownedCount = countOwnedNonDemoTheaters(
+      state,
+      getOwnedTheaterIdsFromAccess(accessTheaters)
+    );
     if (!canCreateTheaterByPlan(ownedCount, isPro)) {
       await alert({
         title: 'Лимит тарифа Free',
         message:
-          'На бесплатном тарифе доступен один театр. Перейдите на Pro, чтобы вести несколько коллективов.',
+          'На бесплатном тарифе доступен один театр. Демо-пример лимит не занимает. Перейдите на Pro для нескольких коллективов.',
         okLabel: 'Понятно',
       });
       return false;

@@ -1,4 +1,4 @@
-import { BookOpen, Building2, Calendar, Users } from 'lucide-react';
+import { BookOpen, Building2, Calendar, Sparkles, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { appPaths } from '../navigation/appPaths';
 import { Button } from './Button';
@@ -8,16 +8,23 @@ type WelcomeOnboardingModalProps = {
   open: boolean;
   onClose: () => void;
   onCreateTheater?: () => void | Promise<boolean>;
+  onTryDemo?: () => void | Promise<boolean>;
 };
 
 export function WelcomeOnboardingModal({
   open,
   onClose,
   onCreateTheater,
+  onTryDemo,
 }: WelcomeOnboardingModalProps) {
   const handleCreate = () => {
     onClose();
     if (onCreateTheater) void onCreateTheater();
+  };
+
+  const handleDemo = () => {
+    onClose();
+    if (onTryDemo) void onTryDemo();
   };
 
   return (
@@ -31,6 +38,12 @@ export function WelcomeOnboardingModal({
           <Button variant="secondary" onClick={onClose}>
             Понятно
           </Button>
+          {onTryDemo ? (
+            <Button variant="secondary" onClick={handleDemo}>
+              <Sparkles size={16} />
+              Попробовать на примере
+            </Button>
+          ) : null}
           {onCreateTheater ? (
             <Button onClick={handleCreate}>Создать первый театр</Button>
           ) : null}
@@ -38,8 +51,8 @@ export function WelcomeOnboardingModal({
       }
     >
       <p className="text-sm leading-relaxed text-muted">
-        Сервис помогает вести расписание репетиций, сцены из Google Docs, участников и напоминания в
-        Telegram — всё в одном месте.
+        Сервис помогает вести расписание репетиций, сцены, участников и напоминания в Telegram — всё в
+        одном месте. Текст пьесы и Google Docs можно подключить позже.
       </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -49,18 +62,26 @@ export function WelcomeOnboardingModal({
             <span className="text-sm font-medium">Свой коллектив</span>
           </div>
           <p className="text-sm text-muted">
-            Создайте театр кнопкой «+ Новый» в боковом меню — вы станете владельцем и сможете сразу
-            добавлять постановки и репетиции.
+            Создайте театр — вы станете владельцем и сможете добавлять постановки, сцены и репетиции.
           </p>
         </div>
         <div className="rounded-xl border border-gold/10 bg-background/40 p-4">
+          <div className="mb-2 flex items-center gap-2 text-gold-light">
+            <Sparkles size={18} />
+            <span className="text-sm font-medium">Учебный пример</span>
+          </div>
+          <p className="text-sm text-muted">
+            Готовая постановка «Каменное сердце» с планом репетиции — за пару кликов, без лимита Free.
+          </p>
+        </div>
+        <div className="rounded-xl border border-gold/10 bg-background/40 p-4 sm:col-span-2">
           <div className="mb-2 flex items-center gap-2 text-gold-light">
             <Users size={18} />
             <span className="text-sm font-medium">Приглашение</span>
           </div>
           <p className="text-sm text-muted">
-            Если вас добавят в существующий театр по email, нажмите «Проверить доступ» — права
-            появятся автоматически.
+            Если вас добавят в существующий театр по email, нажмите «Проверить доступ» — права появятся
+            автоматически.
           </p>
         </div>
       </div>
@@ -69,11 +90,11 @@ export function WelcomeOnboardingModal({
       <ol className="mt-2 space-y-2 text-sm text-muted">
         <li className="flex gap-2">
           <span className="text-gold">1.</span>
-          <span>Создайте театр или дождитесь приглашения от владельца.</span>
+          <span>Создайте театр, попробуйте пример или дождитесь приглашения.</span>
         </li>
         <li className="flex gap-2">
           <span className="text-gold">2.</span>
-          <span>Добавьте постановку и импортируйте сцены из Google Docs.</span>
+          <span>Добавьте сцены вручную или импортируйте из Google Docs.</span>
         </li>
         <li className="flex gap-2">
           <span className="text-gold">3.</span>
@@ -91,7 +112,7 @@ export function WelcomeOnboardingModal({
         </Link>
         <span className="inline-flex items-center gap-1.5 text-muted">
           <Calendar size={15} />
-          На тарифе Free — один театр и одна активная постановка
+          На тарифе Free — один театр и одна активная постановка (демо не считается)
         </span>
       </div>
     </Modal>

@@ -54,9 +54,7 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
   const performance = activePlay ? getSelectedPerformance(state, activePlay.id) : undefined;
   const playCount = getActiveTheaterPlays(state).length;
 
-  const theaterValue = activeTheater?.name ?? 'Не выбран';
-  const performanceValue = performance ? formatPerformanceLabel(performance) : 'Не выбран';
-  const playTitle = activePlay?.title ?? 'Постановка не выбрана';
+  const playTitle = activePlay?.title ?? '';
 
   return (
     <div
@@ -73,47 +71,60 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
       >
         {/* Компактная шапка для телефонов */}
         <div className="flex min-w-0 flex-1 items-center gap-2 lg:hidden">
-          {variant === 'zen' ? (
-            <Link
-              to={appPaths.rehearsals}
-              className="shrink-0 transition-opacity hover:opacity-80"
-              aria-label="Календарь репетиций"
-            >
-              <AppLogo size="sm" variant="zen" />
-            </Link>
+          {!activeTheater ? (
+            <p className="truncate text-sm text-muted">Театр не создан</p>
           ) : (
-            <Link
-              to={appPaths.rehearsals}
-              className="shrink-0 rounded-lg p-1.5 text-gold-light transition-colors hover:bg-white/5"
-              aria-label="Календарь репетиций"
-            >
-              <CalendarDays size={18} strokeWidth={1.75} />
-            </Link>
-          )}
-          <div className="min-w-0 flex-1">
-            {playCount > 1 ? (
-              <div className="min-w-0 [&_select]:max-w-full [&_label]:max-w-full">
-                <PlaySwitcher variant={variant} />
+            <>
+              {variant === 'zen' ? (
+                <Link
+                  to={appPaths.rehearsals}
+                  className="shrink-0 transition-opacity hover:opacity-80"
+                  aria-label="Календарь репетиций"
+                >
+                  <AppLogo size="sm" variant="zen" />
+                </Link>
+              ) : (
+                <Link
+                  to={appPaths.rehearsals}
+                  className="shrink-0 rounded-lg p-1.5 text-gold-light transition-colors hover:bg-white/5"
+                  aria-label="Календарь репетиций"
+                >
+                  <CalendarDays size={18} strokeWidth={1.75} />
+                </Link>
+              )}
+              <div className="min-w-0 flex-1">
+                {playCount > 1 ? (
+                  <div className="min-w-0 [&_select]:max-w-full [&_label]:max-w-full">
+                    <PlaySwitcher variant={variant} />
+                  </div>
+                ) : activePlay ? (
+                  <>
+                    <Link
+                      to={workContextLinks.play}
+                      className={`block truncate text-sm font-medium leading-tight ${
+                        variant === 'zen' ? 'text-foreground' : 'text-gold-light'
+                      }`}
+                    >
+                      «{playTitle}»
+                    </Link>
+                    <Link
+                      to={workContextLinks.theater}
+                      className="mt-0.5 block truncate text-[11px] leading-tight text-muted"
+                    >
+                      {activeTheater.name}
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    to={workContextLinks.theater}
+                    className="block truncate text-sm font-medium text-muted"
+                  >
+                    {activeTheater.name}
+                  </Link>
+                )}
               </div>
-            ) : (
-              <>
-                <Link
-                  to={workContextLinks.play}
-                  className={`block truncate text-sm font-medium leading-tight ${
-                    variant === 'zen' ? 'text-foreground' : 'text-gold-light'
-                  }`}
-                >
-                  {activePlay ? `«${playTitle}»` : playTitle}
-                </Link>
-                <Link
-                  to={workContextLinks.theater}
-                  className="mt-0.5 block truncate text-[11px] leading-tight text-muted"
-                >
-                  {theaterValue}
-                </Link>
-              </>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Полные хлебные крошки — планшет и десктоп */}
@@ -132,34 +143,39 @@ export function WorkContextBar({ variant, onMenuClick }: WorkContextBarProps) {
               </span>
             </>
           ) : null}
-          <ContextValue
-            value={theaterValue}
-            to={workContextLinks.theater}
-            muted={!activeTheater}
-          />
-          <span className="shrink-0 text-muted/40" aria-hidden>
-            ·
-          </span>
-          {playCount > 1 ? (
-            <PlaySwitcherLabel variant={variant} />
+          {!activeTheater ? (
+            <span className="text-sm text-muted">Театр не создан</span>
           ) : (
-            <ContextValue
-              value={activePlay ? `«${activePlay.title}»` : 'Не выбрана'}
-              to={workContextLinks.play}
-              muted={!activePlay}
-            />
+            <>
+              <ContextValue value={activeTheater.name} to={workContextLinks.theater} />
+              {activePlay ? (
+                <>
+                  <span className="shrink-0 text-muted/40" aria-hidden>
+                    ·
+                  </span>
+                  {playCount > 1 ? (
+                    <PlaySwitcherLabel variant={variant} />
+                  ) : (
+                    <ContextValue value={`«${activePlay.title}»`} to={workContextLinks.play} />
+                  )}
+                </>
+              ) : null}
+              {performance && playCount <= 1 ? (
+                <>
+                  <span className="hidden shrink-0 text-muted/40 sm:inline" aria-hidden>
+                    ·
+                  </span>
+                  <span className="hidden sm:contents">
+                    <ContextValue
+                      value={formatPerformanceLabel(performance)}
+                      to={workContextLinks.performance}
+                      title={PERFORMANCE_SCOPE_HINT}
+                    />
+                  </span>
+                </>
+              ) : null}
+            </>
           )}
-          <span className="hidden shrink-0 text-muted/40 sm:inline" aria-hidden>
-            ·
-          </span>
-          <span className="hidden sm:contents">
-            <ContextValue
-              value={performanceValue}
-              to={workContextLinks.performance}
-              muted={!performance}
-              title={PERFORMANCE_SCOPE_HINT}
-            />
-          </span>
           <span className="shrink-0 text-muted/40" aria-hidden>
             ·
           </span>

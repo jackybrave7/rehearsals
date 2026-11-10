@@ -8,6 +8,7 @@ import { ImageCropField } from '../components/ImageCropField';
 import { uploadFile } from '../api/files';
 import { generateId } from '../utils/id';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
+import { CollapsibleOptionalSection } from '../components/CollapsibleOptionalSection';
 import { formatPhone, formatPhoneInput, parsePhoneForSave } from '../utils/phone';
 import { getActorUnavailabilityBadge } from '../utils/actorAvailability';
 import {
@@ -101,30 +102,30 @@ function ActorCard({
           <p className="mt-1 text-sm text-gold-light line-clamp-2" title={rolesSummary}>
             {rolesSummary}
           </p>
-          {!archived && (
+          {!archived && (actor.phone || telegramUsername || telegramConnected || roleCount > 0) && (
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-              <span className="inline-flex items-center gap-1" title="Телефон">
-                <Phone size={12} className="shrink-0 opacity-70" />
-                {actor.phone ? formatPhone(actor.phone) : 'телефон не указан'}
-              </span>
-              <span
-                className={`inline-flex items-center gap-1 ${
-                  telegramConnected ? 'text-emerald-200' : ''
-                }`}
-                title="Telegram"
-              >
-                <AtSign size={12} className="shrink-0 opacity-70" />
-                {telegramConnected
-                  ? 'бот подключён'
-                  : telegramUsername
-                    ? telegramUsername
-                    : 'Telegram не указан'}
-              </span>
-              <span title="Количество ролей в составе">
-                {roleCount > 0
-                  ? `${roleCount} ${roleCount === 1 ? 'роль' : roleCount < 5 ? 'роли' : 'ролей'}`
-                  : 'роли не назначены'}
-              </span>
+              {actor.phone ? (
+                <span className="inline-flex items-center gap-1" title="Телефон">
+                  <Phone size={12} className="shrink-0 opacity-70" />
+                  {formatPhone(actor.phone)}
+                </span>
+              ) : null}
+              {telegramConnected || telegramUsername ? (
+                <span
+                  className={`inline-flex items-center gap-1 ${
+                    telegramConnected ? 'text-emerald-200' : ''
+                  }`}
+                  title="Telegram"
+                >
+                  <AtSign size={12} className="shrink-0 opacity-70" />
+                  {telegramConnected ? 'бот подключён' : `@${telegramUsername}`}
+                </span>
+              ) : null}
+              {roleCount > 0 ? (
+                <span title="Количество ролей в составе">
+                  {roleCount} {roleCount === 1 ? 'роль' : roleCount < 5 ? 'роли' : 'ролей'}
+                </span>
+              ) : null}
             </div>
           )}
           {!archived && (attendancePercent !== undefined || staleLabel) && (
@@ -376,16 +377,18 @@ export function ActorsPage() {
         }
       >
         <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <ActorAvatar name={form.name || 'Участник'} photoUrl={form.photoUrl} size="lg" />
-            <ImageCropField
-              title="Фото участника"
-              className="cursor-pointer rounded-lg border border-gold/20 px-4 py-2 text-sm text-gold-light hover:bg-gold/10"
-              onCropped={handlePhotoCropped}
-            >
-              Загрузить фото
-            </ImageCropField>
-          </div>
+          {editing ? (
+            <div className="flex items-center gap-4">
+              <ActorAvatar name={form.name || 'Участник'} photoUrl={form.photoUrl} size="lg" />
+              <ImageCropField
+                title="Фото участника"
+                className="cursor-pointer rounded-lg border border-gold/20 px-4 py-2 text-sm text-gold-light hover:bg-gold/10"
+                onCropped={handlePhotoCropped}
+              >
+                Загрузить фото
+              </ImageCropField>
+            </div>
+          ) : null}
           <Input
             label="Имя"
             value={form.name}
@@ -396,6 +399,7 @@ export function ActorsPage() {
             Роли назначаются в разделе «Постановки и состав» — один участник может быть в нескольких
             постановках и ролях.
           </p>
+          {editing ? (
           <Select
             label="Статус"
             value={form.status}
@@ -405,7 +409,8 @@ export function ActorsPage() {
               { value: 'archived', label: 'Архив' },
             ]}
           />
-          {form.status === 'archived' && (
+          ) : null}
+          {editing && form.status === 'archived' && (
             <Textarea
               label="Причина архивации"
               value={form.archiveReason ?? ''}
@@ -414,27 +419,27 @@ export function ActorsPage() {
             />
           )}
           {form.status === 'active' && (
-            <>
-              <Input
-                label="Телефон"
-                type="tel"
-                value={form.phone ?? ''}
-                onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
-                placeholder="+7 (999) 123-45-67"
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={form.email ?? ''}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-              <Input
-                label="Telegram"
-                value={form.telegramUsername ?? ''}
-                onChange={(e) => setForm({ ...form, telegramUsername: e.target.value })}
-                placeholder="@username"
-              />
-              {editing && (
+            editing ? (
+              <>
+                <Input
+                  label="Телефон"
+                  type="tel"
+                  value={form.phone ?? ''}
+                  onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
+                  placeholder="+7 (999) 123-45-67"
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={form.email ?? ''}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+                <Input
+                  label="Telegram"
+                  value={form.telegramUsername ?? ''}
+                  onChange={(e) => setForm({ ...form, telegramUsername: e.target.value })}
+                  placeholder="@username"
+                />
                 <ActorTelegramBotLink
                   actorId={editing.id}
                   theaterId={editing.theaterId ?? state.activeTheaterId}
@@ -443,90 +448,119 @@ export function ActorsPage() {
                     editing.telegramChatId
                   }
                 />
-              )}
-              <Textarea
-                label="Заметки"
-                value={form.notes ?? ''}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-              <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-white">
-                  <CalendarOff size={16} className="text-gold/70" />
-                  Недоступность
-                </div>
-                {(form.unavailability ?? []).length > 0 ? (
-                  <ul className="space-y-2">
-                    {(form.unavailability ?? []).map((period) => (
-                      <li
-                        key={period.id}
-                        className="flex items-start justify-between gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <p className="text-white">{formatPeriod(period.from, period.to)}</p>
-                          {period.reason && (
-                            <p className="text-xs text-muted">{period.reason}</p>
-                          )}
-                        </div>
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() => removeUnavailability(period.id)}
-                            className="shrink-0 rounded-lg p-1.5 text-muted hover:bg-red-500/10 hover:text-red-300"
-                            aria-label="Удалить период недоступности"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-muted">Периодов недоступности пока нет.</p>
-                )}
-                {!readOnly && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      label="С"
-                      type="date"
-                      value={unavailForm.from}
-                      onChange={(e) =>
-                        setUnavailForm((f) => ({ ...f, from: e.target.value }))
-                      }
-                    />
-                    <Input
-                      label="По"
-                      type="date"
-                      value={unavailForm.to}
-                      onChange={(e) =>
-                        setUnavailForm((f) => ({ ...f, to: e.target.value }))
-                      }
-                    />
-                    <div className="sm:col-span-2">
-                      <Input
-                        label="Причина (необязательно)"
-                        value={unavailForm.reason}
-                        onChange={(e) =>
-                          setUnavailForm((f) => ({ ...f, reason: e.target.value }))
-                        }
-                        placeholder="Отпуск, гастроли..."
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="!py-1.5 text-sm"
-                        disabled={!unavailForm.from || !unavailForm.to}
-                        onClick={addUnavailability}
-                      >
-                        <Plus size={14} />
-                        Добавить период
-                      </Button>
-                    </div>
+                <Textarea
+                  label="Заметки"
+                  value={form.notes ?? ''}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+                <div className="space-y-3 rounded-xl border border-gold/10 bg-background/20 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <CalendarOff size={16} className="text-gold/70" />
+                    Недоступность
                   </div>
-                )}
-              </div>
-            </>
+                  {(form.unavailability ?? []).length > 0 ? (
+                    <ul className="space-y-2">
+                      {(form.unavailability ?? []).map((period) => (
+                        <li
+                          key={period.id}
+                          className="flex items-start justify-between gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm"
+                        >
+                          <div>
+                            <p className="text-white">{formatPeriod(period.from, period.to)}</p>
+                            {period.reason && <p className="text-xs text-muted">{period.reason}</p>}
+                          </div>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeUnavailability(period.id)}
+                              className="shrink-0 rounded-lg p-1.5 text-muted hover:bg-red-500/10 hover:text-red-300"
+                              aria-label="Удалить период недоступности"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted">Периодов недоступности пока нет.</p>
+                  )}
+                  {!readOnly && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        label="С"
+                        type="date"
+                        value={unavailForm.from}
+                        onChange={(e) => setUnavailForm((f) => ({ ...f, from: e.target.value }))}
+                      />
+                      <Input
+                        label="По"
+                        type="date"
+                        value={unavailForm.to}
+                        onChange={(e) => setUnavailForm((f) => ({ ...f, to: e.target.value }))}
+                      />
+                      <div className="sm:col-span-2">
+                        <Input
+                          label="Причина (необязательно)"
+                          value={unavailForm.reason}
+                          onChange={(e) => setUnavailForm((f) => ({ ...f, reason: e.target.value }))}
+                          placeholder="Отпуск, гастроли..."
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="!py-1.5 text-sm"
+                          disabled={!unavailForm.from || !unavailForm.to}
+                          onClick={addUnavailability}
+                        >
+                          <Plus size={14} />
+                          Добавить период
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <CollapsibleOptionalSection hint="Телефон, email, Telegram и заметки — необязательно.">
+                <div className="flex items-center gap-4">
+                  <ActorAvatar name={form.name || 'Участник'} photoUrl={form.photoUrl} size="lg" />
+                  <ImageCropField
+                    title="Фото участника"
+                    className="cursor-pointer rounded-lg border border-gold/20 px-4 py-2 text-sm text-gold-light hover:bg-gold/10"
+                    onCropped={handlePhotoCropped}
+                  >
+                    Загрузить фото
+                  </ImageCropField>
+                </div>
+                <Input
+                  label="Телефон"
+                  type="tel"
+                  value={form.phone ?? ''}
+                  onChange={(e) => setForm({ ...form, phone: formatPhoneInput(e.target.value) })}
+                  placeholder="+7 (999) 123-45-67"
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={form.email ?? ''}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+                <Input
+                  label="Telegram"
+                  value={form.telegramUsername ?? ''}
+                  onChange={(e) => setForm({ ...form, telegramUsername: e.target.value })}
+                  placeholder="@username"
+                />
+                <Textarea
+                  label="Заметки"
+                  value={form.notes ?? ''}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </CollapsibleOptionalSection>
+            )
           )}
         </div>
       </Modal>

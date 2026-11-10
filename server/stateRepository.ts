@@ -229,14 +229,15 @@ export function insertStateEntities(
   }
 ): void {
   const insertTheater = db.prepare(
-    `INSERT INTO theaters (id, name, notes, owner_user_id, telegram_chat_id, reminder_settings, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO theaters (id, name, notes, owner_user_id, telegram_chat_id, reminder_settings, timezone, is_demo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        notes = excluded.notes,
        owner_user_id = COALESCE(theaters.owner_user_id, excluded.owner_user_id),
        telegram_chat_id = excluded.telegram_chat_id,
        reminder_settings = excluded.reminder_settings,
-       timezone = excluded.timezone`
+       timezone = excluded.timezone,
+       is_demo = excluded.is_demo`
   );
   for (const theater of state.theaters) {
     const ownerUserId = options?.ownerByTheaterId?.get(theater.id) ?? null;
@@ -247,7 +248,8 @@ export function insertStateEntities(
       ownerUserId,
       theater.telegramChatId?.trim() || null,
       JSON.stringify(theater.reminderSettings ?? {}),
-      theater.timezone ?? null
+      theater.timezone ?? null,
+      theater.isDemo ? 1 : 0
     );
     if (ownerUserId && options?.addOwnerMembershipFor?.has(theater.id)) {
       db.prepare(
@@ -646,6 +648,7 @@ export function loadState(db: AppDatabase = getDb(), options?: LoadStateOptions)
       id: String(row.id),
       name: String(row.name),
       notes: (row.notes as string | null) ?? undefined,
+      isDemo: Number(row.is_demo ?? 0) === 1,
       timezone: (row.timezone as string | null)?.trim() || undefined,
       telegramChatId: (row.telegram_chat_id as string | null)?.trim() || undefined,
       reminderSettings: parseTheaterReminderSettings(row.reminder_settings as string | null | undefined),

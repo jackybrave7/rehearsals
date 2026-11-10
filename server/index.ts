@@ -39,6 +39,7 @@ import { registerActorSelfRoutes } from './actorSelfRoutes.js';
 import { registerRehearsalNotesRoutes } from './rehearsalNotesRoutes.js';
 import { registerRehearsalOutcomePhotoRoutes } from './rehearsalOutcomePhotoRoutes.js';
 import { registerRehearsalOutcomeVideoRoutes } from './rehearsalOutcomeVideoRoutes.js';
+import { registerOnboardingEventRoutes, touchUserLastActive } from './onboardingEvents.js';
 
 // Docker на VPS часто резолвит api.telegram.org в IPv6 без маршрута — fetch таймаутится.
 dns.setDefaultResultOrder('ipv4first');
@@ -70,6 +71,7 @@ registerActorSelfRoutes(app);
 registerRehearsalNotesRoutes(app);
 registerRehearsalOutcomePhotoRoutes(app);
 registerRehearsalOutcomeVideoRoutes(app);
+registerOnboardingEventRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rehearsals', db: getDbPath(), ...getDbInfo(), backups: listBackupFiles().length });
@@ -153,7 +155,9 @@ app.put('/api/state', (req, res) => {
   }
 
   try {
-    saveStateForUser(state, session, getDb());
+    const db = getDb();
+    saveStateForUser(state, session, db);
+    touchUserLastActive(db, session.user.id);
     console.log(
       `[api] saved for ${session.user.email}: ${state.rehearsals.length} rehearsals, ${state.scenes.length} scenes, ${state.rehearsals.reduce((sum, rehearsal) => sum + rehearsal.schedule.length, 0)} schedule blocks`
     );

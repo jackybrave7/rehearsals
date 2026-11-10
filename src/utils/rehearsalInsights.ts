@@ -167,16 +167,22 @@ function getLastRehearsalDateForScene(
   return latest;
 }
 
-export function getRehearsalWarnings(state: AppState, rehearsal: Rehearsal): RehearsalWarning[] {
+export function getRehearsalWarnings(
+  state: AppState,
+  rehearsal: Rehearsal,
+  options?: { skipEmptyPlanWarning?: boolean }
+): RehearsalWarning[] {
   const warnings: RehearsalWarning[] = [];
   const expected = getExpectedAttendees(state, rehearsal);
 
   if (rehearsal.schedule.length === 0) {
-    warnings.push({
-      id: 'empty-plan',
-      severity: 'warn',
-      message: 'План по времени пуст — участникам нечего готовить.',
-    });
+    if (!options?.skipEmptyPlanWarning) {
+      warnings.push({
+        id: 'empty-plan',
+        severity: 'warn',
+        message: 'План по времени пуст — участникам нечего готовить.',
+      });
+    }
   } else {
     const planEnd = getScheduleEndTime(rehearsal.schedule, rehearsal.startTime);
     if (timeToMinutes(planEnd) > timeToMinutes(rehearsal.endTime)) {

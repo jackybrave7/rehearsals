@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, Pencil, ExternalLink, FileText, Upload, Plus, Archive, ArchiveRestore, Loader2 } from 'lucide-react';
+import {
+  BookOpen,
+  Pencil,
+  ExternalLink,
+  FileText,
+  Upload,
+  Plus,
+  Archive,
+  ArchiveRestore,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import { DeleteButton } from '../components/DeleteButton';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
@@ -28,6 +39,13 @@ import {
 } from '../store/selectors';
 import { useHashScroll } from '../hooks/useHashScroll';
 import { pageHeaderClass, pageTitleClass } from '../utils/pageLayout';
+import { useInstallDemoTheater } from '../hooks/useInstallDemoTheater';
+import { CollapsibleOptionalSection } from '../components/CollapsibleOptionalSection';
+import {
+  formatPerformanceCountLabel,
+  formatRoleCountLabel,
+  formatSceneCountLabel,
+} from '../utils/ruPlural';
 import {
   canCreateActivePlay,
   countOwnedActivePlays,
@@ -55,6 +73,7 @@ export function PlayPage() {
   const { state, dispatch, readOnly } = useRehearsalStore();
   const { theaters: accessTheaters } = useAuth();
   const { isPro } = useSubscription();
+  const { installDemoTheater } = useInstallDemoTheater();
   const { confirmDelete, alert } = useConfirmDialog();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -344,11 +363,17 @@ export function PlayPage() {
       {theaterPlays.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gold/20 p-12 text-center">
           <BookOpen size={48} className="mx-auto text-gold/30" />
-          <p className="mt-4 text-muted">Добавьте постановку, чтобы начать планирование сцен</p>
+          <p className="mt-4 text-muted">Добавьте постановку или попробуйте готовый пример с планом репетиции</p>
           {!readOnly ? (
-            <Button className="mt-4" onClick={() => void openCreate()}>
-              Добавить постановку
-            </Button>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button onClick={() => void openCreate()}>
+                Добавить постановку
+              </Button>
+              <Button variant="secondary" onClick={() => void installDemoTheater()}>
+                <Sparkles size={16} />
+                Попробовать на примере
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : (
@@ -416,7 +441,8 @@ export function PlayPage() {
                         </p>
                       )}
                       <p className="mt-2 text-xs text-muted">
-                        {roleCount} ролей · {performanceCount} показов · {sceneCount} сцен
+                        {formatRoleCountLabel(roleCount)} · {formatPerformanceCountLabel(performanceCount)} ·{' '}
+                        {formatSceneCountLabel(sceneCount)}
                       </p>
 
                       {(play.documentUrl || play.scriptFileName) && (
@@ -528,6 +554,11 @@ export function PlayPage() {
             onChange={(e) => setForm({ ...form, author: e.target.value })}
             placeholder="Тами Айрис"
           />
+
+          <CollapsibleOptionalSection
+            defaultOpen={Boolean(editingId)}
+            hint="Обложка, цвет, описание и текст пьесы можно добавить позже — для первого плана они не обязательны."
+          >
           <Input
             label="Год"
             type="number"
@@ -674,6 +705,7 @@ export function PlayPage() {
             ) : null}
             {fileError && <p className="text-sm text-red-400">{fileError}</p>}
           </div>
+          </CollapsibleOptionalSection>
         </div>
       </Modal>
     </div>

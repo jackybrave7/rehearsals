@@ -190,7 +190,23 @@ export function LoginPage() {
 
             {mode !== 'forgot' && (
               <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-foreground/90">Пароль</span>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground/90">Пароль</span>
+                  {mode === 'login' ? (
+                    <button
+                      type="button"
+                      onClick={() => switchMode(mailConfigured ? 'forgot' : 'forgot')}
+                      className="text-xs text-accent hover:underline"
+                      title={
+                        mailConfigured
+                          ? undefined
+                          : 'Восстановление по почте доступно, когда на сервере настроена отправка писем'
+                      }
+                    >
+                      Забыли пароль?
+                    </button>
+                  ) : null}
+                </div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -239,16 +255,6 @@ export function LoginPage() {
                   </Link>
                 </span>
               </label>
-            )}
-
-            {mode === 'login' && mailConfigured && (
-              <button
-                type="button"
-                onClick={() => switchMode('forgot')}
-                className="text-sm text-accent hover:underline"
-              >
-                Забыли пароль?
-              </button>
             )}
 
             {mode === 'forgot' && (
