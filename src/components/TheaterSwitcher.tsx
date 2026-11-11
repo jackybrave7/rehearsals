@@ -11,6 +11,7 @@ import {
   type TheaterMenuAction,
 } from './TheaterItemMenu';
 import type { Theater } from '../types';
+import { DemoTheaterInstallButton } from './DemoTheaterInstallButton';
 
 type TheaterSwitcherProps = {
   variant: 'sidebar' | 'zen';
@@ -193,6 +194,7 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
           ) : null}
         </div>
         {theaterList}
+        <DemoTheaterInstallButton variant="sidebar" />
       </div>
     );
   }
@@ -247,6 +249,7 @@ export function TheaterSwitcher({ variant, onTheaterChange }: TheaterSwitcherPro
             />
           ) : null}
         </div>
+        <DemoTheaterInstallButton variant="zen" />
       </div>
     );
   }

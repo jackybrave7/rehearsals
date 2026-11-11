@@ -40,6 +40,7 @@ import { pageTitleClass } from '../../utils/pageLayout';
 import { PlayMiniIcon } from './PlayMiniIcon';
 import { PlayOverviewMini } from '../../pages/OverviewPage';
 import { TheaterSetupChecklist } from '../guide/TheaterSetupChecklist';
+import { DemoTheaterDiscoverCard } from '../DemoTheaterDiscoverCard';
 import { getNextSetupStep, getTheaterSetupProgress } from '../../utils/guideOnboarding';
 import { sendTelegramHtmlMessage } from '../../api/telegram';
 import { buildRehearsalTelegramBotMessage } from '../../utils/rehearsalTelegramExport';
@@ -271,6 +272,8 @@ export function DirectorDashboard({ variant }: { variant: 'theater' | 'zen' }) {
       )}
 
       <TheaterSetupChecklist variant={variant} />
+
+      <DemoTheaterDiscoverCard variant={variant} />
 
       {continueRehearsal ? (
         <Link
