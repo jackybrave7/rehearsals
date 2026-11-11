@@ -10,15 +10,18 @@ import type {
   Venue,
 } from '../types';
 import { generateId } from '../utils/id';
-import { buildStoneHeartCast, STONE_HEART_PLAY_META } from './stoneHeartCast';
-import { buildStoneHeartScenes } from './stoneHeartScenes';
 import { createDefaultVenue } from './seedVenue';
 import { buildScheduleFromRehearsalItems } from '../utils/schedulePlan';
 import { mergeActorsForSceneIds } from '../utils/rehearsalActors';
-import { ACTOR_PHOTOS } from '../utils/actorPhotos';
-import { STONE_HEART_ACTOR_NAMES } from './stoneHeartCast';
+import {
+  buildDemoChaikaActors,
+  buildDemoChaikaCast,
+  buildDemoChaikaScenes,
+  demoChaikaRehearsalSceneIds,
+  DEMO_CHAIKA_PLAY_META,
+} from './demoChaika';
 
-export const DEMO_THEATER_NAME = 'Пример: Каменное сердце';
+export const DEMO_THEATER_NAME = 'Пример: Чайка (демо)';
 
 export interface DemoInstallBundle {
   theater: Theater;
@@ -41,38 +44,27 @@ export function buildDemoTheaterBundle(): DemoInstallBundle {
     timezone: 'Europe/Moscow',
   };
 
-  const actors: Actor[] = STONE_HEART_ACTOR_NAMES.map((name) => ({
-    id: generateId(),
-    theaterId,
-    name,
-    status: 'active',
-    photoUrl: ACTOR_PHOTOS[name],
-  }));
-
+  const actors = buildDemoChaikaActors(theaterId);
   const actorByName = Object.fromEntries(actors.map((actor) => [actor.name, actor]));
 
   const play: Play = {
     id: generateId(),
     theaterId,
-    ...STONE_HEART_PLAY_META,
+    ...DEMO_CHAIKA_PLAY_META,
   };
 
-  const { playRoles, performances, castAssignments: rawCast } = buildStoneHeartCast(
-    play.id,
-    actorByName
-  );
-  const defaultPerformance = performances.find((p) => p.isDefault) ?? performances[0]!;
-  const performancesFiltered = [defaultPerformance];
-  const castAssignments = rawCast.filter((a) => a.performanceId === defaultPerformance.id);
+  const { playRoles, performances, castAssignments } = buildDemoChaikaCast(play.id, actorByName);
+  const scenes = buildDemoChaikaScenes(play.id, playRoles);
+  const venues: Venue[] = [
+    {
+      ...createDefaultVenue(),
+      theaterId,
+      name: 'Зал примера (демо)',
+      address: 'Учебная площадка — адрес можно заменить своим',
+    },
+  ];
 
-  const scenes = buildStoneHeartScenes(play.id, playRoles);
-  const venues: Venue[] = [{ ...createDefaultVenue(), theaterId }];
-
-  const sceneIdsForRehearsal = scenes
-    .slice()
-    .sort((a, b) => a.number - b.number)
-    .slice(0, 4)
-    .map((scene) => scene.id);
+  const sceneIdsForRehearsal = demoChaikaRehearsalSceneIds(scenes);
 
   const rehearsalDate = format(addDays(new Date(), 3), 'yyyy-MM-dd');
   const startTime = '18:00';
@@ -94,7 +86,8 @@ export function buildDemoTheaterBundle(): DemoInstallBundle {
     endTime,
     location: venues[0]!.name,
     venueId: venues[0]!.id,
-    notes: 'Демо-репетиция: пример плана по первым сценам «Каменного сердца».',
+    notes:
+      'Демо-репетиция: план по первым сценам 1-го акта «Чайки» (адаптация разобрана по сценам, участники вымышленные).',
     sceneIds: sceneIdsForRehearsal,
     taskIds: [],
     schedule,
@@ -108,7 +101,7 @@ export function buildDemoTheaterBundle(): DemoInstallBundle {
     actors,
     plays: [play],
     playRoles,
-    performances: performancesFiltered,
+    performances,
     castAssignments,
     scenes,
     venues,
@@ -132,7 +125,7 @@ export function buildDemoTheaterBundle(): DemoInstallBundle {
     actors,
     play,
     playRoles,
-    performances: performancesFiltered,
+    performances,
     castAssignments,
     scenes,
     venues,
