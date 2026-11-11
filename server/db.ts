@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { propagateActorTelegramLinksByEmail } from './actorTelegramLink.js';
+import { seedDemoPlayAssets } from './seedDemoPlayAssets.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -389,6 +390,8 @@ export function getDb(): AppDatabase {
   }
 
   dbInstance = wrapDatabase(db);
+
+  seedDemoPlayAssets(dbInstance);
 
   const propagatedLinks = propagateActorTelegramLinksByEmail(dbInstance);
   if (propagatedLinks > 0) {

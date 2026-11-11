@@ -1,4 +1,5 @@
 import type { AuthSessionPayload } from './authTypes.js';
+import { DEMO_CHAIKA_SCRIPT_FILE_ID } from '../src/data/demoChaikaPlayMaterial.js';
 import { getDb, type AppDatabase } from './db.js';
 import { getFileRecord, publicFileUrl } from './fileStorage.js';
 
@@ -43,6 +44,8 @@ function isFileLinkedToTheaters(
 }
 
 export function canUserDownloadFile(session: AuthSessionPayload, fileId: string): boolean {
+  if (fileId === DEMO_CHAIKA_SCRIPT_FILE_ID) return true;
+
   const db = getDb();
   const record = getFileRecord(db, fileId);
   if (!record) return false;

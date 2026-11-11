@@ -46,6 +46,7 @@ import {
   isDemoTheater,
   normalizeDemoTheaterFlags,
 } from '../utils/demoTheaterIdentity';
+import { migrateDemoChaikaPlayMaterial } from '../utils/migrateDemoChaikaPlayMaterial';
 import { ACTOR_PHOTOS, enrichActorPhotos } from '../utils/actorPhotos';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
@@ -453,6 +454,7 @@ function migrateState(raw: unknown): AppState {
   migrated = migratePerformances(migrated);
   migrated = normalizeDemoTheaterFlags(migrated);
   migrated = dedupeDemoTheatersInState(migrated);
+  migrated = migrateDemoChaikaPlayMaterial(migrated);
   if (migrated.playRoles.length === 0 && rawActors.some((a) => a.role?.trim())) {
     migrated = migrateLegacyCast(migrated, rawActors);
   }

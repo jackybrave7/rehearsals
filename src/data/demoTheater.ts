@@ -20,6 +20,8 @@ import {
   demoChaikaRehearsalSceneIds,
   DEMO_CHAIKA_PLAY_META,
 } from './demoChaika';
+import { DEMO_CHAIKA_PLAY_MATERIAL } from './demoChaikaPlayMaterial';
+import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 
 export const DEMO_THEATER_NAME = 'Демо-театр';
 
@@ -47,11 +49,13 @@ export function buildDemoTheaterBundle(): DemoInstallBundle {
   const actors = buildDemoChaikaActors(theaterId);
   const actorByName = Object.fromEntries(actors.map((actor) => [actor.name, actor]));
 
-  const play: Play = {
+  const play: Play = enrichPlayDocumentMeta({
     id: generateId(),
     theaterId,
     ...DEMO_CHAIKA_PLAY_META,
-  };
+    ...DEMO_CHAIKA_PLAY_MATERIAL,
+    scriptFileSize: 86_874,
+  });
 
   const { playRoles, performances, castAssignments } = buildDemoChaikaCast(play.id, actorByName);
   const scenes = buildDemoChaikaScenes(play.id, playRoles);
