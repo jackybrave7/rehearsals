@@ -784,7 +784,6 @@ function reducer(state: AppState, action: Action): AppState {
       const existing = findDemoTheater(next);
       if (existing) {
         const demoPlay = next.plays.find((play) => play.theaterId === existing.id);
-        const demoRehearsal = next.rehearsals.find((r) => r.theaterId === existing.id);
         return {
           ...next,
           activeTheaterId: existing.id,
