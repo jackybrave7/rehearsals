@@ -71,7 +71,8 @@ export function WelcomeOnboardingModal({
             <span className="text-sm font-medium">Учебный пример</span>
           </div>
           <p className="text-sm text-muted">
-            Готовая постановка «Чайка» (ваша адаптация по сценам) с планом репетиции — за пару кликов, без лимита Free.
+            «Демо-театр» с постановкой «Чайка» (адаптация по сценам) и готовым планом репетиции — за пару кликов, без
+            лимита Free.
           </p>
         </div>
         <div className="rounded-xl border border-gold/10 bg-background/40 p-4 sm:col-span-2">

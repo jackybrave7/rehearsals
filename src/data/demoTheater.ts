@@ -21,7 +21,7 @@ import {
   DEMO_CHAIKA_PLAY_META,
 } from './demoChaika';
 
-export const DEMO_THEATER_NAME = 'Пример: Чайка (демо)';
+export const DEMO_THEATER_NAME = 'Демо-театр';
 
 export interface DemoInstallBundle {
   theater: Theater;

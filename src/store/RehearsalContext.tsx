@@ -40,6 +40,12 @@ import {
   applyStoneHeartScenesToState,
   STONE_HEART_SCENES_VERSION,
 } from '../data/stoneHeartScenes';
+import {
+  dedupeDemoTheatersInState,
+  findDemoTheater,
+  isDemoTheater,
+  normalizeDemoTheaterFlags,
+} from '../utils/demoTheaterIdentity';
 import { ACTOR_PHOTOS, enrichActorPhotos } from '../utils/actorPhotos';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
@@ -445,6 +451,8 @@ function migrateState(raw: unknown): AppState {
   };
 
   migrated = migratePerformances(migrated);
+  migrated = normalizeDemoTheaterFlags(migrated);
+  migrated = dedupeDemoTheatersInState(migrated);
   if (migrated.playRoles.length === 0 && rawActors.some((a) => a.role?.trim())) {
     migrated = migrateLegacyCast(migrated, rawActors);
   }
@@ -772,17 +780,28 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'INSTALL_DEMO_THEATER': {
       const bundle = action.payload;
+      let next = dedupeDemoTheatersInState(state);
+      const existing = findDemoTheater(next);
+      if (existing) {
+        const demoPlay = next.plays.find((play) => play.theaterId === existing.id);
+        const demoRehearsal = next.rehearsals.find((r) => r.theaterId === existing.id);
+        return {
+          ...next,
+          activeTheaterId: existing.id,
+          activePlayId: demoPlay?.id ?? next.activePlayId,
+        };
+      }
       return {
-        ...state,
-        theaters: [...state.theaters.filter((t) => t.id !== bundle.theater.id), bundle.theater],
-        actors: [...state.actors, ...bundle.actors],
-        plays: [...state.plays, bundle.play],
-        playRoles: [...state.playRoles, ...bundle.playRoles],
-        performances: [...state.performances, ...bundle.performances],
-        castAssignments: [...state.castAssignments, ...bundle.castAssignments],
-        scenes: [...state.scenes, ...bundle.scenes],
-        venues: [...state.venues, ...bundle.venues],
-        rehearsals: [...state.rehearsals, bundle.rehearsal],
+        ...next,
+        theaters: [...next.theaters, bundle.theater],
+        actors: [...next.actors, ...bundle.actors],
+        plays: [...next.plays, bundle.play],
+        playRoles: [...next.playRoles, ...bundle.playRoles],
+        performances: [...next.performances, ...bundle.performances],
+        castAssignments: [...next.castAssignments, ...bundle.castAssignments],
+        scenes: [...next.scenes, ...bundle.scenes],
+        venues: [...next.venues, ...bundle.venues],
+        rehearsals: [...next.rehearsals, bundle.rehearsal],
         activeTheaterId: bundle.theater.id,
         activePlayId: bundle.play.id,
       };
@@ -796,7 +815,7 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'DELETE_THEATER': {
       const deleting = state.theaters.find((theater) => theater.id === action.payload);
-      if (state.theaters.length <= 1 && !deleting?.isDemo) return state;
+      if (state.theaters.length <= 1 && deleting && !isDemoTheater(deleting)) return state;
       const theaters = state.theaters.filter((theater) => theater.id !== action.payload);
       const activeTheaterId =
         state.activeTheaterId === action.payload ? theaters[0]?.id ?? null : state.activeTheaterId;

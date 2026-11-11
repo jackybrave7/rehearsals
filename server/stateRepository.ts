@@ -216,6 +216,7 @@ export function deleteTheaterContent(db: AppDatabase, theaterId: string): void {
 
 export function deleteTheaterData(db: AppDatabase, theaterId: string): void {
   deleteTheaterContent(db, theaterId);
+  db.prepare('DELETE FROM theater_members WHERE theater_id = ?').run(theaterId);
   db.prepare('DELETE FROM theaters WHERE id = ?').run(theaterId);
 }
 

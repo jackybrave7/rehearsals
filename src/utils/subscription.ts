@@ -1,6 +1,7 @@
 import type { SubscriptionPlan } from '../types/subscription';
 import { FREE_PLAN_LIMITS, PRO_PRICING, SUBSCRIPTION_PLAN_LABELS } from '../types/subscription';
 import type { AppState, Play } from '../types';
+import { isDemoTheater } from './demoTheaterIdentity';
 
 export function isProPlan(plan: SubscriptionPlan | undefined, isPlatformAdmin = false): boolean {
   return isPlatformAdmin || plan === 'pro';
@@ -15,7 +16,7 @@ export function isPlayReadOnly(play: Pick<Play, 'archivedAt'>): boolean {
 }
 
 const demoTheaterIds = (state: AppState) =>
-  new Set(state.theaters.filter((theater) => theater.isDemo).map((theater) => theater.id));
+  new Set(state.theaters.filter(isDemoTheater).map((theater) => theater.id));
 
 export function countOwnedActivePlays(state: AppState, ownedTheaterIds: Set<string>): number {
   const demoIds = demoTheaterIds(state);
@@ -39,7 +40,7 @@ export function countOwnedNonDemoTheaters(
   ownedTheaterIds: Set<string>
 ): number {
   return state.theaters.filter(
-    (theater) => ownedTheaterIds.has(theater.id) && !theater.isDemo
+    (theater) => ownedTheaterIds.has(theater.id) && !isDemoTheater(theater)
   ).length;
 }
 

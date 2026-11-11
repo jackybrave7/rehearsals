@@ -7,6 +7,7 @@ import {
   getTheaterRehearsals,
 } from '../store/selectors';
 import { getTheaterScenes } from '../utils/guideOnboarding';
+import { isDemoTheater } from '../utils/demoTheaterIdentity';
 
 /** Отправляет на сервер первые достижения по онбордингу (идемпотентно на бэкенде). */
 export function useOnboardingMilestones() {
@@ -23,11 +24,11 @@ export function useOnboardingMilestones() {
       void recordOnboardingEvent(eventType, theaterId);
     };
 
-    if (state.theaters.some((t) => t.isDemo)) {
+    if (state.theaters.some(isDemoTheater)) {
       maybe('demo', 'demo_installed');
     }
 
-    const realTheaters = state.theaters.filter((t) => !t.isDemo);
+    const realTheaters = state.theaters.filter((t) => !isDemoTheater(t));
     if (realTheaters.length >= 1) {
       maybe('theater', 'theater_created');
     }

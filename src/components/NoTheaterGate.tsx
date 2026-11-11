@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '../store/AuthContext';
@@ -21,9 +21,11 @@ function NoTheaterAccess() {
   const { installDemoTheater } = useInstallDemoTheater();
   const [searchParams, setSearchParams] = useSearchParams();
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const tryDemoHandledRef = useRef(false);
 
   useEffect(() => {
-    if (searchParams.get('tryDemo') !== '1' || !canCreateTheater) return;
+    if (searchParams.get('tryDemo') !== '1' || !canCreateTheater || tryDemoHandledRef.current) return;
+    tryDemoHandledRef.current = true;
     void installDemoTheater().finally(() => {
       const next = new URLSearchParams(searchParams);
       next.delete('tryDemo');
@@ -105,17 +107,22 @@ function NoTheaterAccess() {
 
 function TryDemoDeepLink() {
   const { canCreateTheater } = useAuth();
+  const { ready } = useRehearsalStore();
   const { installDemoTheater } = useInstallDemoTheater();
   const [searchParams, setSearchParams] = useSearchParams();
+  const tryDemoHandledRef = useRef(false);
 
   useEffect(() => {
-    if (searchParams.get('tryDemo') !== '1' || !canCreateTheater) return;
+    if (!ready || searchParams.get('tryDemo') !== '1' || !canCreateTheater || tryDemoHandledRef.current) {
+      return;
+    }
+    tryDemoHandledRef.current = true;
     void installDemoTheater().finally(() => {
       const next = new URLSearchParams(searchParams);
       next.delete('tryDemo');
       setSearchParams(next, { replace: true });
     });
-  }, [canCreateTheater, installDemoTheater, searchParams, setSearchParams]);
+  }, [ready, canCreateTheater, installDemoTheater, searchParams, setSearchParams]);
 
   return null;
 }
