@@ -319,6 +319,17 @@ export function mapActGroupsToMatchedScenes(
   return result;
 }
 
+/** Заголовок сцены при импорте: в каждом действии снова «Сцена 1» — добавляем действие в название. */
+export function formatImportSceneTitle(anchorText: string, actGroup?: string | null): string {
+  const text = anchorText.trim();
+  if (!text) return text;
+  if (/акт|действие/i.test(text)) return text;
+  const group = actGroup?.trim();
+  if (!group) return text;
+  if (text.toLowerCase().startsWith(group.toLowerCase())) return text;
+  return `${group}. ${text}`;
+}
+
 export function listImportableScenesWithActGroups<T extends { text: string }>(
   anchors: T[]
 ): Array<{ anchor: T; actGroup?: string }> {

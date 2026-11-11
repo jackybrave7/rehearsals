@@ -10,6 +10,7 @@ import {
 import {
   isGoogleDocsUrl,
   isLikelyUploadedOfficeDoc,
+  formatImportSceneTitle,
   listImportableScenesWithActGroups,
   mapActAnchorsFromDocument,
   mapActGroupsToMatchedScenes,
@@ -100,8 +101,8 @@ export function GoogleDocsLinksPanel({ play, scenes, readOnly = false }: GoogleD
         const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
           id: generateId(),
           playId: play.id,
-          number: resolveSceneNumberFromTitle(anchor.text, index + 1),
-          title: anchor.text,
+          number: resolveSceneNumberFromTitle(formatImportSceneTitle(anchor.text, actGroup), index + 1),
+          title: formatImportSceneTitle(anchor.text, actGroup),
           actGroup,
           status: 'not_started',
           priority: 'medium',

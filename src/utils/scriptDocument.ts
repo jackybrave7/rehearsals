@@ -1,6 +1,7 @@
 import type { Scene } from '../types';
 import {
   type DocTextAnchor,
+  formatImportSceneTitle,
   isImportableSceneHeading,
   listImportableScenesWithActGroups,
   matchScenesToDocAnchors,
@@ -126,6 +127,17 @@ export function countSceneCharactersFromPlainText(
   return counts;
 }
 
+function resolveImportSceneNumbers(
+  importable: Array<{ anchor: DocTextAnchor; actGroup?: string }>
+): number[] {
+  const titles = importable.map(({ anchor, actGroup }) =>
+    formatImportSceneTitle(anchor.text, actGroup)
+  );
+  const fromTitles = titles.map((title, index) => resolveSceneNumberFromTitle(title, index + 1));
+  const useDocumentOrder = new Set(fromTitles).size !== fromTitles.length;
+  return fromTitles.map((_, index) => (useDocumentOrder ? index + 1 : fromTitles[index]!));
+}
+
 export function mergeMissingScenesFromImport(
   playId: string,
   existingScenes: Scene[],
@@ -133,6 +145,7 @@ export function mergeMissingScenesFromImport(
   matches: SceneAnchorMatch[]
 ): { toAdd: Scene[]; toUpdate: Scene[]; allScenes: Scene[] } {
   const importable = listImportableScenesWithActGroups(anchors);
+  const sceneNumbers = resolveImportSceneNumbers(importable);
   const sceneById = new Map(existingScenes.map((scene) => [scene.id, scene]));
   const matchByAnchorKey = new Map(
     matches.map((match) => [`${match.anchor.type}:${match.anchor.id}`, match])
@@ -145,7 +158,8 @@ export function mergeMissingScenesFromImport(
   importable.forEach(({ anchor, actGroup }, index) => {
     const anchorKey = `${anchor.type}:${anchor.id}`;
     const existingMatch = matchByAnchorKey.get(anchorKey);
-    const number = resolveSceneNumberFromTitle(anchor.text, index + 1);
+    const title = formatImportSceneTitle(anchor.text, actGroup);
+    const number = sceneNumbers[index] ?? index + 1;
 
     if (existingMatch) {
       const scene = sceneById.get(existingMatch.sceneId);
@@ -153,7 +167,7 @@ export function mergeMissingScenesFromImport(
       const updated: Scene = {
         ...scene,
         number,
-        title: anchor.text,
+        title,
         actGroup: actGroup ?? scene.actGroup,
       };
       if (
@@ -171,7 +185,7 @@ export function mergeMissingScenesFromImport(
       id: generateId(),
       playId,
       number,
-      title: anchor.text,
+      title,
       actGroup,
       status: 'not_started',
       priority: 'medium',

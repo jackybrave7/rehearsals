@@ -14,6 +14,7 @@ import {
   parseScriptFileId,
 } from '../utils/scriptDocument';
 import {
+  formatImportSceneTitle,
   isGoogleDocsUrl,
   isLikelyUploadedOfficeDoc,
   listImportableScenesWithActGroups,
@@ -144,8 +145,8 @@ export function ScriptImportPanel({ play, scenes, readOnly = false }: ScriptImpo
         const createdScenes: Scene[] = sceneAnchors.map(({ anchor, actGroup }, index) => ({
           id: generateId(),
           playId: play.id,
-          number: resolveSceneNumberFromTitle(anchor.text, index + 1),
-          title: anchor.text,
+          number: resolveSceneNumberFromTitle(formatImportSceneTitle(anchor.text, actGroup), index + 1),
+          title: formatImportSceneTitle(anchor.text, actGroup),
           actGroup,
           status: 'not_started',
           priority: 'medium',

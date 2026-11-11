@@ -23,6 +23,12 @@ type ChaikaSceneSeed = {
 const ROLES = chaikaRolesData as ChaikaRoleSeed[];
 const SCENES = chaikaScenesData as ChaikaSceneSeed[];
 
+export type DemoChaikaSceneSeed = ChaikaSceneSeed;
+
+export const DEMO_CHAIKA_SCENE_SEEDS: readonly DemoChaikaSceneSeed[] = SCENES;
+
+export const DEMO_CHAIKA_SCENE_COUNT = SCENES.length;
+
 /** Вымышленные участники — без фото реальной труппы (только инициалы в UI). */
 export const DEMO_CHAIKA_CHARACTER_ACTORS: Record<string, string> = {
   Аркадина: 'Вера Орлова',
