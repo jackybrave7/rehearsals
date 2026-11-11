@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ExpandableText } from './ExpandableText';
 import { useRehearsalStore } from '../store/RehearsalContext';
+import { useDesign } from '../store/DesignContext';
 import { getSceneCharacterNames } from '../utils/sceneLabels';
 import { Button } from './Button';
 import { DeleteButton } from './DeleteButton';
@@ -130,6 +131,7 @@ export function RehearsalScheduleEditor({
   readOnly = false,
 }: RehearsalScheduleEditorProps) {
   const { state } = useRehearsalStore();
+  const { isZen } = useDesign();
   const isMobile = useMaxLg();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -357,12 +359,19 @@ export function RehearsalScheduleEditor({
       </div>
 
       {undistributedMinutes > 0 && (
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            isZen
+              ? 'border-amber-600/35 bg-amber-50 text-neutral-900'
+              : 'border-amber-400/30 bg-amber-950/50 text-white'
+          }`}
+          role="status"
+        >
           <p className="font-medium">
             Не распределено {formatDuration(undistributedMinutes)} (план до {planEndTime}, репетиция до{' '}
             {rehearsal.endTime})
           </p>
-          <p className="mt-1 text-xs text-amber-100/90">
+          <p className={`mt-1 text-xs ${isZen ? 'text-neutral-700' : 'text-white/85'}`}>
             Растяните сцены, добавьте перерыв или разминку, либо сократите время окончания репетиции.
           </p>
         </div>
