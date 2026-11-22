@@ -53,13 +53,28 @@ export function TheaterScenePicker({
     return selectablePlays[0]?.id ?? '';
   };
 
+  const selectablePlayKey = useMemo(
+    () => selectablePlays.map((play) => play.id).join('\0'),
+    [selectablePlays]
+  );
+
   const [browsePlayId, setBrowsePlayId] = useState(() =>
     resolveBrowsePlayId(selectedPlayId ?? defaultPlayId)
   );
 
+  // Не сбрасывать постановку при каждом клике по сцене (plays/scenes с новой ссылкой у родителя).
   useEffect(() => {
-    setBrowsePlayId(resolveBrowsePlayId(selectedPlayId ?? defaultPlayId));
-  }, [selectedPlayId, defaultPlayId, selectablePlays]);
+    if (selectedPlayId != null && selectedPlayId !== '') {
+      setBrowsePlayId(resolveBrowsePlayId(selectedPlayId));
+      return;
+    }
+    setBrowsePlayId((current) => {
+      if (current && selectablePlays.some((play) => play.id === current)) {
+        return current;
+      }
+      return resolveBrowsePlayId(defaultPlayId);
+    });
+  }, [selectedPlayId, defaultPlayId, selectablePlayKey, selectablePlays]);
 
   const handlePlayChange = (playId: string) => {
     setBrowsePlayId(playId);
