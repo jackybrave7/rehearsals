@@ -10,6 +10,9 @@ async function parseSaveError(response: Response): Promise<string> {
     if (data.error === 'WOULD_LOSE_USER_DATA') {
       return 'WOULD_LOSE_USER_DATA';
     }
+    if (data.error === 'STALE_CLIENT_STATE') {
+      return 'STALE_CLIENT_STATE';
+    }
     if (data.error === 'FORBIDDEN') {
       return 'FORBIDDEN';
     }

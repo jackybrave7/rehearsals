@@ -48,6 +48,7 @@ import {
 } from '../utils/demoTheaterIdentity';
 import { migrateDemoChaikaPlayMaterial } from '../utils/migrateDemoChaikaPlayMaterial';
 import { migrateDemoChaikaSceneCatalog } from '../utils/migrateDemoChaikaSceneCatalog';
+import { appendRehearsalDeletionId } from '../utils/rehearsalDeletionLedger';
 import { ACTOR_PHOTOS, enrichActorPhotos } from '../utils/actorPhotos';
 import { enrichPlayDocumentMeta } from '../utils/googleDocs';
 import { DEFAULT_SCENE_REHEARSAL_MINUTES } from '../utils/sceneDefaults';
@@ -283,6 +284,9 @@ function formatSaveError(error: unknown): string {
   if (message.includes('UNIQUE constraint') || message.includes('SQLITE_CONSTRAINT')) {
     return 'Не удалось синхронизировать данные с сервером. Нажмите «Повторить подключение».';
   }
+  if (message === 'STALE_CLIENT_STATE' || message.includes('STALE_CLIENT_STATE')) {
+    return 'STALE_CLIENT_STATE';
+  }
   if (message.includes('WOULD_LOSE_USER_DATA')) {
     return 'Сохранение отклонено: попытка затереть данные. Обновите страницу.';
   }
@@ -316,7 +320,8 @@ function persistToStorage(
   setSaveError: (message: string | null) => void,
   setSaveStatus: (status: SaveStatus) => void,
   readOnly: boolean,
-  refreshSession?: () => Promise<unknown>
+  refreshSession?: () => Promise<unknown>,
+  resyncFromServer?: () => Promise<void>
 ): void {
   if (readOnly) {
     setSaveStatus('saving');
@@ -334,7 +339,6 @@ function persistToStorage(
     return;
   }
 
-  mirrorLocalStorage(state);
   setSaveStatus('saving');
   persistChain = persistChain
     .then(async () => {
@@ -346,10 +350,27 @@ function persistToStorage(
       setSaveError(null);
       setSaveStatus('saved');
     })
-    .catch((error) => {
+    .catch(async (error) => {
       console.error('[rehearsals] Ошибка сохранения в SQLite', error);
+      const formatted = formatSaveError(error);
+      if (formatted === 'STALE_CLIENT_STATE' && resyncFromServer) {
+        try {
+          await resyncFromServer();
+          setSaveError(
+            'На сервере есть более свежие данные — подтянули с сервера. Проверьте репетиции.'
+          );
+          setSaveStatus('saved');
+          return;
+        } catch (resyncError) {
+          console.error('[rehearsals] Не удалось подтянуть с сервера', resyncError);
+        }
+      }
       setSaveStatus('error');
-      setSaveError(formatSaveError(error));
+      setSaveError(
+        formatted === 'STALE_CLIENT_STATE'
+          ? 'Данные на сервере новее этой вкладки. Обновите страницу (F5), чтобы не потерять репетиции.'
+          : formatted
+      );
     });
 }
 
@@ -1222,6 +1243,13 @@ function reducer(state: AppState, action: Action): AppState {
         rehearsalActorNotes: (state.rehearsalActorNotes ?? []).filter(
           (note) => note.rehearsalId !== action.payload
         ),
+        appMeta: {
+          ...state.appMeta,
+          rehearsalDeletionIds: appendRehearsalDeletionId(
+            state.appMeta?.rehearsalDeletionIds,
+            action.payload
+          ),
+        },
       };
     case 'ADD_REHEARSAL_TEMPLATE':
       return {
@@ -1377,6 +1405,17 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
 
   const retryConnection = () => setLoadAttempt((value) => value + 1);
 
+  const resyncFromServer = useCallback(async () => {
+    const session = await refreshSession();
+    const theaterIds = new Set(session?.theaters.map((entry) => entry.theaterId) ?? []);
+    const remote = await fetchAppState();
+    if (!remote) throw new Error('EMPTY');
+    const best = pickAccessibleAppState(theaterIds, remote, null, null) ?? remote;
+    const bootstrapped = bootstrapAppState(best);
+    mirrorLocalStorage(bootstrapped);
+    dispatch({ type: 'LOAD', payload: bootstrapped });
+  }, [refreshSession]);
+
   const restoreLatestBackup = async () => {
     const files = await fetchBackupList();
     if (files.length === 0) return;
@@ -1433,25 +1472,68 @@ export function RehearsalProvider({ children }: { children: ReactNode }) {
 
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
+      persistToStorage(
+        stateRef.current,
+        setSaveError,
+        setSaveStatus,
+        readOnly,
+        refreshSession,
+        resyncFromServer
+      );
     }, 50);
 
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
-        persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
+        persistToStorage(
+          stateRef.current,
+          setSaveError,
+          setSaveStatus,
+          readOnly,
+          refreshSession,
+          resyncFromServer
+        );
       }
     };
-  }, [state, ready, loadError, readOnly, refreshSession]);
+  }, [state, ready, loadError, readOnly, refreshSession, resyncFromServer]);
 
   useEffect(() => {
     if (!ready || loadError) return;
 
     return () => {
-      persistToStorage(stateRef.current, setSaveError, setSaveStatus, readOnly, refreshSession);
+      persistToStorage(
+        stateRef.current,
+        setSaveError,
+        setSaveStatus,
+        readOnly,
+        refreshSession,
+        resyncFromServer
+      );
     };
-  }, [ready, loadError, readOnly, refreshSession]);
+  }, [ready, loadError, readOnly, refreshSession, resyncFromServer]);
+
+  useEffect(() => {
+    if (!ready || loadError || readOnly) return;
+
+    const onFocus = () => {
+      void (async () => {
+        try {
+          const remote = await fetchAppState();
+          if (!remote) return;
+          const localIds = new Set(stateRef.current.rehearsals.map((rehearsal) => rehearsal.id));
+          const hasNewOnServer = remote.rehearsals.some((rehearsal) => !localIds.has(rehearsal.id));
+          if (!hasNewOnServer) return;
+          await resyncFromServer();
+        } catch {
+          // сеть / сессия
+        }
+      })();
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [ready, loadError, readOnly, resyncFromServer]);
 
   useLayoutEffect(() => {
     if (!ready || loadError) return;

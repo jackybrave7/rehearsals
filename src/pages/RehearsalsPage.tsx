@@ -45,8 +45,43 @@ import { formatSceneCountLabel } from '../utils/ruPlural';
 import { usePlanShareDeepLink } from '../hooks/usePlanShareDeepLink';
 
 const CALENDAR_FILTERS_KEY = 'rehearsals-calendar-filters';
+const CREATE_REHEARSAL_PREFS_KEY = 'rehearsals-create-rehearsal-prefs';
 
 type CalendarFilters = { playId: string; actorId: string };
+
+type CreateRehearsalPrefs = {
+  startTime: string;
+  endTime: string;
+  venueId?: string;
+  location?: string;
+};
+
+function readCreateRehearsalPrefs(theaterId: string | null | undefined): CreateRehearsalPrefs | null {
+  if (!theaterId) return null;
+  try {
+    const raw = localStorage.getItem(`${CREATE_REHEARSAL_PREFS_KEY}:${theaterId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CreateRehearsalPrefs>;
+    if (typeof parsed.startTime !== 'string' || typeof parsed.endTime !== 'string') return null;
+    return {
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      venueId: parsed.venueId,
+      location: parsed.location,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCreateRehearsalPrefs(theaterId: string | undefined, prefs: CreateRehearsalPrefs): void {
+  if (!theaterId) return;
+  try {
+    localStorage.setItem(`${CREATE_REHEARSAL_PREFS_KEY}:${theaterId}`, JSON.stringify(prefs));
+  } catch {
+    // приватный режим
+  }
+}
 
 const NO_CALENDAR_FILTERS: CalendarFilters = { playId: '', actorId: '' };
 
@@ -211,11 +246,24 @@ export function RehearsalsPage() {
 
   const openCreate = () => {
     if (readOnly) return;
+    const savedPrefs = readCreateRehearsalPrefs(activeTheaterId);
+    const venueOk =
+      savedPrefs?.venueId && theaterVenues.some((venue) => venue.id === savedPrefs.venueId);
+
     setForm({
       ...emptyRehearsal(
         selectedDateStr ?? format(new Date(), 'yyyy-MM-dd'),
         state.activeTheaterId ?? undefined
       ),
+      ...(savedPrefs
+        ? {
+            startTime: savedPrefs.startTime,
+            endTime: savedPrefs.endTime,
+            ...(venueOk
+              ? { venueId: savedPrefs.venueId, location: savedPrefs.location ?? '' }
+              : {}),
+          }
+        : {}),
       // Репетиция принадлежит постановке с самого начала: иначе до сборки плана она не попадает
       // ни в фильтр календаря, ни в сводку.
       playId: activePlay?.id ?? theaterPlays[0]?.id,
@@ -250,6 +298,13 @@ export function RehearsalsPage() {
       ),
     };
     dispatch({ type: 'ADD_REHEARSAL', payload: rehearsal });
+    const theaterId = rehearsal.theaterId ?? state.activeTheaterId ?? undefined;
+    writeCreateRehearsalPrefs(theaterId, {
+      startTime: form.startTime,
+      endTime: form.endTime,
+      venueId: form.venueId,
+      location: form.location,
+    });
     setModalOpen(false);
     navigate(appPaths.rehearsal(rehearsal.id));
   };

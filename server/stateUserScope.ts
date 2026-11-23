@@ -68,6 +68,28 @@ function expandTheaterAccess(
   return { accessibleIds, editableIds };
 }
 
+/** Репетиции, которые исчезнут при save, но не внесены в ledger явного удаления (устаревшая вкладка). */
+export function rehearsalIdsRemovedWithoutLedger(
+  next: AppState,
+  previous: AppState,
+  editableTheaterIds: Set<string>,
+  ledger: Set<string>
+): string[] {
+  const nextIds = new Set(
+    next.rehearsals
+      .filter((rehearsal) => rehearsal.theaterId && editableTheaterIds.has(rehearsal.theaterId))
+      .map((rehearsal) => rehearsal.id)
+  );
+  const removed: string[] = [];
+  for (const rehearsal of previous.rehearsals) {
+    if (!rehearsal.theaterId || !editableTheaterIds.has(rehearsal.theaterId)) continue;
+    if (!nextIds.has(rehearsal.id) && !ledger.has(rehearsal.id)) {
+      removed.push(rehearsal.id);
+    }
+  }
+  return removed;
+}
+
 function mergeStateForSave(
   clientState: AppState,
   dbState: AppState,
@@ -154,6 +176,17 @@ export function saveStateForUser(
   const mergedForCheck = mergeStateForSave(clientState, dbState, editableIds, accessibleIds);
   if (wouldLoseUserData(mergedForCheck, dbState)) {
     throw new Error('WOULD_LOSE_USER_DATA');
+  }
+
+  const deletionLedger = new Set(clientState.appMeta?.rehearsalDeletionIds ?? []);
+  const removedWithoutLedger = rehearsalIdsRemovedWithoutLedger(
+    mergedForCheck,
+    dbState,
+    editableIds,
+    deletionLedger
+  );
+  if (removedWithoutLedger.length > 0) {
+    throw new Error('STALE_CLIENT_STATE');
   }
 
   validateSubscriptionLimits(

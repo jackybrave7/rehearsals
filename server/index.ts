@@ -168,7 +168,7 @@ app.put('/api/state', (req, res) => {
     const status =
       message === 'FORBIDDEN'
         ? 403
-        : message === 'WOULD_LOSE_USER_DATA'
+        : message === 'WOULD_LOSE_USER_DATA' || message === 'STALE_CLIENT_STATE'
           ? 409
           : message === 'SUBSCRIPTION_THEATER_LIMIT' || message === 'SUBSCRIPTION_PLAY_LIMIT'
             ? 402

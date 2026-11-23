@@ -344,6 +344,8 @@ export interface AppState {
     filesMigratedVersion?: string;
     /** Отмечено при экспорте плана (ics / Google / Telegram) для чеклиста настройки */
     guideOnboardingPlanSent?: boolean;
+    /** Явно удалённые репетиции — чтобы устаревшая вкладка не затёрла сервер */
+    rehearsalDeletionIds?: string[];
   };
 }
 
