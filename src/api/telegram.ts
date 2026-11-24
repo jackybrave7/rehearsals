@@ -1,4 +1,5 @@
 import { API_BASE } from './apiBase';
+import { formatFetchError } from './formatFetchError';
 
 export interface TelegramStatus {
   configured: boolean;
@@ -10,9 +11,17 @@ export interface TelegramStatus {
   reminderWindowMinutes: number;
 }
 
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    throw new Error(formatFetchError(error));
+  }
+}
+
 export async function fetchTelegramStatus(theaterId: string): Promise<TelegramStatus> {
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `${API_BASE}/telegram/config?theaterId=${encodeURIComponent(theaterId)}`,
       { credentials: 'include' }
     );
@@ -28,7 +37,8 @@ export async function fetchTelegramStatus(theaterId: string): Promise<TelegramSt
       };
     }
     return response.json() as Promise<TelegramStatus>;
-  } catch {
+  } catch (error) {
+    console.warn('[telegram] status fetch failed', error);
     return {
       configured: false,
       botConfigured: false,
@@ -62,7 +72,7 @@ export async function fetchTelegramGroupChats(
   const params = new URLSearchParams({ theaterId });
   if (options?.refresh) params.set('refresh', '1');
 
-  const response = await fetch(`${API_BASE}/telegram/group-chats?${params}`, {
+  const response = await apiFetch(`${API_BASE}/telegram/group-chats?${params}`, {
     credentials: 'include',
   });
 
@@ -76,7 +86,7 @@ export async function fetchTelegramGroupChats(
 }
 
 export async function sendTelegramHtmlMessage(theaterId: string, html: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/telegram/send`, {
+  const response = await apiFetch(`${API_BASE}/telegram/send`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -90,7 +100,7 @@ export async function sendTelegramHtmlMessage(theaterId: string, html: string): 
 }
 
 export async function sendTelegramTestMessage(theaterId: string, chatId?: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/telegram/test`, {
+  const response = await apiFetch(`${API_BASE}/telegram/test`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

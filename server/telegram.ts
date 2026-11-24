@@ -186,7 +186,12 @@ function formatTelegramApiError(body: string): string {
     const data = JSON.parse(body) as { description?: string };
     const description = data.description ?? '';
     if (description.includes('chat not found')) {
-      return 'Чат не найден: добавьте бота в группу, напишите в чат и скопируйте актуальный chat.id из getUpdates (у супергрупп id начинается с -100).';
+      return [
+        'Чат не найден для этого бота: номер устарел или не от той группы.',
+        'Напишите в группе /chatid или нажмите «Подтянуть чаты» в настройках и выберите нужную группу.',
+        'После смены обычной группы на супергруппу Chat ID меняется (начинается с -100) — бот присылает новый автоматически.',
+        'Отправка идёт с сервера rehears.ru; VPN на вашем компьютере на это не влияет.',
+      ].join(' ');
     }
     if (description.includes('bot was kicked') || description.includes('bot is not a member')) {
       return 'Бот не в группе или был удалён — добавьте @rehears_bot снова и дайте право писать сообщения.';

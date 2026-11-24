@@ -1,6 +1,6 @@
 import { Check, Palette, Sparkles, Drama, AlertTriangle, LogOut, Clock, Bell, BarChart3, Send, Building2, Settings2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDesign, type AppDesign } from '../store/DesignContext';
 import { useRehearsalStore } from '../store/RehearsalContext';
 import { useAuth } from '../store/AuthContext';
@@ -22,6 +22,7 @@ import {
   type TelegramGroupChat,
   type TelegramStatus,
 } from '../api/telegram';
+import { formatFetchError } from '../api/formatFetchError';
 import {
   DEFAULT_THEATER_REMINDER_SETTINGS,
   REMINDER_TYPE_LABELS,
@@ -86,6 +87,8 @@ export function SettingsPage() {
   const [telegramChatInput, setTelegramChatInput] = useState('');
   const [telegramTestPending, setTelegramTestPending] = useState(false);
   const [telegramTestMessage, setTelegramTestMessage] = useState<string | null>(null);
+  const [telegramChatVerified, setTelegramChatVerified] = useState(false);
+  const verifiedTelegramChatIdRef = useRef<string | null>(null);
   const [telegramGroupChats, setTelegramGroupChats] = useState<TelegramGroupChat[]>([]);
   const [telegramGroupChatsPending, setTelegramGroupChatsPending] = useState(false);
   const [telegramGroupChatsError, setTelegramGroupChatsError] = useState<string | null>(null);
@@ -105,6 +108,15 @@ export function SettingsPage() {
   useEffect(() => {
     setTelegramChatInput(activeTheater?.telegramChatId ?? '');
   }, [activeTheater?.id, activeTheater?.telegramChatId]);
+
+  useEffect(() => {
+    const saved = activeTheater?.telegramChatId?.trim() || null;
+    if (saved && saved === verifiedTelegramChatIdRef.current) {
+      setTelegramChatVerified(true);
+    } else if (telegramChatInput.trim() !== verifiedTelegramChatIdRef.current) {
+      setTelegramChatVerified(false);
+    }
+  }, [activeTheater?.telegramChatId, telegramChatInput]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -206,9 +218,14 @@ export function SettingsPage() {
         type: 'UPDATE_THEATER',
         payload: { ...activeTheater, telegramChatId: chatId },
       });
+      verifiedTelegramChatIdRef.current = chatId;
+      setTelegramChatVerified(true);
       setTelegramTestMessage('Тестовое сообщение отправлено в группу');
+      void fetchTelegramStatus(state.activeTheaterId).then(setTelegramStatus);
     } catch (error) {
-      setTelegramTestMessage(error instanceof Error ? error.message : 'Не удалось отправить');
+      setTelegramChatVerified(false);
+      verifiedTelegramChatIdRef.current = null;
+      setTelegramTestMessage(formatFetchError(error));
     } finally {
       setTelegramTestPending(false);
     }
@@ -228,16 +245,22 @@ export function SettingsPage() {
       }
     } catch (error) {
       setTelegramGroupChats([]);
-      setTelegramGroupChatsError(error instanceof Error ? error.message : 'Не удалось получить чаты');
+      setTelegramGroupChatsError(formatFetchError(error));
     } finally {
       setTelegramGroupChatsPending(false);
     }
   };
 
   const pickTelegramGroupChat = (chat: TelegramGroupChat) => {
+    if (!activeTheater || readOnly) return;
     setTelegramChatInput(chat.id);
-    setTelegramTestMessage(`Выбран: ${chat.title}`);
-    window.setTimeout(() => setTelegramTestMessage(null), 2500);
+    setTelegramChatVerified(false);
+    verifiedTelegramChatIdRef.current = null;
+    dispatch({
+      type: 'UPDATE_THEATER',
+      payload: { ...activeTheater, telegramChatId: chat.id },
+    });
+    setTelegramTestMessage(`Выбран «${chat.title}» — нажмите «Проверить»`);
   };
 
   const updateTheaterTimezone = (timezone: string) => {
@@ -689,18 +712,25 @@ export function SettingsPage() {
                     ))}
                   </ul>
                 ) : null}
-                {telegramGroupChatsError ? (
-                  <p className="text-sm text-amber-200">{telegramGroupChatsError}</p>
-                ) : null}
-                {telegramStatus.chatConfigured ? (
-                  <p className="text-sm text-emerald-300/90">Чат подключён — можно отправлять напоминания</p>
+                {telegramChatVerified ? (
+                  <p className="text-sm text-emerald-300/90">
+                    Чат проверен — можно отправлять план из карточки репетиции в эту группу.
+                  </p>
+                ) : telegramStatus.chatConfigured ? (
+                  <p className="text-sm text-muted">
+                    Chat ID сохранён, но группа ещё не проверена. Нажмите «Проверить» — без успешного теста
+                    отправка не дойдёт до Telegram.
+                  </p>
                 ) : (
                   <p className="text-sm text-muted">Укажите Chat ID и нажмите «Проверить»</p>
                 )}
+                {telegramGroupChatsError ? (
+                  <p className="text-sm text-amber-200">{telegramGroupChatsError}</p>
+                ) : null}
                 {telegramTestMessage ? (
                   <p
                     className={`text-sm ${
-                      telegramTestMessage.includes('отправлено')
+                      telegramTestMessage.includes('отправлено') || telegramTestMessage.includes('сохранён')
                         ? 'text-gold-light'
                         : 'text-amber-200'
                     }`}
