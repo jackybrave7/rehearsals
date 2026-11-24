@@ -25,7 +25,8 @@ import {
 } from './onboardingDripRules.js';
 import { getRegistrationMode, isRegistrationApproved } from './platformSettings.js';
 import { isPlatformAdminEmail, requirePlatformAdmin } from './platformAdmin.js';
-import { createDripDelivery, getDripChainEngagementStats } from './dripEmailTracking.js';
+import { createDripDelivery, getDripChainEngagementStats, listDripStepDeliveries } from './dripEmailTracking.js';
+import { getOnboardingDripDiagnostics } from './onboardingDripDiagnostics.js';
 
 const BATCH_SIZE = 30;
 
@@ -161,8 +162,13 @@ export async function processOnboardingDripBatch(): Promise<{ sent: number }> {
 
   const users = db
     .prepare(
-      `SELECT id, email, name, created_at, email_verified_at
-       FROM users ORDER BY created_at ASC LIMIT 500`
+      `SELECT u.id, u.email, u.name, u.created_at, u.email_verified_at
+       FROM users u
+       WHERE u.email_verified_at IS NOT NULL
+       ORDER BY
+         (SELECT COUNT(*) FROM email_drip_sent ds WHERE ds.user_id = u.id) ASC,
+         u.created_at DESC
+       LIMIT 500`
     )
     .all() as Array<{
     id: string;
@@ -290,6 +296,7 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
       },
       stats: { totalSent: countDripEmailsSent(db) },
       engagement: getDripChainEngagementStats(db),
+      diagnostics: getOnboardingDripDiagnostics(db),
     });
   });
 
@@ -369,6 +376,34 @@ export function registerOnboardingDripAdminRoutes(app: Express): void {
       return;
     }
     res.status(201).json({ step: serializeStep(step) });
+  });
+
+  app.get('/api/admin/onboarding-drip/steps/:id/engagement', (req, res) => {
+    if (!requirePlatformAdmin(req, res)) return;
+    const db = getDb();
+    const step = listEmailDripSteps(db).find((item) => item.id === req.params.id);
+    if (!step) {
+      res.status(404).json({ error: 'NOT_FOUND' });
+      return;
+    }
+    const deliveries = listDripStepDeliveries(step.id, db);
+    const opened = deliveries.filter((item) => item.openCount > 0).length;
+    const clicked = deliveries.filter((item) => item.clickCount > 0).length;
+    res.json({
+      stepId: step.id,
+      stepTitle: step.title,
+      subject: step.subject,
+      stats: {
+        deliveries: deliveries.length,
+        openedCount: opened,
+        clickedCount: clicked,
+        openRatePercent:
+          deliveries.length > 0 ? Math.round((opened / deliveries.length) * 1000) / 10 : 0,
+        clickRatePercent:
+          deliveries.length > 0 ? Math.round((clicked / deliveries.length) * 1000) / 10 : 0,
+      },
+      deliveries,
+    });
   });
 
   app.post('/api/admin/onboarding-drip/test-send', async (req, res) => {

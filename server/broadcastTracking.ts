@@ -302,18 +302,42 @@ export function listBroadcastRecipientEngagement(
   }));
 }
 
+export interface TrackedEmailOpenEvent {
+  openedAt: string;
+  userAgent: string | null;
+}
+
 export interface UserBroadcastEngagement {
   broadcastId: string;
+  recipientId: string;
   subject: string;
   broadcastAt: string;
   deliveryStatus: 'sent' | 'failed' | 'pending';
   deliveryError: string | null;
   sentAt: string | null;
   openedAt: string | null;
+  lastOpenedAt: string | null;
   openCount: number;
   clickedAt: string | null;
   clickCount: number;
-  clicks: Array<{ url: string; clickedAt: string }>;
+  opens: TrackedEmailOpenEvent[];
+  clicks: Array<{ url: string; clickedAt: string; userAgent: string | null }>;
+}
+
+function listBroadcastOpenEvents(
+  recipientId: string,
+  db: AppDatabase
+): TrackedEmailOpenEvent[] {
+  return (
+    db
+      .prepare(
+        `SELECT opened_at, user_agent FROM email_broadcast_opens WHERE recipient_id = ? ORDER BY opened_at DESC`
+      )
+      .all(recipientId) as Array<{ opened_at: string; user_agent: string | null }>
+  ).map((row) => ({
+    openedAt: row.opened_at,
+    userAgent: row.user_agent,
+  }));
 }
 
 export function listUserBroadcastEngagement(
@@ -345,25 +369,35 @@ export function listUserBroadcastEngagement(
   }>;
 
   const clickStmt = db.prepare(
-    `SELECT url, clicked_at FROM email_broadcast_clicks WHERE recipient_id = ? ORDER BY clicked_at DESC`
+    `SELECT url, clicked_at, user_agent FROM email_broadcast_clicks WHERE recipient_id = ? ORDER BY clicked_at DESC`
   );
 
-  return rows.map((row) => ({
-    broadcastId: row.broadcast_id,
-    subject: row.subject,
-    broadcastAt: row.broadcast_at,
-    deliveryStatus: row.delivery_status as UserBroadcastEngagement['deliveryStatus'],
-    deliveryError: row.delivery_error,
-    sentAt: row.sent_at,
-    openedAt: row.opened_at,
-    openCount: row.open_count,
-    clickedAt: row.clicked_at,
-    clickCount: row.click_count,
-    clicks: (clickStmt.all(row.id) as Array<{ url: string; clicked_at: string }>).map((click) => ({
-      url: click.url,
-      clickedAt: click.clicked_at,
-    })),
-  }));
+  return rows.map((row) => {
+    const opens = listBroadcastOpenEvents(row.id, db);
+    const lastOpenedAt = opens[0]?.openedAt ?? row.opened_at;
+    return {
+      broadcastId: row.broadcast_id,
+      recipientId: row.id,
+      subject: row.subject,
+      broadcastAt: row.broadcast_at,
+      deliveryStatus: row.delivery_status as UserBroadcastEngagement['deliveryStatus'],
+      deliveryError: row.delivery_error,
+      sentAt: row.sent_at,
+      openedAt: row.opened_at,
+      lastOpenedAt,
+      openCount: row.open_count,
+      clickedAt: row.clicked_at,
+      clickCount: row.click_count,
+      opens,
+      clicks: (
+        clickStmt.all(row.id) as Array<{ url: string; clicked_at: string; user_agent: string | null }>
+      ).map((click) => ({
+        url: click.url,
+        clickedAt: click.clicked_at,
+        userAgent: click.user_agent,
+      })),
+    };
+  });
 }
 
 export function registerBroadcastTrackingRoutes(app: Express): void {

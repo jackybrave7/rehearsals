@@ -12,8 +12,6 @@ import {
   Users,
   HardDrive,
   Mail,
-  MousePointerClick,
-  Eye,
 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner, StatCard, formatBytes } from '../components/admin/adminUi';
@@ -25,6 +23,11 @@ import { formatAdminSubscriptionLabel } from '../utils/subscription';
 import { useAuth } from '../store/AuthContext';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
 import { Button } from '../components/Button';
+import {
+  AdminTrackedEmailEngagementModal,
+  TrackedEmailEngagementBadges,
+  type TrackedEmailEngagementItem,
+} from '../components/admin/AdminTrackedEmailEngagement';
 
 function authLabel(detail: AdminUserDetail): string {
   const methods: string[] = [];
@@ -54,6 +57,7 @@ export function AdminUserDetailPage() {
     'unlimited'
   );
   const [proCustomDate, setProCustomDate] = useState('');
+  const [emailEngagementModal, setEmailEngagementModal] = useState<TrackedEmailEngagementItem | null>(null);
   const isSelf = Boolean(userId && currentUser?.id === userId);
 
   const load = useCallback(async () => {
@@ -91,20 +95,7 @@ export function AdminUserDetailPage() {
 
   const emailHistory = useMemo(() => {
     if (!detail) return [];
-    type Row = {
-      key: string;
-      kind: 'broadcast' | 'drip';
-      at: string;
-      subject: string;
-      stepTitle?: string;
-      deliveryStatus: 'sent' | 'failed' | 'pending';
-      deliveryError: string | null;
-      openCount: number;
-      openedAt: string | null;
-      clickCount: number;
-      clickedAt: string | null;
-      clicks: Array<{ url: string; clickedAt: string }>;
-    };
+    type Row = TrackedEmailEngagementItem & { key: string; at: string };
     const rows: Row[] = [];
 
     for (const item of detail.broadcastEngagement ?? []) {
@@ -115,11 +106,14 @@ export function AdminUserDetailPage() {
         subject: item.subject,
         deliveryStatus: item.deliveryStatus,
         deliveryError: item.deliveryError,
+        sentAt: item.sentAt ?? item.broadcastAt,
         openCount: item.openCount,
         openedAt: item.openedAt,
+        lastOpenedAt: item.lastOpenedAt ?? item.openedAt,
         clickCount: item.clickCount,
         clickedAt: item.clickedAt,
-        clicks: item.clicks,
+        opens: item.opens ?? [],
+        clicks: item.clicks ?? [],
       });
     }
 
@@ -132,11 +126,14 @@ export function AdminUserDetailPage() {
         stepTitle: item.stepTitle,
         deliveryStatus: 'sent',
         deliveryError: null,
+        sentAt: item.sentAt,
         openCount: item.openCount,
         openedAt: item.openedAt,
+        lastOpenedAt: item.lastOpenedAt ?? item.openedAt,
         clickCount: item.clickCount,
         clickedAt: item.clickedAt,
-        clicks: item.clicks,
+        opens: item.opens ?? [],
+        clicks: item.clicks ?? [],
       });
     }
 
@@ -491,8 +488,7 @@ export function AdminUserDetailPage() {
                       <th className="px-3 py-2 font-medium">Тип</th>
                       <th className="px-3 py-2 font-medium">Тема</th>
                       <th className="px-3 py-2 font-medium">Доставка</th>
-                      <th className="px-3 py-2 font-medium">Открыто</th>
-                      <th className="px-3 py-2 font-medium">Клики</th>
+                      <th className="px-3 py-2 font-medium">Активность</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -521,42 +517,11 @@ export function AdminUserDetailPage() {
                             <span className="text-muted">ожидание</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-sky-300">
-                          {item.openCount > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Eye size={14} />
-                              {item.openCount}
-                              {item.openedAt
-                                ? ` · ${format(parseISO(item.openedAt), 'd MMM, HH:mm', { locale: ru })}`
-                                : ''}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-amber-200">
-                          {item.clickCount > 0 ? (
-                            <span>
-                              <span className="inline-flex items-center gap-1">
-                                <MousePointerClick size={14} />
-                                {item.clickCount}
-                                {item.clickedAt
-                                  ? ` · ${format(parseISO(item.clickedAt), 'd MMM, HH:mm', { locale: ru })}`
-                                  : ''}
-                              </span>
-                              {item.clicks.length > 0 ? (
-                                <span className="mt-1 block text-xs text-muted">
-                                  {item.clicks
-                                    .slice(0, 2)
-                                    .map((click) => click.url)
-                                    .join(' · ')}
-                                  {item.clicks.length > 2 ? ` · +${item.clicks.length - 2}` : ''}
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
+                        <td className="px-3 py-2">
+                          <TrackedEmailEngagementBadges
+                            item={item}
+                            onDetails={() => setEmailEngagementModal(item)}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -732,6 +697,11 @@ export function AdminUserDetailPage() {
           </p>
         </>
       ) : null}
+      <AdminTrackedEmailEngagementModal
+        open={Boolean(emailEngagementModal)}
+        onClose={() => setEmailEngagementModal(null)}
+        item={emailEngagementModal}
+      />
     </div>
   );
 }

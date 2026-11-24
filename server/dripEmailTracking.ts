@@ -217,6 +217,24 @@ export function getDripChainEngagementStats(db: AppDatabase = getDb()): DripChai
   };
 }
 
+export interface TrackedEmailOpenEvent {
+  openedAt: string;
+  userAgent: string | null;
+}
+
+export interface DripStepDeliveryEngagement {
+  deliveryId: string;
+  userId: string;
+  email: string;
+  name: string;
+  sentAt: string;
+  openCount: number;
+  openedAt: string | null;
+  lastOpenedAt: string | null;
+  clickCount: number;
+  clickedAt: string | null;
+}
+
 export interface UserDripEngagement {
   deliveryId: string;
   stepId: string;
@@ -225,9 +243,74 @@ export interface UserDripEngagement {
   sentAt: string;
   openCount: number;
   openedAt: string | null;
+  lastOpenedAt: string | null;
   clickCount: number;
   clickedAt: string | null;
+  opens: TrackedEmailOpenEvent[];
   clicks: Array<{ url: string; clickedAt: string }>;
+}
+
+function listDripOpenEvents(
+  deliveryId: string,
+  db: AppDatabase
+): TrackedEmailOpenEvent[] {
+  return (
+    db
+      .prepare(
+        `SELECT opened_at, user_agent FROM email_drip_opens WHERE delivery_id = ? ORDER BY opened_at DESC`
+      )
+      .all(deliveryId) as Array<{ opened_at: string; user_agent: string | null }>
+  ).map((row) => ({
+    openedAt: row.opened_at,
+    userAgent: row.user_agent,
+  }));
+}
+
+export function listDripStepDeliveries(
+  stepId: string,
+  db: AppDatabase = getDb()
+): DripStepDeliveryEngagement[] {
+  const rows = db
+    .prepare(
+      `SELECT d.id, d.user_id, d.email, d.sent_at, d.open_count, d.opened_at, d.click_count, d.clicked_at,
+              COALESCE(NULLIF(trim(u.name), ''), u.email) AS name
+       FROM email_drip_deliveries d
+       JOIN users u ON u.id = d.user_id
+       WHERE d.step_id = ?
+       ORDER BY d.sent_at DESC
+       LIMIT 500`
+    )
+    .all(stepId) as Array<{
+    id: string;
+    user_id: string;
+    email: string;
+    sent_at: string;
+    open_count: number;
+    opened_at: string | null;
+    click_count: number;
+    clicked_at: string | null;
+    name: string;
+  }>;
+
+  const lastOpenStmt = db.prepare(
+    `SELECT MAX(opened_at) AS opened_at FROM email_drip_opens WHERE delivery_id = ?`
+  );
+
+  return rows.map((row) => {
+    const lastOpen = lastOpenStmt.get(row.id) as { opened_at: string | null } | undefined;
+    return {
+      deliveryId: row.id,
+      userId: row.user_id,
+      email: row.email,
+      name: row.name,
+      sentAt: row.sent_at,
+      openCount: row.open_count,
+      openedAt: row.opened_at,
+      lastOpenedAt: lastOpen?.opened_at ?? row.opened_at,
+      clickCount: row.click_count,
+      clickedAt: row.clicked_at,
+    };
+  });
 }
 
 export function listUserDripEngagement(
@@ -259,21 +342,27 @@ export function listUserDripEngagement(
     `SELECT url, clicked_at FROM email_drip_clicks WHERE delivery_id = ? ORDER BY clicked_at DESC`
   );
 
-  return rows.map((row) => ({
-    deliveryId: row.id,
-    stepId: row.step_id,
-    stepTitle: row.step_title,
-    subject: row.subject,
-    sentAt: row.sent_at,
-    openCount: row.open_count,
-    openedAt: row.opened_at,
-    clickCount: row.click_count,
-    clickedAt: row.clicked_at,
-    clicks: (clickStmt.all(row.id) as Array<{ url: string; clicked_at: string }>).map((click) => ({
-      url: click.url,
-      clickedAt: click.clicked_at,
-    })),
-  }));
+  return rows.map((row) => {
+    const opens = listDripOpenEvents(row.id, db);
+    const lastOpenedAt = opens[0]?.openedAt ?? row.opened_at;
+    return {
+      deliveryId: row.id,
+      stepId: row.step_id,
+      stepTitle: row.step_title,
+      subject: row.subject,
+      sentAt: row.sent_at,
+      openCount: row.open_count,
+      openedAt: row.opened_at,
+      lastOpenedAt,
+      clickCount: row.click_count,
+      clickedAt: row.clicked_at,
+      opens,
+      clicks: (clickStmt.all(row.id) as Array<{ url: string; clicked_at: string }>).map((click) => ({
+        url: click.url,
+        clickedAt: click.clicked_at,
+      })),
+    };
+  });
 }
 
 export function registerDripTrackingRoutes(app: Express): void {

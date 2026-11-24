@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Copy, Mail, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, ChevronDown, Copy, Mail, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { AdminErrorBanner } from '../components/admin/adminUi';
 import { Button } from '../components/Button';
@@ -11,12 +12,16 @@ import { DripFullEmailEditor } from '../components/admin/DripFullEmailEditor';
 import { dripBodyHtmlFromPlainText, plainTextFromHtml } from '../../shared/dripEmailBody';
 import { isFullDripEmailDocument, wrapFullDripEmailHtml } from '../../shared/dripEmailDocument';
 import { useConfirmDialog } from '../components/ConfirmDialogContext';
+import { appPaths } from '../navigation/appPaths';
+import { openEngagementLabel } from '../components/admin/trackedEmailEngagementUtils';
 import {
   createAdminDripStep,
   deleteAdminDripStep,
   duplicateAdminDripStep,
+  fetchAdminDripStepEngagement,
   fetchAdminOnboardingDrip,
   sendAdminDripTestEmail,
+  type DripStepEngagementDetail,
   updateAdminDripStep,
   updateAdminOnboardingDripSettings,
   type EmailDripStepDto,
@@ -126,6 +131,10 @@ export function AdminOnboardingDripPage() {
   const [form, setForm] = useState<EmailDripStepInput | null>(null);
   const [testSending, setTestSending] = useState(false);
   const [testNotice, setTestNotice] = useState<string | null>(null);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+  const [stepEngagement, setStepEngagement] = useState<DripStepEngagementDetail | null>(null);
+  const [stepEngagementLoading, setStepEngagementLoading] = useState(false);
+  const [stepEngagementError, setStepEngagementError] = useState<string | null>(null);
 
   const previewAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rehears.ru';
 
@@ -270,6 +279,26 @@ export function AdminOnboardingDripPage() {
     }
   };
 
+  const toggleStepEngagement = async (stepId: string) => {
+    if (expandedStepId === stepId) {
+      setExpandedStepId(null);
+      setStepEngagement(null);
+      setStepEngagementError(null);
+      return;
+    }
+    setExpandedStepId(stepId);
+    setStepEngagement(null);
+    setStepEngagementError(null);
+    setStepEngagementLoading(true);
+    try {
+      setStepEngagement(await fetchAdminDripStepEngagement(stepId));
+    } catch (e) {
+      setStepEngagementError(e instanceof Error ? e.message : 'Не удалось загрузить статистику');
+    } finally {
+      setStepEngagementLoading(false);
+    }
+  };
+
   const engagementByStep = useMemo(() => {
     const map = new Map<string, DripStepEngagementStats>();
     for (const row of data?.engagement.steps ?? []) {
@@ -360,6 +389,101 @@ export function AdminOnboardingDripPage() {
         </p>
       )}
 
+      {data?.diagnostics ? (
+        <section className="space-y-4 rounded-2xl border border-gold/15 bg-surface/25 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Диагностика отправки
+          </h2>
+          {!settings?.enabled ? (
+            <p className="flex gap-2 text-sm text-amber-200">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              Цепочка <strong className="font-semibold">выключена</strong> — планировщик не шлёт письма,
+              пока не включите галочку выше.
+            </p>
+          ) : null}
+          {data.diagnostics.registrationMode === 'beta' ? (
+            <p className="text-sm text-muted">
+              Режим <strong className="text-white">beta</strong>: цепочка только после подтверждения email
+              <strong className="text-white"> и</strong> одобрения регистрации в карточке пользователя.
+            </p>
+          ) : null}
+          <p className="text-sm text-muted">
+            Последнее письмо цепочки:{' '}
+            <span className="text-white">
+              {data.diagnostics.lastDeliveryAt
+                ? format(parseISO(data.diagnostics.lastDeliveryAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                : 'ещё не было'}
+            </span>
+            {' · '}
+            за 24 ч: <span className="text-white">{data.diagnostics.deliveriesLast24h}</span>
+            {' · '}
+            за 7 д: <span className="text-white">{data.diagnostics.deliveriesLast7d}</span>
+          </p>
+          <p className="text-xs text-muted">
+            Первое письмо цепочки («Попробовать на примере») — не сразу после регистрации, а через{' '}
+            <strong className="text-white/80">2 суток</strong> после подтверждения email (если шаг «театр» не
+            закрыт). Письмо-подтверждение регистрации — отдельно, при регистрации.
+          </p>
+          {data.diagnostics.recentDeliveries.length > 0 ? (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                Последние отправки
+              </p>
+              <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+                {data.diagnostics.recentDeliveries.map((row) => (
+                  <li key={`${row.sentAt}-${row.email}`} className="text-muted">
+                    <span className="text-white/90">
+                      {format(parseISO(row.sentAt), 'd MMM, HH:mm', { locale: ru })}
+                    </span>
+                    {' · '}
+                    {row.email} — {row.stepTitle}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {data.diagnostics.recentRegistrations.length > 0 ? (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                Регистрации за 3 дня
+              </p>
+              <div className="overflow-x-auto rounded-xl border border-gold/10">
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs uppercase text-muted">
+                    <tr>
+                      <th className="px-3 py-2">Email</th>
+                      <th className="px-3 py-2">Email ✓</th>
+                      <th className="px-3 py-2">Одобрение</th>
+                      <th className="px-3 py-2">Писем цепочки</th>
+                      <th className="px-3 py-2">Почему не шлём</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.diagnostics.recentRegistrations.map((row) => (
+                      <tr key={row.id} className="border-t border-gold/10">
+                        <td className="px-3 py-2">
+                          <Link to={appPaths.adminUser(row.id)} className="text-gold-light hover:underline">
+                            {row.email}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">{row.emailVerifiedAt ? 'да' : 'нет'}</td>
+                        <td className="px-3 py-2">{row.registrationApprovedAt ? 'да' : 'нет'}</td>
+                        <td className="px-3 py-2 text-white">{row.dripLettersSent}</td>
+                        <td className="px-3 py-2 text-xs text-amber-200">
+                          {row.dripBlockers.length > 0 ? row.dripBlockers.join(' · ') : 'в очереди / ждём задержку'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted">Новых регистраций за последние 3 дня не было.</p>
+          )}
+        </section>
+      ) : null}
+
       {data?.engagement && (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
@@ -421,6 +545,18 @@ export function AdminOnboardingDripPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-1">
+                <Button
+                  variant="ghost"
+                  className="!px-2"
+                  onClick={() => void toggleStepEngagement(step.id)}
+                  title="Статистика по пользователям"
+                >
+                  <ChevronDown
+                    size={16}
+                    className={expandedStepId === step.id ? 'rotate-180 transition' : 'transition'}
+                  />
+                  Получатели
+                </Button>
                 <Button variant="ghost" className="!px-2" onClick={() => void toggleEnabled(step)} title="Вкл/выкл">
                   {step.enabled ? 'Выкл' : 'Вкл'}
                 </Button>
@@ -435,6 +571,95 @@ export function AdminOnboardingDripPage() {
                 </Button>
               </div>
             </div>
+            {expandedStepId === step.id ? (
+              <div className="mt-4 border-t border-gold/10 pt-4">
+                {stepEngagementLoading ? (
+                  <p className="text-sm text-muted">Загрузка статистики…</p>
+                ) : stepEngagementError ? (
+                  <p className="text-sm text-amber-200">{stepEngagementError}</p>
+                ) : stepEngagement && stepEngagement.stepId === step.id ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted">
+                      Доставлено: <span className="text-white">{stepEngagement.stats.deliveries}</span>
+                      {' · '}
+                      открыли:{' '}
+                      <span className="text-sky-300">
+                        {stepEngagement.stats.openedCount} ({stepEngagement.stats.openRatePercent}%)
+                      </span>
+                      {' · '}
+                      кликнули:{' '}
+                      <span className="text-amber-200">
+                        {stepEngagement.stats.clickedCount} ({stepEngagement.stats.clickRatePercent}%)
+                      </span>
+                    </p>
+                    {stepEngagement.deliveries.length === 0 ? (
+                      <p className="text-sm text-muted">Ещё никому не отправлялось.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-gold/10">
+                        <table className="min-w-full text-sm">
+                          <thead className="text-left text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Пользователь</th>
+                              <th className="px-3 py-2">Отправлено</th>
+                              <th className="px-3 py-2">Открытия</th>
+                              <th className="px-3 py-2">Клики</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stepEngagement.deliveries.map((row) => {
+                              const open = openEngagementLabel(row.openCount, row.lastOpenedAt ?? row.openedAt);
+                              return (
+                                <tr key={row.deliveryId} className="border-t border-gold/10">
+                                  <td className="px-3 py-2">
+                                    <Link
+                                      to={appPaths.adminUser(row.userId)}
+                                      className="font-medium text-gold-light hover:underline"
+                                    >
+                                      {row.name}
+                                    </Link>
+                                    <span className="mt-0.5 block text-xs text-muted">{row.email}</span>
+                                  </td>
+                                  <td className="px-3 py-2 text-muted">
+                                    {format(parseISO(row.sentAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span
+                                      className={
+                                        open.tone === 'none'
+                                          ? 'text-muted'
+                                          : open.tone === 'recent'
+                                            ? 'text-sky-200'
+                                            : 'text-sky-300'
+                                      }
+                                    >
+                                      {open.text}
+                                    </span>
+                                    {row.openedAt ? (
+                                      <span className="mt-0.5 block text-xs text-muted">
+                                        с {format(parseISO(row.openedAt), 'd MMM, HH:mm', { locale: ru })}
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-3 py-2 text-amber-200">
+                                    {row.clickCount > 0
+                                      ? `${row.clickCount} · ${format(parseISO(row.clickedAt!), 'd MMM, HH:mm', {
+                                          locale: ru,
+                                        })}`
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">Нет данных.</p>
+                )}
+              </div>
+            ) : null}
           </div>
         ))}
       </section>

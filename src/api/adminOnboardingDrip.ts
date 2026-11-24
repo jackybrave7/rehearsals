@@ -52,6 +52,28 @@ export interface DripChainEngagementStats {
   steps: DripStepEngagementStats[];
 }
 
+export interface OnboardingDripDiagnostics {
+  registrationMode: 'beta' | 'normal';
+  lastDeliveryAt: string | null;
+  deliveriesLast24h: number;
+  deliveriesLast7d: number;
+  recentDeliveries: Array<{
+    sentAt: string;
+    email: string;
+    subject: string;
+    stepTitle: string;
+  }>;
+  recentRegistrations: Array<{
+    id: string;
+    email: string;
+    createdAt: string;
+    emailVerifiedAt: string | null;
+    registrationApprovedAt: string | null;
+    dripLettersSent: number;
+    dripBlockers: string[];
+  }>;
+}
+
 export interface OnboardingDripOverview {
   settings: OnboardingDripSettings;
   mailConfigured: boolean;
@@ -63,6 +85,7 @@ export interface OnboardingDripOverview {
   };
   stats: { totalSent: number };
   engagement: DripChainEngagementStats;
+  diagnostics?: OnboardingDripDiagnostics;
 }
 
 export type EmailDripStepInput = Partial<
@@ -72,6 +95,39 @@ export type EmailDripStepInput = Partial<
 
 async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${API_BASE}${path}`, { credentials: 'include', ...init });
+}
+
+export interface DripStepDeliveryRow {
+  deliveryId: string;
+  userId: string;
+  email: string;
+  name: string;
+  sentAt: string;
+  openCount: number;
+  openedAt: string | null;
+  lastOpenedAt: string | null;
+  clickCount: number;
+  clickedAt: string | null;
+}
+
+export interface DripStepEngagementDetail {
+  stepId: string;
+  stepTitle: string;
+  subject: string;
+  stats: {
+    deliveries: number;
+    openedCount: number;
+    clickedCount: number;
+    openRatePercent: number;
+    clickRatePercent: number;
+  };
+  deliveries: DripStepDeliveryRow[];
+}
+
+export async function fetchAdminDripStepEngagement(stepId: string): Promise<DripStepEngagementDetail> {
+  const response = await adminFetch(`/admin/onboarding-drip/steps/${stepId}/engagement`);
+  if (!response.ok) throw new Error(await response.text());
+  return response.json() as Promise<DripStepEngagementDetail>;
 }
 
 export async function fetchAdminOnboardingDrip(): Promise<OnboardingDripOverview> {

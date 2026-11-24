@@ -130,6 +130,11 @@ export interface AdminUserTheaterStats {
   rehearsalsUpcoming: number;
 }
 
+export interface TrackedEmailOpenEvent {
+  openedAt: string;
+  userAgent: string | null;
+}
+
 export interface UserDripEngagement {
   deliveryId: string;
   stepId: string;
@@ -138,8 +143,10 @@ export interface UserDripEngagement {
   sentAt: string;
   openCount: number;
   openedAt: string | null;
+  lastOpenedAt: string | null;
   clickCount: number;
   clickedAt: string | null;
+  opens: TrackedEmailOpenEvent[];
   clicks: Array<{ url: string; clickedAt: string }>;
 }
 
@@ -251,14 +258,17 @@ export interface BroadcastDetail extends BroadcastHistoryItem {
 
 export interface UserBroadcastEngagement {
   broadcastId: string;
+  recipientId: string;
   subject: string;
   broadcastAt: string;
   deliveryStatus: 'sent' | 'failed' | 'pending';
   deliveryError: string | null;
   sentAt: string | null;
   openedAt: string | null;
+  lastOpenedAt: string | null;
   openCount: number;
   clickedAt: string | null;
   clickCount: number;
-  clicks: Array<{ url: string; clickedAt: string }>;
+  opens: TrackedEmailOpenEvent[];
+  clicks: Array<{ url: string; clickedAt: string; userAgent: string | null }>;
 }
