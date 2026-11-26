@@ -135,6 +135,7 @@ export function AdminOnboardingDripPage() {
   const [stepEngagement, setStepEngagement] = useState<DripStepEngagementDetail | null>(null);
   const [stepEngagementLoading, setStepEngagementLoading] = useState(false);
   const [stepEngagementError, setStepEngagementError] = useState<string | null>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   const previewAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rehears.ru';
 
@@ -389,101 +390,6 @@ export function AdminOnboardingDripPage() {
         </p>
       )}
 
-      {data?.diagnostics ? (
-        <section className="space-y-4 rounded-2xl border border-gold/15 bg-surface/25 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-            Диагностика отправки
-          </h2>
-          {!settings?.enabled ? (
-            <p className="flex gap-2 text-sm text-amber-200">
-              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-              Цепочка <strong className="font-semibold">выключена</strong> — планировщик не шлёт письма,
-              пока не включите галочку выше.
-            </p>
-          ) : null}
-          {data.diagnostics.registrationMode === 'beta' ? (
-            <p className="text-sm text-muted">
-              Режим <strong className="text-white">beta</strong>: цепочка только после подтверждения email
-              <strong className="text-white"> и</strong> одобрения регистрации в карточке пользователя.
-            </p>
-          ) : null}
-          <p className="text-sm text-muted">
-            Последнее письмо цепочки:{' '}
-            <span className="text-white">
-              {data.diagnostics.lastDeliveryAt
-                ? format(parseISO(data.diagnostics.lastDeliveryAt), 'd MMM yyyy, HH:mm', { locale: ru })
-                : 'ещё не было'}
-            </span>
-            {' · '}
-            за 24 ч: <span className="text-white">{data.diagnostics.deliveriesLast24h}</span>
-            {' · '}
-            за 7 д: <span className="text-white">{data.diagnostics.deliveriesLast7d}</span>
-          </p>
-          <p className="text-xs text-muted">
-            Первое письмо цепочки («Попробовать на примере») — не сразу после регистрации, а через{' '}
-            <strong className="text-white/80">2 суток</strong> после подтверждения email (если шаг «театр» не
-            закрыт). Письмо-подтверждение регистрации — отдельно, при регистрации.
-          </p>
-          {data.diagnostics.recentDeliveries.length > 0 ? (
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-                Последние отправки
-              </p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
-                {data.diagnostics.recentDeliveries.map((row) => (
-                  <li key={`${row.sentAt}-${row.email}`} className="text-muted">
-                    <span className="text-white/90">
-                      {format(parseISO(row.sentAt), 'd MMM, HH:mm', { locale: ru })}
-                    </span>
-                    {' · '}
-                    {row.email} — {row.stepTitle}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {data.diagnostics.recentRegistrations.length > 0 ? (
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-                Регистрации за 3 дня
-              </p>
-              <div className="overflow-x-auto rounded-xl border border-gold/10">
-                <table className="min-w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-muted">
-                    <tr>
-                      <th className="px-3 py-2">Email</th>
-                      <th className="px-3 py-2">Email ✓</th>
-                      <th className="px-3 py-2">Одобрение</th>
-                      <th className="px-3 py-2">Писем цепочки</th>
-                      <th className="px-3 py-2">Почему не шлём</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.diagnostics.recentRegistrations.map((row) => (
-                      <tr key={row.id} className="border-t border-gold/10">
-                        <td className="px-3 py-2">
-                          <Link to={appPaths.adminUser(row.id)} className="text-gold-light hover:underline">
-                            {row.email}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2">{row.emailVerifiedAt ? 'да' : 'нет'}</td>
-                        <td className="px-3 py-2">{row.registrationApprovedAt ? 'да' : 'нет'}</td>
-                        <td className="px-3 py-2 text-white">{row.dripLettersSent}</td>
-                        <td className="px-3 py-2 text-xs text-amber-200">
-                          {row.dripBlockers.length > 0 ? row.dripBlockers.join(' · ') : 'в очереди / ждём задержку'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted">Новых регистраций за последние 3 дня не было.</p>
-          )}
-        </section>
-      ) : null}
-
       {data?.engagement && (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-gold/15 bg-surface/30 p-4">
@@ -663,6 +569,147 @@ export function AdminOnboardingDripPage() {
           </div>
         ))}
       </section>
+
+      {data?.diagnostics ? (
+        <section className="overflow-hidden rounded-2xl border border-gold/15 bg-surface/25">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-gold/5"
+            onClick={() => setDiagnosticsOpen((open) => !open)}
+            aria-expanded={diagnosticsOpen}
+          >
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                Диагностика отправки
+              </h2>
+              {!diagnosticsOpen ? (
+                <p className="mt-1 truncate text-sm text-muted">
+                  Последнее:{' '}
+                  <span className="text-white/90">
+                    {data.diagnostics.lastDeliveryAt
+                      ? format(parseISO(data.diagnostics.lastDeliveryAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                      : 'ещё не было'}
+                  </span>
+                  {' · '}
+                  24 ч: {data.diagnostics.deliveriesLast24h} · 7 д: {data.diagnostics.deliveriesLast7d}
+                  {data.diagnostics.recentRegistrations.length > 0
+                    ? ` · регистраций (3 д): ${data.diagnostics.recentRegistrations.length}`
+                    : ''}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted">Свернуть</p>
+              )}
+            </div>
+            <ChevronDown
+              size={20}
+              className={`shrink-0 text-gold/80 transition ${diagnosticsOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {diagnosticsOpen ? (
+            <div className="space-y-4 border-t border-gold/10 p-4 sm:p-5">
+              {!settings?.enabled ? (
+                <p className="flex gap-2 text-sm text-amber-200">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                  Цепочка <strong className="font-semibold">выключена</strong> — планировщик не шлёт письма.
+                </p>
+              ) : null}
+              {data.diagnostics.registrationMode === 'beta' ? (
+                <p className="text-sm text-muted">
+                  Режим <strong className="text-white">beta</strong>: после подтверждения email
+                  <strong className="text-white"> и</strong> одобрения регистрации.
+                </p>
+              ) : null}
+              <p className="text-sm text-muted">
+                Последнее письмо:{' '}
+                <span className="text-white">
+                  {data.diagnostics.lastDeliveryAt
+                    ? format(parseISO(data.diagnostics.lastDeliveryAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                    : 'ещё не было'}
+                </span>
+                {' · '}
+                за 24 ч: <span className="text-white">{data.diagnostics.deliveriesLast24h}</span>
+                {' · '}
+                за 7 д: <span className="text-white">{data.diagnostics.deliveriesLast7d}</span>
+              </p>
+              <p className="text-xs leading-relaxed text-muted">
+                Первое письмо цепочки — через <strong className="text-white/80">2 суток</strong> после
+                подтверждения email. Подтверждение регистрации — отдельное письмо при регистрации.
+              </p>
+
+              {data.diagnostics.recentDeliveries.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                    Последние отправки
+                  </p>
+                  <ul className="max-h-36 space-y-1.5 overflow-y-auto text-sm">
+                    {data.diagnostics.recentDeliveries.map((row) => (
+                      <li key={`${row.sentAt}-${row.email}`} className="break-words text-muted">
+                        <span className="whitespace-nowrap text-white/90">
+                          {format(parseISO(row.sentAt), 'd MMM, HH:mm', { locale: ru })}
+                        </span>
+                        <span className="mx-1">·</span>
+                        <span className="text-white/75">{row.email}</span>
+                        <span className="mx-1">—</span>
+                        {row.stepTitle}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                  Регистрации за 3 дня
+                </p>
+                {data.diagnostics.recentRegistrations.length > 0 ? (
+                  <div className="-mx-1 overflow-x-auto rounded-xl border border-gold/10">
+                    <table className="min-w-[36rem] w-full text-sm">
+                      <thead className="text-left text-[0.65rem] uppercase tracking-wide text-muted">
+                        <tr>
+                          <th className="px-3 py-2 font-medium">Email</th>
+                          <th className="px-2 py-2 font-medium">✓</th>
+                          <th className="px-2 py-2 font-medium">Одобр.</th>
+                          <th className="px-2 py-2 font-medium">Цепочка</th>
+                          <th className="min-w-[10rem] px-3 py-2 font-medium">Статус</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.diagnostics.recentRegistrations.map((row) => (
+                          <tr key={row.id} className="border-t border-gold/10">
+                            <td className="max-w-[12rem] px-3 py-2">
+                              <Link
+                                to={appPaths.adminUser(row.id)}
+                                className="break-all text-gold-light hover:underline"
+                              >
+                                {row.email}
+                              </Link>
+                            </td>
+                            <td className="px-2 py-2 text-center text-muted">
+                              {row.emailVerifiedAt ? 'да' : 'нет'}
+                            </td>
+                            <td className="px-2 py-2 text-center text-muted">
+                              {row.registrationApprovedAt ? 'да' : 'нет'}
+                            </td>
+                            <td className="px-2 py-2 text-center text-white">{row.dripLettersSent}</td>
+                            <td className="px-3 py-2 text-xs leading-snug text-amber-200">
+                              {row.dripBlockers.length > 0
+                                ? row.dripBlockers.join(' · ')
+                                : 'в очереди / ждём задержку'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">Новых регистраций за последние 3 дня не было.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {form && meta && (
         <Modal

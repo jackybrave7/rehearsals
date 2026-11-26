@@ -54,19 +54,25 @@ export function OutcomeGalleryLightbox({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [index, items.length, onClose]);
 
+  const chromeBtn =
+    'pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white shadow-lg backdrop-blur-sm transition hover:bg-black';
+
   const content = (
-    <div
-      className="fixed inset-0 z-[200] bg-black/90"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      {/* Медиа строго по центру viewport */}
+    <div className="fixed inset-0 z-[200]" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/90"
+        aria-label="Закрыть просмотр"
+        onClick={onClose}
+      />
+
       <div
-        className="absolute inset-0 flex items-center justify-center px-14 py-16 sm:px-20"
-        onClick={(event) => event.stopPropagation()}
+        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-14 py-16 sm:px-20"
       >
-        <div className="flex max-h-full max-w-full items-center justify-center">
+        <div
+          className="pointer-events-auto flex max-h-full max-w-full items-center justify-center"
+          onClick={(event) => event.stopPropagation()}
+        >
           {item.kind === 'photo' ? (
             <img
               src={item.url}
@@ -79,54 +85,53 @@ export function OutcomeGalleryLightbox({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="absolute right-3 top-3 z-10 rounded-full bg-black/70 p-2.5 text-white hover:bg-black sm:right-4 sm:top-4"
-        onClick={(event) => {
-          event.stopPropagation();
-          onClose();
-        }}
-        aria-label="Закрыть"
-      >
-        <X size={22} />
-      </button>
+      <div className="pointer-events-none absolute inset-0 z-20">
+        <button
+          type="button"
+          className={`${chromeBtn} absolute right-3 top-3 sm:right-4 sm:top-4`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
+          aria-label="Закрыть"
+        >
+          <X size={22} color="#ffffff" strokeWidth={2.25} />
+        </button>
 
-      {items.length > 1 && (
-        <>
-          <button
-            type="button"
-            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black sm:left-3"
-            onClick={(event) => {
-              event.stopPropagation();
-              showPrev();
-            }}
-            aria-label="Предыдущее"
-          >
-            <ChevronLeft size={26} />
-          </button>
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black sm:right-3"
-            onClick={(event) => {
-              event.stopPropagation();
-              showNext();
-            }}
-            aria-label="Следующее"
-          >
-            <ChevronRight size={26} />
-          </button>
-        </>
-      )}
+        {items.length > 1 && (
+          <>
+            <button
+              type="button"
+              className={`${chromeBtn} absolute left-2 top-1/2 -translate-y-1/2 sm:left-4`}
+              onClick={(event) => {
+                event.stopPropagation();
+                showPrev();
+              }}
+              aria-label="Предыдущее"
+            >
+              <ChevronLeft size={26} color="#ffffff" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              className={`${chromeBtn} absolute right-2 top-1/2 -translate-y-1/2 sm:right-4`}
+              onClick={(event) => {
+                event.stopPropagation();
+                showNext();
+              }}
+              aria-label="Следующее"
+            >
+              <ChevronRight size={26} color="#ffffff" strokeWidth={2.25} />
+            </button>
+          </>
+        )}
 
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-3 px-4 pb-4 pt-8"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {footer && <div className="pointer-events-auto">{footer}</div>}
-        <p className="rounded-full bg-black/70 px-3 py-1 text-xs text-white/90">
-          {index + 1} / {items.length}
-          {item.kind === 'video' ? ' · видео' : ' · фото'}
-        </p>
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-4 pb-4 pt-8">
+          {footer && <div className="pointer-events-auto">{footer}</div>}
+          <p className="rounded-full border border-white/20 bg-black/80 px-3 py-1 text-xs text-white shadow-lg backdrop-blur-sm">
+            {index + 1} / {items.length}
+            {item.kind === 'video' ? ' · видео' : ' · фото'}
+          </p>
+        </div>
       </div>
     </div>
   );

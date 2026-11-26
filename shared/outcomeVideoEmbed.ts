@@ -104,7 +104,7 @@ function parseVimeo(parsed: URL): EmbeddableVideo | null {
     provider: 'vimeo',
     canonicalUrl,
     embedUrl: `https://player.vimeo.com/video/${videoId}`,
-    thumbnailUrl: null,
+    thumbnailUrl: `https://vumbnail.com/${videoId}.jpg`,
   };
 }
 
@@ -128,8 +128,17 @@ function parseKinescope(parsed: URL): EmbeddableVideo | null {
     provider: 'kinescope',
     canonicalUrl,
     embedUrl: `https://kinescope.io/embed/${videoId}`,
-    thumbnailUrl: null,
+    thumbnailUrl: `https://kinescope.io/${videoId}/poster/sm.webp`,
   };
+}
+
+/** Варианты постера (webp → jpg), если первая ссылка не открылась. */
+export function kinescopePosterCandidates(videoId: string): string[] {
+  return [
+    `https://kinescope.io/${videoId}/poster/sm.webp`,
+    `https://kinescope.io/${videoId}/poster/sm.jpg`,
+    `https://kinescope.io/${videoId}/poster.jpg`,
+  ];
 }
 
 function parseVk(parsed: URL): EmbeddableVideo | null {
@@ -188,6 +197,18 @@ export function outcomeVideoEmbedUrl(url: string): string | null {
 
 export function outcomeVideoThumbnailUrl(url: string): string | null {
   return parseEmbeddableVideoLink(url)?.thumbnailUrl ?? null;
+}
+
+/** Все кандидаты превью по убыванию предпочтения (для onError-цепочки). */
+export function outcomeVideoThumbnailCandidates(url: string): string[] {
+  const parsed = parseEmbeddableVideoLink(url);
+  if (!parsed) return [];
+  if (parsed.provider === 'kinescope') {
+    const videoId = parsed.canonicalUrl.replace(/^https:\/\/kinescope\.io\//, '');
+    return kinescopePosterCandidates(videoId);
+  }
+  if (parsed.thumbnailUrl) return [parsed.thumbnailUrl];
+  return [];
 }
 
 export function outcomeVideoProviderLabel(url: string): string | null {

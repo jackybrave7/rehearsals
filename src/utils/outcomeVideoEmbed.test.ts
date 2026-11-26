@@ -30,6 +30,7 @@ describe('parseEmbeddableVideoLink', () => {
     assert.equal(watch?.provider, 'kinescope');
     assert.equal(watch?.canonicalUrl, 'https://kinescope.io/202589431');
     assert.equal(watch?.embedUrl, 'https://kinescope.io/embed/202589431');
+    assert.match(watch?.thumbnailUrl ?? '', /kinescope\.io\/202589431\/poster\/sm\.webp/);
 
     const embed = parseEmbeddableVideoLink('https://kinescope.io/embed/202589431?autoplay=0');
     assert.equal(embed?.canonicalUrl, 'https://kinescope.io/202589431');
